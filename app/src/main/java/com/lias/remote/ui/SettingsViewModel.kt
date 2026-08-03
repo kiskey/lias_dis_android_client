@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Fixed testConnection() to use HealthResponse instead of DeviceListResponse.
+//   1. Added `flushNftables()` function to support Danger Zone UI.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -23,7 +23,8 @@ data class SettingsUiState(
     val serverUrl: String = "",
     val authToken: String = "",
     val isTesting: Boolean = false,
-    val testResult: String? = null
+    val testResult: String? = null,
+    val isFlushing: Boolean = false // FIX 3.2: Added state for flush loading
 )
 
 class SettingsViewModel(
@@ -59,14 +60,12 @@ class SettingsViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isTesting = true, testResult = null)
             
-            // Temporarily apply settings to API client
             val tempUrl = _uiState.value.serverUrl
             val tempToken = _uiState.value.authToken.ifBlank { null }
             
             api.baseUrl = tempUrl
             api.authToken = tempToken
 
-            // FIX 3.1: Use HealthResponse instead of DeviceListResponse
             val result = api.get<HealthResponse>(Endpoints.HEALTH)
             
             _uiState.value = _uiState.value.copy(
@@ -85,6 +84,23 @@ class SettingsViewModel(
         viewModelScope.launch {
             settings.saveServerUrl(_uiState.value.serverUrl)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
+        }
+    }
+
+    // FIX 3.2: Implemented flushNftables
+    fun flushNftables() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFlushing = true)
+            val result = api.post<Unit, Unit>(Endpoints.NFTABLES_FLUSH, Unit)
+            _uiState.value = _uiState.value.copy(
+                isFlushing = false,
+                testResult = when (result) {
+                    is ApiResult.Success -> "Nftables table flushed successfully."
+                    is ApiResult.HttpError -> "Flush failed: HTTP ${result.code}"
+                    is ApiResult.NetworkError -> "Flush failed: ${result.cause.message}"
+                    is ApiResult.Conflict -> "Conflict"
+                }
+            )
         }
     }
 }
