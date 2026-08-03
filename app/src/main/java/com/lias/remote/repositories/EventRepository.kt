@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.0.0
-// Purpose: Aggregates REST initial loads and SSE real-time deltas
-//          into a single StateFlow<UiState>. Handles connection lifecycle.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Added missing `async` and `coroutineScope` imports.
+//   2. Changed `_state`, `api`, and `refreshAll()` from `private` to `internal` 
+//      to allow EventRepositoryActions.kt extension functions access.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -13,33 +15,32 @@ import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.ConnectionState
+import com.lias.remote.core.network.DeviceListResponse
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.EventConstants
 import com.lias.remote.core.network.LiasApiClient
 import com.lias.remote.core.network.LiasSseClient
-import com.lias.remote.core.network.DeviceListResponse
 import com.lias.remote.core.store.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 class EventRepository(
-    private val api: LiasApiClient,
+    internal val api: LiasApiClient, // Changed to internal
     private val sse: LiasSseClient,
     private val settings: SettingsRepository
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    private val _state = MutableStateFlow(UiState())
+    internal val _state = MutableStateFlow(UiState()) // Changed to internal
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
         scope.launch {
@@ -71,7 +72,7 @@ class EventRepository(
         }
     }
 
-    suspend fun refreshAll() {
+    internal suspend fun refreshAll() { // Changed to internal
         coroutineScope {
             val devs = async { api.get<DeviceListResponse>(Endpoints.DEVICES) }
             val tags = async { api.get<List<Tag>>(Endpoints.TAGS) }
