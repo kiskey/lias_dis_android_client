@@ -1,13 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Moved misplaced `import androidx.compose.foundation.layout.Spacer` from the 
-//      bottom of the file to the correct import block at the top.
+//   1. Replaced unsafe OutlinedTextField time inputs with a native Material 3 
+//      TimePicker dialog to guarantee strict HH:MM format compliance.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -24,18 +24,23 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 
@@ -123,23 +128,81 @@ fun ScheduleEditorSheet(
                                 )
                             }
                         }
+                        
                         Spacer(modifier = Modifier.size(12.dp))
+                        
+                        // FIX 3.4: Native TimePicker implementation
+                        var showStartPicker by remember { mutableStateOf(false) }
+                        var showEndPicker by remember { mutableStateOf(false) }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedTextField(
-                                value = rule.startTime,
-                                onValueChange = { rules[index] = rule.copy(startTime = it) },
-                                label = { Text("Start (HH:MM)") },
-                                modifier = Modifier.weight(1f)
+                            Card(
+                                modifier = Modifier.weight(1f).clickable { showStartPicker = true },
+                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Start", style = MaterialTheme.typography.labelSmall)
+                                    Text(rule.startTime, style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                            Text("to", style = MaterialTheme.typography.bodyMedium)
+                            Card(
+                                modifier = Modifier.weight(1f).clickable { showEndPicker = true },
+                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("End", style = MaterialTheme.typography.labelSmall)
+                                    Text(rule.endTime, style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                        }
+
+                        if (showStartPicker) {
+                            val parts = rule.startTime.split(":")
+                            val timeState = rememberTimePickerState(
+                                initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 0,
+                                initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
+                                is24Hour = true
                             )
-                            OutlinedTextField(
-                                value = rule.endTime,
-                                onValueChange = { rules[index] = rule.copy(endTime = it) },
-                                label = { Text("End (HH:MM)") },
-                                modifier = Modifier.weight(1f)
+                            TimePickerDialog(
+                                onConfirm = {
+                                    val h = timeState.hour.toString().padStart(2, '0')
+                                    val m = timeState.minute.toString().padStart(2, '0')
+                                    rules[index] = rule.copy(startTime = "$h:$m")
+                                    showStartPicker = false
+                                },
+                                onDismiss = { showStartPicker = false }
+                            ) {
+                                TimePicker(state = timeState)
+                            }
+                        }
+
+                        if (showEndPicker) {
+                            val parts = rule.endTime.split(":")
+                            val timeState = rememberTimePickerState(
+                                initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 0,
+                                initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
+                                is24Hour = true
                             )
+                            TimePickerDialog(
+                                onConfirm = {
+                                    val h = timeState.hour.toString().padStart(2, '0')
+                                    val m = timeState.minute.toString().padStart(2, '0')
+                                    rules[index] = rule.copy(endTime = "$h:$m")
+                                    showEndPicker = false
+                                },
+                                onDismiss = { showEndPicker = false }
+                            ) {
+                                TimePicker(state = timeState)
+                            }
                         }
                     }
                 }
@@ -158,6 +221,32 @@ fun ScheduleEditorSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Save Schedule")
+            }
+        }
+    }
+}
+
+@Composable
+fun TimePickerDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Select Time", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
+                content()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onConfirm) { Text("OK") }
+                }
             }
         }
     }
