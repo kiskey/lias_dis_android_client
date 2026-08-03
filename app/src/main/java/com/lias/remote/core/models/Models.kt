@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.0.0
-// Purpose: Core domain models mapped directly from LIAS Go shared/models.
-//          Uses @Serializable for zero-reflection JSON parsing.
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Added DeviceReidentifiedPayload model for SSE event parsing (GAP-C05).
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -101,4 +101,13 @@ data class LiasEvent(
     val timestamp: String,
     @SerialName("device_id") val deviceID: String,
     val payload: JsonElement? = null
+)
+
+// GAP-C05 Fix: Added missing payload model for device.reidentified event
+@Serializable
+data class DeviceReidentifiedPayload(
+    @SerialName("old_pdid") val oldPdid: String,
+    @SerialName("new_pdid") val newPdid: String,
+    val reason: String = "",
+    @SerialName("migrated_macs") val migratedMacs: List<String> = emptyList()
 )
