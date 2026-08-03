@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/WeeklyTimeline.kt
-// Version: 1.0.0
-// Purpose: Custom Canvas component drawing a 7-day timeline grid.
-//          Visualizes schedule rules with colored bands matching the web UI.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Rewrote Canvas drawing logic to use ScheduleProjection segments.
+//      This accurately handles overnight wrap-around drawing across midnight.
+//   2. Added `conflicts` parameter to render red hatch patterns over 
+//      overlapping contradictory windows, matching web dashboard UI parity.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -21,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,11 +32,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.util.ScheduleProjection
 
 @Composable
 fun WeeklyTimeline(
     schedules: List<Schedule>,
+    conflicts: List<Conflict> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val colors = listOf(
@@ -40,6 +47,12 @@ fun WeeklyTimeline(
         Color(0xFFAF52DE), Color(0xFF5856D6), Color(0xFF00C7BE)
     )
     val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
+    val dayNames = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
+
+    // FIX 4.1 & 4.2: Use ScheduleProjection for accurate segments
+    val allSegments = remember(schedules) {
+        schedules.flatMap { ScheduleProjection.projectSchedule(it) }
+    }
 
     Column(
         modifier = modifier
@@ -70,43 +83,43 @@ fun WeeklyTimeline(
                         val canvasHeight = size.height
                         val canvasWidth = size.width
                         
-                        schedules.forEachIndexed { schedIdx, schedule ->
-                            val color = colors[schedIdx % colors.size]
-                            
-                            schedule.rules.forEach { rule ->
-                                val ruleDays = rule.days.map { it.lowercase().take(3) }
-                                val currentDayStr = days[dayIdx].take(3).lowercase()
+                        // Draw Schedule Bands
+                        allSegments.forEach { seg ->
+                            val segDayIdx = seg.start / 1440
+                            if (segDayIdx == dayIdx) {
+                                val startMin = seg.start % 1440
+                                val endMin = seg.end % 1440
                                 
-                                if (currentDayStr in ruleDays) {
-                                    val startParts = rule.startTime.split(":")
-                                    val endParts = rule.endTime.split(":")
-                                    
-                                    val startMin = (startParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
-                                    val endMin = (endParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
-                                    
-                                    if (startMin < endMin) {
-                                        // Normal window
-                                        val left = (startMin / 1440f) * canvasWidth
-                                        val width = ((endMin - startMin) / 1440f) * canvasWidth
-                                        drawRect(
-                                            color = color,
-                                            topLeft = Offset(left, 2f),
-                                            size = Size(width, canvasHeight - 4f)
-                                        )
-                                    } else if (startMin > endMin) {
-                                        // Overnight window (starts today, ends tomorrow)
-                                        // We only draw the "starts today" part here to keep Canvas simple.
-                                        // A fully accurate wrap-around requires drawing on the next day's track.
-                                        val left = (startMin / 1440f) * canvasWidth
-                                        val width = ((1440 - startMin) / 1440f) * canvasWidth
-                                        drawRect(
-                                            color = color,
-                                            topLeft = Offset(left, 2f),
-                                            size = Size(width, canvasHeight - 4f)
-                                        )
-                                    }
-                                }
+                                val schedIdx = schedules.indexOfFirst { it.id == seg.scheduleId }
+                                val color = colors[if (schedIdx != -1) schedIdx % colors.size else 0]
+                                
+                                val left = (startMin / 1440f) * canvasWidth
+                                val width = ((endMin - startMin) / 1440f) * canvasWidth
+                                
+                                drawRect(
+                                    color = color,
+                                    topLeft = Offset(left, 2f),
+                                    size = Size(width, canvasHeight - 4f)
+                                )
                             }
+                        }
+                        
+                        // Draw Conflicts
+                        val dayNameStr = dayNames[dayIdx]
+                        conflicts.filter { it.day.equals(dayNameStr, ignoreCase = true) }.forEach { c ->
+                            val startParts = c.overlapStart.split(":")
+                            val endParts = c.overlapEnd.split(":")
+                            val startMin = (startParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                            val endMin = (endParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                            
+                            val left = (startMin / 1440f) * canvasWidth
+                            val width = ((endMin - startMin) / 1440f) * canvasWidth
+                            
+                            drawRect(
+                                color = Color.Red.copy(alpha = 0.6f),
+                                topLeft = Offset(left, 0f),
+                                size = Size(width, canvasHeight)
+                            )
                         }
                     }
                 }
