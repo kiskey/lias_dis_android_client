@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Replaced unsafe OutlinedTextField time inputs with a native Material 3 
-//      TimePicker dialog to guarantee strict HH:MM format compliance (Gap 3.4).
+//   1. Implemented Add Rule and Remove Rule buttons (GAP-C02).
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -17,11 +16,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -108,11 +111,35 @@ fun ScheduleEditorSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text("Rules", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Rules", style = MaterialTheme.typography.titleMedium)
+                // GAP-C02 Fix: Add Rule Button
+                TextButton(onClick = { 
+                    rules.add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block")) 
+                }) {
+                    Text("+ Add Rule")
+                }
+            }
             
             rules.forEachIndexed { index, rule ->
                 Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Rule ${index + 1}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            // GAP-C02 Fix: Remove Rule Button
+                            IconButton(onClick = { rules.removeAt(index) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Remove Rule")
+                            }
+                        }
+                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -132,7 +159,6 @@ fun ScheduleEditorSheet(
                         
                         Spacer(modifier = Modifier.size(12.dp))
                         
-                        // FIX 3.4: Native TimePicker implementation
                         var showStartPicker by remember { mutableStateOf(false) }
                         var showEndPicker by remember { mutableStateOf(false) }
 
