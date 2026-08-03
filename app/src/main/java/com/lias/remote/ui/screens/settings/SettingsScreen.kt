@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed unsafe `= viewModel()` default parameter.
+//   1. Added "Flush Nftables" Danger Zone section as planned.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -24,9 +25,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -35,6 +40,7 @@ import com.lias.remote.ui.SettingsViewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    var showFlushDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -100,5 +106,58 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             }
         }
+
+        Spacer(modifier = Modifier.size(32.dp))
+
+        // FIX 3.2: Danger Zone Section
+        Text(
+            text = "Danger Zone",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.size(16.dp))
+        
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("System Maintenance", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Flush the netdev lancontrol table on the LIAS server. LIAS will rebuild it on the next sync cycle.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Button(
+                    onClick = { showFlushDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Flush Nftables Table")
+                }
+            }
+        }
+    }
+
+    if (showFlushDialog) {
+        AlertDialog(
+            onDismissRequest = { showFlushDialog = false },
+            title = { Text("Confirm Flush") },
+            text = { Text("Are you sure you want to flush all nftables rules? Internet access will be temporarily unrestricted until LIAS rebuilds the table.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.flushNftables()
+                        showFlushDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Flush") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFlushDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
