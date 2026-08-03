@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.0.0
-// Purpose: UI for configuring the LIAS server URL and Auth Token.
-//          Validates connection before committing via DataStore.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Removed unsafe `= viewModel()` default parameter.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -30,11 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lias.remote.ui.SettingsViewModel
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(viewModel: SettingsViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
@@ -96,7 +95,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 uiState.testResult?.let { result ->
                     Text(
                         text = result,
-                        color = if (result.startsWith("Success")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        color = if (result.startsWith("Success") || result.startsWith("Connection")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 }
             }
