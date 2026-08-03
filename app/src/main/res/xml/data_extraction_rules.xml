@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ==================================================================== -->
+<!-- File: app/src/main/res/xml/data_extraction_rules.xml                 -->
+<!-- Version: 1.1.1                                                       -->
+<!-- Purpose: Android 12+ data extraction rules. Required by Manifest.     -->
+<!-- ==================================================================== -->
+
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- DataStore is excluded from auto-backup to prevent restore corruption -->
+        <exclude domain="sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>
