@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/ConnectionStatusBanner.kt
-// Version: 1.0.0
-// Purpose: Thin colored strip indicating SSE connection status.
-//          Provides immediate visual feedback for network drops.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Wrapped the Box in an `if` block so it doesn't render at all when 
+//      connected, preventing the 4dp layout jump.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -16,34 +17,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.network.ConnectionState
 
 @Composable
 fun ConnectionStatusBanner(connectionState: ConnectionState) {
+    if (connectionState == ConnectionState.CONNECTED) return
+    
     val (backgroundColor, text) = when (connectionState) {
-        ConnectionState.CONNECTED -> Color.Transparent to ""
         ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondary to "Connecting..."
         ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.error to "Reconnecting..."
         ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.error to "Disconnected"
+        else -> return
     }
 
-    if (connectionState != ConnectionState.CONNECTED) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(backgroundColor)
-                .padding(4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                color = MaterialTheme.colorScheme.onError,
-                style = MaterialTheme.typography.labelMedium,
-                textAlign = TextAlign.Center
-            )
-        }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor)
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = MaterialTheme.colorScheme.onError,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center
+        )
     }
 }
