@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.1.0
-// Purpose: Navigation graph and scaffold wrapper. Updated to integrate
-//          the actual ViewModel-backed screens instead of placeholders.
+// Version: 1.2.0
+// Audit Fixes: 
+//   1. Added SnackbarHost to the Scaffold to display transient SSE events.
+//   2. Collected `uiEvents` from `LiasViewModel` to trigger Snackbars.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -18,17 +19,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.lias.remote.repositories.UiEvent
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.screens.dashboard.DashboardScreen
@@ -59,7 +66,21 @@ fun LiasNavHost(
         LiasScreen.Settings
     )
 
+    // FIX 3.1: Snackbar Host State
+    val snackbarHostState = remember { SnackbarHostState() }
+    val uiEvents by liasViewModel.uiEvents.collectAsStateWithLifecycle(initialValue = null)
+
+    // FIX 3.1: Collect transient events
+    LaunchedEffect(uiEvents) {
+        uiEvents?.let { event ->
+            when (event) {
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
