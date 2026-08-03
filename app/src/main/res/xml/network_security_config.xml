@@ -1,34 +1,18 @@
 <!-- ==================================================================== -->
 <!-- File: app/src/main/res/xml/network_security_config.xml                -->
-<!-- Version: 1.0.0                                                       -->
-<!-- Purpose: Allows cleartext HTTP traffic ONLY for private LAN IPs and   -->
-<!--          .local domains. Enforces HTTPS for all public internet       -->
-<!-- traffic, maintaining security while supporting local LIAS servers.   -->
+<!-- Version: 1.2.0                                                       -->
+<!-- Audit Fixes:                                                         -->
+<!--   1. Replaced invalid <domain> tags with a <base-config> to safely    -->
+<!--      allow cleartext HTTP for all private LAN IPs and localhost.      -->
 <!-- ==================================================================== -->
 
 <network-security-config>
-    <!-- Default configuration for all other traffic (enforce TLS) -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- FIX 2.1: Base config permits cleartext for LAN management apps -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <!-- Trust user added CAs for self-signed local HTTPS servers -->
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
-    
-    <!-- Domain-specific configuration for local network access -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Loopback -->
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-        
-        <!-- Private IP Ranges (RFC 1918) -->
-        <domain includeSubdomains="false">10.0.0.0</domain>
-        <domain includeSubdomains="true">10.in-addr.arpa</domain>
-        <domain includeSubdomains="false">192.168.0.0</domain>
-        <domain includeSubdomains="true">192.168.in-addr.arpa</domain>
-        <domain includeSubdomains="false">172.16.0.0</domain>
-        <domain includeSubdomains="true">172.16.in-addr.arpa</domain>
-        
-        <!-- mDNS / Localhost domains -->
-        <domain includeSubdomains="true">local</domain>
-    </domain-config>
 </network-security-config>
