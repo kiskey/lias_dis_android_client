@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/ApiTypes.kt
-// Version: 1.0.0
-// Purpose: Request/Response DTOs (Data Transfer Objects) matching the
-//          Go shared/api types.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Added missing HealthResponse DTO to match Go server's /health endpoint.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -32,4 +32,11 @@ data class PolicyValidateRequest(
 @Serializable
 data class DeviceTagRequest(
     @SerialName("tag_id") val tagId: String
+)
+
+// FIX 1.3 & 3.1: Added HealthResponse DTO
+@Serializable
+data class HealthResponse(
+    val status: String,
+    val version: String
 )
