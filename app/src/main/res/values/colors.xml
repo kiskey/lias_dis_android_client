@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ==================================================================== -->
+<!-- File: app/src/main/res/values/colors.xml                             -->
+<!-- Version: 1.0.0                                                       -->
+<!-- Purpose: Base Android XML colors. Used by themes.xml to prevent       -->
+<!--          white flash on cold start by matching Compose backgrounds.   -->
+<!-- ==================================================================== -->
+
+<resources>
+    <color name="background_light">#F5F5F7</color>
+    <color name="background_dark">#000000</color>
+</resources>
