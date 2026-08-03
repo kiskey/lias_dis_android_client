@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.0.0
-// Purpose: Persistent SSE connection manager. Reads chunked streams
-//          manually via OkHttp Source to avoid EventSource library
-//          overhead. Implements exponential backoff matching dis_client.go.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Added missing `import okhttp3.Response`.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -12,7 +11,6 @@ import com.lias.remote.core.models.LiasEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
- okhttp3.Response
+import okhttp3.Response
 import okio.use
 
 class LiasSseClient(
@@ -106,7 +104,7 @@ class LiasSseClient(
                             try {
                                 val event = LiasEvent(
                                     type = eventType.ifEmpty { "message" },
-                                    timestamp = "", // Handled by JSON payload if present
+                                    timestamp = "", 
                                     deviceID = extractDeviceId(payloadStr),
                                     payload = json.parseToJsonElement(payloadStr)
                                 )
@@ -127,7 +125,6 @@ class LiasSseClient(
     }
 
     private fun extractDeviceId(jsonStr: String): String {
-        // Quick regex/direct parse to avoid full deserialization twice
         val regex = """"pdid"\s*:\s*"([^"]+)"""".toRegex()
         val match = regex.find(jsonStr)
         return match?.groupValues?.get(1) ?: ""
