@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.1.1
-// Purpose: FIX 3.3 - Fully implements the 3-step Policy Wizard bottom sheet.
-//          Step 1: Target (Name, Type, TargetID)
-//          Step 2: Enforcement (Action, Priority)
-//          Step 3: Schedules (Selection with client-side conflict preview)
+// Version: 1.2.0
+// Audit Fixes: 
+//   1. Disabled "Next" button on Step 1 if the policy name is blank.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -117,7 +115,12 @@ fun PolicyWizardSheet(
                         }
                     }
                     
-                    Button(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth()) {
+                    // FIX 4.1: Disabled Next button if name is blank
+                    Button(
+                        onClick = { step = 2 }, 
+                        enabled = name.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Next")
                     }
                 }
