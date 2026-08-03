@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added missing `import okhttp3.Response`.
+//   1. Hardened empty payload parsing to prevent silent exceptions on pings (GAP-E05).
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -106,7 +106,8 @@ class LiasSseClient(
                                     type = eventType.ifEmpty { "message" },
                                     timestamp = "", 
                                     deviceID = extractDeviceId(payloadStr),
-                                    payload = json.parseToJsonElement(payloadStr)
+                                    // GAP-E05 Fix: Safely handle empty payloads like pings
+                                    payload = if (payloadStr.isNotBlank()) json.parseToJsonElement(payloadStr) else null
                                 )
                                 _events.emit(event)
                             } catch (_: Exception) { /* Ignore parse error for pings */ }
