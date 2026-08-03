@@ -1,15 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.0.0
-// Purpose: Extension functions for EventRepository to handle optimistic
-//          UI updates (instant feedback) with automatic rollback on failure.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Implemented missing deletePolicy() function with optimistic UI update.
+//   2. Implemented missing deleteSchedule() function with optimistic UI update.
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
-import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.DeviceTagRequest
 import com.lias.remote.core.network.Endpoints
@@ -67,6 +67,24 @@ suspend fun EventRepository.savePolicy(policy: Policy): ApiResult<Policy> {
     return result
 }
 
+// FIX 3.2: Implemented deletePolicy
+suspend fun EventRepository.deletePolicy(policyId: String): ApiResult<Unit> {
+    val previousPolicies = _state.value.policies
+    
+    // Optimistic Update
+    _state.value = _state.value.copy(
+        policies = _state.value.policies.filterNot { it.id == policyId }
+    )
+
+    val result = api.delete<Unit>(Endpoints.policy(policyId))
+    
+    // Rollback on failure
+    if (result !is ApiResult.Success) {
+        _state.value = _state.value.copy(policies = previousPolicies)
+    }
+    return result
+}
+
 suspend fun EventRepository.saveSchedule(schedule: Schedule): ApiResult<Schedule> {
     val existedBefore = _state.value.schedules.any { it.id == schedule.id }
     
@@ -92,6 +110,24 @@ suspend fun EventRepository.saveSchedule(schedule: Schedule): ApiResult<Schedule
         )
     } else {
         refreshAll() 
+    }
+    return result
+}
+
+// FIX 3.2: Implemented deleteSchedule
+suspend fun EventRepository.deleteSchedule(scheduleId: String): ApiResult<Unit> {
+    val previousSchedules = _state.value.schedules
+    
+    // Optimistic Update
+    _state.value = _state.value.copy(
+        schedules = _state.value.schedules.filterNot { it.id == scheduleId }
+    )
+
+    val result = api.delete<Unit>(Endpoints.schedule(scheduleId))
+    
+    // Rollback on failure
+    if (result !is ApiResult.Success) {
+        _state.value = _state.value.copy(schedules = previousSchedules)
     }
     return result
 }
