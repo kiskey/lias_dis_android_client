@@ -2,7 +2,7 @@
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
 // Version: 1.2.0
 // Audit Fixes: 
-//   1. Added `flushNftables()` function to support Danger Zone UI.
+//   1. Added `flushNftables()` function to support Danger Zone UI (Gap 3.2).
 // ====================================================================
 
 package com.lias.remote.ui
@@ -24,7 +24,7 @@ data class SettingsUiState(
     val authToken: String = "",
     val isTesting: Boolean = false,
     val testResult: String? = null,
-    val isFlushing: Boolean = false // FIX 3.2: Added state for flush loading
+    val isFlushing: Boolean = false 
 )
 
 class SettingsViewModel(
@@ -87,7 +87,6 @@ class SettingsViewModel(
         }
     }
 
-    // FIX 3.2: Implemented flushNftables
     fun flushNftables() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isFlushing = true)
