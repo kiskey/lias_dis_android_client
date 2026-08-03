@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added missing `async` and `coroutineScope` imports.
-//   2. Changed `_state`, `api`, and `refreshAll()` from `private` to `internal` 
-//      to allow EventRepositoryActions.kt extension functions access.
+//   1. Added `uiEvents` SharedFlow to emit transient SSE notifications 
+//      (e.g., "Device Online") for Snackbar display (Gap 3.1).
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -26,19 +25,31 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+// Defines transient UI events for Snackbars
+sealed class UiEvent {
+    data class ShowSnackbar(val message: String) : UiEvent()
+}
+
 class EventRepository(
-    internal val api: LiasApiClient, // Changed to internal
+    internal val api: LiasApiClient,
     private val sse: LiasSseClient,
     private val settings: SettingsRepository
 ) {
-    internal val _state = MutableStateFlow(UiState()) // Changed to internal
+    internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    // FIX 3.1: SharedFlow for transient Snackbar events
+    private val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
+    val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -72,7 +83,7 @@ class EventRepository(
         }
     }
 
-    internal suspend fun refreshAll() { // Changed to internal
+    internal suspend fun refreshAll() {
         coroutineScope {
             val devs = async { api.get<DeviceListResponse>(Endpoints.DEVICES) }
             val tags = async { api.get<List<Tag>>(Endpoints.TAGS) }
@@ -97,9 +108,19 @@ class EventRepository(
     private suspend fun collectSseEvents() {
         sse.events.collect { event ->
             when (event.type) {
-                EventConstants.DEVICE_ADDED,
-                EventConstants.DEVICE_ONLINE,
-                EventConstants.DEVICE_OFFLINE,
+                EventConstants.DEVICE_ADDED -> {
+                    refreshSingleDevice(event.deviceID)
+                    // FIX 3.1: Emit Snackbar event
+                    _uiEvents.emit(UiEvent.ShowSnackbar("✨ New Device Discovered: ${event.deviceID.takeLast(8)}"))
+                }
+                EventConstants.DEVICE_ONLINE -> {
+                    refreshSingleDevice(event.deviceID)
+                    _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}"))
+                }
+                EventConstants.DEVICE_OFFLINE -> {
+                    refreshSingleDevice(event.deviceID)
+                    _uiEvents.emit(UiEvent.ShowSnackbar("🔴 Device Offline: ${event.deviceID.takeLast(8)}"))
+                }
                 EventConstants.HOSTNAME_CHANGED,
                 EventConstants.FINGERPRINT_UPDATED,
                 EventConstants.IP_CHANGED,
