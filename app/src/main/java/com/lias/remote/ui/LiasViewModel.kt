@@ -13,9 +13,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class LiasViewModel(
@@ -24,7 +22,7 @@ class LiasViewModel(
 
     val state: StateFlow<UiState> = eventRepository.state
 
-    // FIX 3.1: Expose transient UI events
+    // FIX 3.1: Expose transient UI events to the UI layer
     val uiEvents = eventRepository.uiEvents
 
     init {
