@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.0.0
-// Purpose: Modal bottom sheet for creating/editing schedules.
-//          Handles day chips, time inputs, and action selection.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Moved misplaced `import androidx.compose.foundation.layout.Spacer` from the 
+//      bottom of the file to the correct import block at the top.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -10,12 +11,14 @@ package com.lias.remote.ui.screens.schedules
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -159,6 +162,3 @@ fun ScheduleEditorSheet(
         }
     }
 }
-
-// Missing import for Spacer
-import androidx.compose.foundation.layout.Spacer
