@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.0.0
-// Purpose: Lists all configured schedules with visual timelines.
-//          Provides entry point to the Schedule Editor Sheet.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Removed unsafe `= viewModel()` default parameter.
+//   2. Added Delete IconButton and wired it to `viewModel.deleteSchedule()`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -37,13 +38,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.WeeklyTimeline
 
 @Composable
-fun SchedulesScreen(viewModel: LiasViewModel = viewModel()) {
+fun SchedulesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
@@ -87,11 +87,18 @@ fun SchedulesScreen(viewModel: LiasViewModel = viewModel()) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            // FIX 3.2: Added Edit button
                             IconButton(onClick = {
                                 editingSchedule = schedule
                                 showEditor = true
                             }) {
                                 Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                            }
+                            // FIX 3.2: Added Delete button and wired it
+                            IconButton(onClick = {
+                                viewModel.deleteSchedule(schedule.id)
+                            }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                             }
                         }
                         
