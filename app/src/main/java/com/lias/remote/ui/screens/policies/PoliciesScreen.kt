@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.0.0
-// Purpose: Lists all configured policies. Displays scope, target,
-//          and color-coded action badges.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Removed unsafe `= viewModel()` default parameter.
+//   2. Wired Delete IconButton to `viewModel.deletePolicy()`.
+//   3. Replaced FAB placeholder with `PolicyWizardSheet` implementation.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -33,22 +35,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
 
 @Composable
-fun PoliciesScreen(viewModel: LiasViewModel = viewModel()) {
+fun PoliciesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
+    
+    // FIX 3.3: State for Policy Wizard
+    var showWizard by remember { mutableStateOf(false) }
+    var editingPolicy by remember { mutableStateOf<Policy?>(null) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* Opens Wizard in future batch */ },
+                onClick = {
+                    // FIX 3.3: Open Wizard for new policy
+                    editingPolicy = null
+                    showWizard = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Policy")
@@ -75,8 +87,9 @@ fun PoliciesScreen(viewModel: LiasViewModel = viewModel()) {
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
-                            IconButton(onClick = { /* Delete logic */ }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                            // FIX 3.2: Wired delete policy
+                            IconButton(onClick = { viewModel.deletePolicy(policy.id) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                             }
                         }
                         
@@ -109,5 +122,19 @@ fun PoliciesScreen(viewModel: LiasViewModel = viewModel()) {
                 }
             }
         }
+    }
+
+    // FIX 3.3: Render Wizard
+    if (showWizard) {
+        PolicyWizardSheet(
+            initialPolicy = editingPolicy,
+            tags = state.tags,
+            schedules = state.schedules,
+            onDismiss = { showWizard = false },
+            onSave = { policy ->
+                viewModel.savePolicy(policy)
+                showWizard = false
+            }
+        )
     }
 }
