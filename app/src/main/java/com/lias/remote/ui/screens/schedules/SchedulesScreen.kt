@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed unsafe `= viewModel()` default parameter.
-//   2. Added Delete IconButton and wired it to `viewModel.deleteSchedule()`.
+//   1. Added Delete Confirmation Dialog warning about dependent policies.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +48,9 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
+    
+    // FIX 3.3: Delete Confirmation State
+    var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
 
     Scaffold(
         floatingActionButton = {
@@ -87,16 +91,15 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            // FIX 3.2: Added Edit button
                             IconButton(onClick = {
                                 editingSchedule = schedule
                                 showEditor = true
                             }) {
                                 Icon(Icons.Filled.Edit, contentDescription = "Edit")
                             }
-                            // FIX 3.2: Added Delete button and wired it
                             IconButton(onClick = {
-                                viewModel.deleteSchedule(schedule.id)
+                                // FIX 3.3: Trigger dialog instead of immediate deletion
+                                scheduleToDelete = schedule
                             }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                             }
@@ -116,6 +119,43 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             onSave = { schedule ->
                 viewModel.saveSchedule(schedule)
                 showEditor = false
+            }
+        )
+    }
+
+    // FIX 3.3: Delete Confirmation Dialog
+    scheduleToDelete?.let { schedule ->
+        val impactedPolicies = state.policies.filter { p ->
+            p.scheduleIDs?.contains(schedule.id) == true || p.scheduleID == schedule.id
+        }
+        
+        AlertDialog(
+            onDismissRequest = { scheduleToDelete = null },
+            title = { Text("Confirm Delete") },
+            text = {
+                if (impactedPolicies.isNotEmpty()) {
+                    Column {
+                        Text("⚠️ Warning: This schedule is attached to the following policies:")
+                        impactedPolicies.forEach { p ->
+                            Text("• ${p.name}", fontWeight = FontWeight.Bold)
+                        }
+                        Text("These policies will fail closed (BLOCK).")
+                    }
+                } else {
+                    Text("Are you sure you want to delete this schedule?")
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSchedule(schedule.id)
+                        scheduleToDelete = null
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { scheduleToDelete = null }) { Text("Cancel") }
             }
         )
     }
