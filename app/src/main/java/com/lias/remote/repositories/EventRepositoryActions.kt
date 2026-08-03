@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Implemented missing deletePolicy() function with optimistic UI update.
-//   2. Implemented missing deleteSchedule() function with optimistic UI update.
+//   1. Fixed optimistic UI rollback on deletion to only restore the specific 
+//      item, preventing accidental overwrite of concurrent SSE updates.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -17,7 +17,6 @@ import com.lias.remote.core.network.Endpoints
 suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiResult<Unit> {
     val previousTags = _state.value.devices.find { it.pdid == pdid }?.tags
 
-    // Optimistic Update
     _state.value = _state.value.copy(
         devices = _state.value.devices.map { d ->
             if (d.pdid == pdid) d.copy(tags = listOf(tagId)) else d
@@ -26,7 +25,6 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
 
     val result = api.post<Unit, DeviceTagRequest>(Endpoints.deviceTags(pdid), DeviceTagRequest(tagId))
     
-    // Rollback on failure
     if (result !is ApiResult.Success) {
         _state.value = _state.value.copy(
             devices = _state.value.devices.map { d ->
@@ -40,7 +38,6 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
 suspend fun EventRepository.savePolicy(policy: Policy): ApiResult<Policy> {
     val existedBefore = _state.value.policies.any { it.id == policy.id }
     
-    // Optimistic Update
     val currentPolicies = _state.value.policies.toMutableList()
     val existingIndex = currentPolicies.indexOfFirst { it.id == policy.id }
     if (existingIndex != -1) {
@@ -56,31 +53,31 @@ suspend fun EventRepository.savePolicy(policy: Policy): ApiResult<Policy> {
         api.post<Policy, Policy>(Endpoints.POLICIES, policy)
     }
 
-    // Revert to server reality
     if (result is ApiResult.Success) {
         _state.value = _state.value.copy(
             policies = _state.value.policies.map { if (it.id == result.data.id) result.data else it }
         )
     } else {
-        refreshAll() // Safest fallback on failure
+        refreshAll() 
     }
     return result
 }
 
-// FIX 3.2: Implemented deletePolicy
+// FIX 4.2: Granular rollback for deletePolicy
 suspend fun EventRepository.deletePolicy(policyId: String): ApiResult<Unit> {
-    val previousPolicies = _state.value.policies
+    val deletedPolicy = _state.value.policies.find { it.id == policyId }
     
-    // Optimistic Update
     _state.value = _state.value.copy(
         policies = _state.value.policies.filterNot { it.id == policyId }
     )
 
     val result = api.delete<Unit>(Endpoints.policy(policyId))
     
-    // Rollback on failure
-    if (result !is ApiResult.Success) {
-        _state.value = _state.value.copy(policies = previousPolicies)
+    if (result !is ApiResult.Success && deletedPolicy != null) {
+        // Restore only the deleted item instead of overwriting the whole list
+        _state.value = _state.value.copy(
+            policies = _state.value.policies + deletedPolicy
+        )
     }
     return result
 }
@@ -88,7 +85,6 @@ suspend fun EventRepository.deletePolicy(policyId: String): ApiResult<Unit> {
 suspend fun EventRepository.saveSchedule(schedule: Schedule): ApiResult<Schedule> {
     val existedBefore = _state.value.schedules.any { it.id == schedule.id }
     
-    // Optimistic Update
     val currentSchedules = _state.value.schedules.toMutableList()
     val existingIndex = currentSchedules.indexOfFirst { it.id == schedule.id }
     if (existingIndex != -1) {
@@ -114,20 +110,21 @@ suspend fun EventRepository.saveSchedule(schedule: Schedule): ApiResult<Schedule
     return result
 }
 
-// FIX 3.2: Implemented deleteSchedule
+// FIX 4.2: Granular rollback for deleteSchedule
 suspend fun EventRepository.deleteSchedule(scheduleId: String): ApiResult<Unit> {
-    val previousSchedules = _state.value.schedules
+    val deletedSchedule = _state.value.schedules.find { it.id == scheduleId }
     
-    // Optimistic Update
     _state.value = _state.value.copy(
         schedules = _state.value.schedules.filterNot { it.id == scheduleId }
     )
 
     val result = api.delete<Unit>(Endpoints.schedule(scheduleId))
     
-    // Rollback on failure
-    if (result !is ApiResult.Success) {
-        _state.value = _state.value.copy(schedules = previousSchedules)
+    if (result !is ApiResult.Success && deletedSchedule != null) {
+        // Restore only the deleted item instead of overwriting the whole list
+        _state.value = _state.value.copy(
+            schedules = _state.value.schedules + deletedSchedule
+        )
     }
     return result
 }
