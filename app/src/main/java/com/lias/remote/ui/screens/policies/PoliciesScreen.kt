@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed unsafe `= viewModel()` default parameter.
-//   2. Wired Delete IconButton to `viewModel.deletePolicy()`.
-//   3. Replaced FAB placeholder with `PolicyWizardSheet` implementation.
+//   1. Added Delete Confirmation Dialog (Gap 3.3).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -24,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -32,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,15 +49,16 @@ import com.lias.remote.ui.LiasViewModel
 fun PoliciesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     
-    // FIX 3.3: State for Policy Wizard
     var showWizard by remember { mutableStateOf(false) }
     var editingPolicy by remember { mutableStateOf<Policy?>(null) }
+    
+    // FIX 3.3: Delete Confirmation State
+    var policyToDelete by remember { mutableStateOf<Policy?>(null) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // FIX 3.3: Open Wizard for new policy
                     editingPolicy = null
                     showWizard = true
                 },
@@ -87,8 +88,10 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
-                            // FIX 3.2: Wired delete policy
-                            IconButton(onClick = { viewModel.deletePolicy(policy.id) }) {
+                            IconButton(onClick = { 
+                                // FIX 3.3: Trigger dialog instead of immediate deletion
+                                policyToDelete = policy 
+                            }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                             }
                         }
@@ -124,7 +127,6 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
         }
     }
 
-    // FIX 3.3: Render Wizard
     if (showWizard) {
         PolicyWizardSheet(
             initialPolicy = editingPolicy,
@@ -134,6 +136,27 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
             onSave = { policy ->
                 viewModel.savePolicy(policy)
                 showWizard = false
+            }
+        )
+    }
+
+    // FIX 3.3: Delete Confirmation Dialog
+    policyToDelete?.let { policy ->
+        AlertDialog(
+            onDismissRequest = { policyToDelete = null },
+            title = { Text("Confirm Delete") },
+            text = { Text("Are you sure you want to delete the policy '${policy.name}'?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deletePolicy(policy.id)
+                        policyToDelete = null
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { policyToDelete = null }) { Text("Cancel") }
             }
         )
     }
