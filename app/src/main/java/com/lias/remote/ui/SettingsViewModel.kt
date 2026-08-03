@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.0.0
-// Purpose: ViewModel for managing server connection settings and
-//          validating them before starting the main EventRepository.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Fixed testConnection() to use HealthResponse instead of DeviceListResponse.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.Endpoints
+import com.lias.remote.core.network.HealthResponse
 import com.lias.remote.core.network.LiasApiClient
 import com.lias.remote.core.store.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,12 +66,13 @@ class SettingsViewModel(
             api.baseUrl = tempUrl
             api.authToken = tempToken
 
-            val result = api.get<com.lias.remote.core.network.DeviceListResponse>(Endpoints.HEALTH)
+            // FIX 3.1: Use HealthResponse instead of DeviceListResponse
+            val result = api.get<HealthResponse>(Endpoints.HEALTH)
             
             _uiState.value = _uiState.value.copy(
                 isTesting = false,
                 testResult = when (result) {
-                    is ApiResult.Success -> "Connection successful!"
+                    is ApiResult.Success -> "Connection successful! Server Version: ${result.data.version}"
                     is ApiResult.HttpError -> "HTTP Error: ${result.code}"
                     is ApiResult.NetworkError -> "Failed: ${result.cause.message}"
                     is ApiResult.Conflict -> "Conflict"
