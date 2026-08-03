@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added `uiEvents` SharedFlow to emit transient SSE notifications 
-//      (e.g., "Device Online") for Snackbar display (Gap 3.1).
+//   1. Implemented SSE disconnect/reconnect on server URL change (GAP-C04).
+//   2. Implemented `device.reidentified` event handling to prune old PDID and fetch new PDID (GAP-C05).
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.DeviceReidentifiedPayload
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
@@ -33,6 +34,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 
 // Defines transient UI events for Snackbars
 sealed class UiEvent {
@@ -47,10 +50,10 @@ class EventRepository(
     internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    // FIX 3.1: SharedFlow for transient Snackbar events
     private val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
+    private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
@@ -58,6 +61,9 @@ class EventRepository(
             settings.serverUrl.collectLatest { url ->
                 api.baseUrl = url
                 sse.baseUrl = url
+                // GAP-C04 Fix: Safely tear down old SSE connection and reconnect with new URL
+                sse.disconnect()
+                sse.connect(scope)
                 refreshAll()
             }
         }
@@ -110,7 +116,6 @@ class EventRepository(
             when (event.type) {
                 EventConstants.DEVICE_ADDED -> {
                     refreshSingleDevice(event.deviceID)
-                    // FIX 3.1: Emit Snackbar event
                     _uiEvents.emit(UiEvent.ShowSnackbar("✨ New Device Discovered: ${event.deviceID.takeLast(8)}"))
                 }
                 EventConstants.DEVICE_ONLINE -> {
@@ -131,6 +136,23 @@ class EventRepository(
                     _state.value = _state.value.copy(
                         devices = _state.value.devices.filterNot { it.pdid == event.deviceID }
                     )
+                }
+                EventConstants.DEVICE_REIDENTIFIED -> {
+                    // GAP-C05 Fix: Handle device.reidentified event
+                    val payload = event.payload?.let {
+                        try { 
+                            json.decodeFromJsonElement<DeviceReidentifiedPayload>(it) 
+                        } catch (e: Exception) { 
+                            null 
+                        }
+                    }
+                    if (payload != null) {
+                        _state.value = _state.value.copy(
+                            devices = _state.value.devices.filterNot { it.pdid == payload.oldPdid }
+                        )
+                        refreshSingleDevice(payload.newPdid)
+                        _uiEvents.emit(UiEvent.ShowSnackbar("🔄 Device identified: ${payload.newPdid.takeLast(8)} (promoted from ${payload.reason})"))
+                    }
                 }
             }
         }
