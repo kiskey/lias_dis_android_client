@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.0.0
-// Purpose: Main dashboard view. Displays the global switch, high-level
-//          stats, and a grid of recent devices. Binds to LiasViewModel.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Removed unsafe `= viewModel()` default parameter to prevent crashes 
+//      when no ViewModelProvider.Factory is provided.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -29,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
@@ -37,7 +37,7 @@ import com.lias.remote.ui.components.DeviceCard
 import com.lias.remote.ui.components.SegmentedControl
 
 @Composable
-fun DashboardScreen(viewModel: LiasViewModel = viewModel()) {
+fun DashboardScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
 
     Column(
