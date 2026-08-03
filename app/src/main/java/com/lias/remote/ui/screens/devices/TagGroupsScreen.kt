@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.0.0
-// Purpose: Displays devices grouped by tags. Features collapsible
-//          accordion sections for clean organization on mobile.
+// Version: 1.1.1
+// Audit Fixes: 
+//   1. Removed unsafe `= viewModel()` default parameter.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,17 +36,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.DeviceCard
-import com.lias.remote.core.models.Tag
 
 @Composable
-fun TagGroupsScreen(viewModel: LiasViewModel = viewModel()) {
+fun TagGroupsScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
 
     // Group devices by their first tag
@@ -121,8 +116,6 @@ private fun ExpandableTagGroup(
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
-                // Grid layout doesn't play nicely inside LazyColumn without fixed height.
-                // For a thin client, a simple Column or Row layout is safer.
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
