@@ -2,7 +2,7 @@
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
 // Version: 1.2.0
 // Audit Fixes: 
-//   1. Disabled "Next" button on Step 1 if the policy name is blank.
+//   1. Disabled "Next" button on Step 1 if the policy name is blank (Gap 4.1).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
