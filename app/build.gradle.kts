@@ -1,14 +1,16 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.0.0
-// Purpose: App module configuration. Enforces R8 full mode, resource
-//          shrinking, and strict SDK bounds for zero-waste APK output.
+// Version: 1.2.0
+// Audit Fixes: 
+//   1. Applied `compose.compiler` plugin.
+//   2. Removed deprecated `composeOptions` block.
 // ====================================================================
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose.compiler) // FIX 1.1: Kotlin 2.0 Compose Compiler
 }
 
 android {
@@ -17,10 +19,10 @@ android {
 
     defaultConfig {
         applicationId = "com.lias.remote"
-        minSdk = 26 // Android 8.0 (modern java.time, wide compatibility)
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0-dev"
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -37,7 +39,6 @@ android {
                 "proguard-rules.pro"
             )
             
-            // CI/CD Signing Setup
             val keystoreFile = file("release.keystore")
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release").apply {
@@ -64,9 +65,7 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    // FIX 1.1: Removed `composeOptions` block entirely as it's handled by the plugin
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -75,12 +74,11 @@ android {
 }
 
 dependencies {
-    // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose) // For collectAsStateWithLifecycle
     
-    // Compose
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -90,15 +88,12 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     
-    // Networking & Async
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     
-    // Local Storage
     implementation(libs.androidx.datastore.preferences)
     
-    // Debugging
     debugImplementation(libs.androidx.ui.tooling)
 }
