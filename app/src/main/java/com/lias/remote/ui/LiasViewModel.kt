@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added deletePolicy() and deleteSchedule() functions to match UI wiring.
+//   1. Exposed `uiEvents` flow to allow UI layer to collect Snackbar events.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -11,8 +11,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
+import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class LiasViewModel(
@@ -20,6 +23,9 @@ class LiasViewModel(
 ) : ViewModel() {
 
     val state: StateFlow<UiState> = eventRepository.state
+
+    // FIX 3.1: Expose transient UI events
+    val uiEvents = eventRepository.uiEvents
 
     init {
         eventRepository.start()
@@ -29,7 +35,7 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.assignDeviceTag(pdid, tagId)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // In a full app, emit a transient error event to show a Snackbar
+                // Could emit a specific error snackbar here
             }
         }
     }
@@ -40,7 +46,6 @@ class LiasViewModel(
         }
     }
 
-    // FIX 3.2: Added deletePolicy
     fun deletePolicy(policyId: String) {
         viewModelScope.launch {
             val result = eventRepository.deletePolicy(policyId)
@@ -56,7 +61,6 @@ class LiasViewModel(
         }
     }
 
-    // FIX 3.2: Added deleteSchedule
     fun deleteSchedule(scheduleId: String) {
         viewModelScope.launch {
             val result = eventRepository.deleteSchedule(scheduleId)
