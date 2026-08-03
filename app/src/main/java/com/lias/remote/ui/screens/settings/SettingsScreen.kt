@@ -2,7 +2,7 @@
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
 // Version: 1.2.0
 // Audit Fixes: 
-//   1. Added "Flush Nftables" Danger Zone section as planned.
+//   1. Added "Flush Nftables" Danger Zone section as planned (Gap 3.2).
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
