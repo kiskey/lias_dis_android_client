@@ -3,7 +3,7 @@
 // Version: 1.2.0
 // Audit Fixes: 
 //   1. Replaced unsafe OutlinedTextField time inputs with a native Material 3 
-//      TimePicker dialog to guarantee strict HH:MM format compliance.
+//      TimePicker dialog to guarantee strict HH:MM format compliance (Gap 3.4).
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -142,7 +143,7 @@ fun ScheduleEditorSheet(
                         ) {
                             Card(
                                 modifier = Modifier.weight(1f).clickable { showStartPicker = true },
-                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             ) {
@@ -154,7 +155,7 @@ fun ScheduleEditorSheet(
                             Text("to", style = MaterialTheme.typography.bodyMedium)
                             Card(
                                 modifier = Modifier.weight(1f).clickable { showEndPicker = true },
-                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             ) {
