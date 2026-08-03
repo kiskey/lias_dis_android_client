@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added Delete Confirmation Dialog (Gap 3.3).
+//   1. Added Edit button to policy row (GAP-C01).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,7 +53,6 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
     var showWizard by remember { mutableStateOf(false) }
     var editingPolicy by remember { mutableStateOf<Policy?>(null) }
     
-    // FIX 3.3: Delete Confirmation State
     var policyToDelete by remember { mutableStateOf<Policy?>(null) }
 
     Scaffold(
@@ -88,8 +88,14 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
+                            // GAP-C01 Fix: Add Edit Button
                             IconButton(onClick = { 
-                                // FIX 3.3: Trigger dialog instead of immediate deletion
+                                editingPolicy = policy
+                                showWizard = true
+                            }) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Edit Policy")
+                            }
+                            IconButton(onClick = { 
                                 policyToDelete = policy 
                             }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
@@ -140,7 +146,6 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
         )
     }
 
-    // FIX 3.3: Delete Confirmation Dialog
     policyToDelete?.let { policy ->
         AlertDialog(
             onDismissRequest = { policyToDelete = null },
