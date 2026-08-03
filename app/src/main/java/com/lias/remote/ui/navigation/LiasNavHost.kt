@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.0.0
-// Purpose: Navigation graph and scaffold wrapper. Implements the 5-tab
-//          bottom navigation bar for phones. Renders placeholders for
-//          screens which will be populated in subsequent batches.
+// Version: 1.1.0
+// Purpose: Navigation graph and scaffold wrapper. Updated to integrate
+//          the actual ViewModel-backed screens instead of placeholders.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -23,14 +22,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.SettingsViewModel
+import com.lias.remote.ui.screens.dashboard.DashboardScreen
+import com.lias.remote.ui.screens.devices.TagGroupsScreen
+import com.lias.remote.ui.screens.policies.PoliciesScreen
+import com.lias.remote.ui.screens.schedules.SchedulesScreen
+import com.lias.remote.ui.screens.settings.SettingsScreen
 
-sealed class LiasScreen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+sealed class LiasScreen(val route: String, val label: String, val icon: ImageVector) {
     data object Dashboard : LiasScreen("dashboard", "Home", Icons.Filled.SpaceDashboard)
     data object Devices : LiasScreen("devices", "Tags", Icons.Filled.Devices)
     data object Schedules : LiasScreen("schedules", "Schedules", Icons.Filled.Schedule)
@@ -39,7 +46,10 @@ sealed class LiasScreen(val route: String, val label: String, val icon: androidx
 }
 
 @Composable
-fun LiasNavHost() {
+fun LiasNavHost(
+    liasViewModel: LiasViewModel,
+    settingsViewModel: SettingsViewModel
+) {
     val navController = rememberNavController()
     val items = listOf(
         LiasScreen.Dashboard,
@@ -80,20 +90,19 @@ fun LiasNavHost() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(LiasScreen.Dashboard.route) {
-                // Placeholder - Will be replaced by DashboardScreen
-                Text("Dashboard Screen - Batch 7")
+                DashboardScreen(viewModel = liasViewModel)
             }
             composable(LiasScreen.Devices.route) {
-                Text("Tag Groups Screen - Batch 7")
+                TagGroupsScreen(viewModel = liasViewModel)
             }
             composable(LiasScreen.Schedules.route) {
-                Text("Schedules Screen - Batch 7")
+                SchedulesScreen(viewModel = liasViewModel)
             }
             composable(LiasScreen.Policies.route) {
-                Text("Policies Screen - Batch 7")
+                PoliciesScreen(viewModel = liasViewModel)
             }
             composable(LiasScreen.Settings.route) {
-                Text("Settings Screen - Batch 7")
+                SettingsScreen(viewModel = settingsViewModel)
             }
         }
     }
