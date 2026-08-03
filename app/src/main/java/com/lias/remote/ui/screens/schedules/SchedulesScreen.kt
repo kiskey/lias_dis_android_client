@@ -2,7 +2,7 @@
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
 // Version: 1.2.0
 // Audit Fixes: 
-//   1. Added Delete Confirmation Dialog warning about dependent policies.
+//   1. Added Delete Confirmation Dialog warning about dependent policies (Gap 3.3).
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
