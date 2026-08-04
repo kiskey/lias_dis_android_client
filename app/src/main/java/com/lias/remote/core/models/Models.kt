@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.2.0
-// Audit Fixes: 
-//   1. Added DeviceEventPayload model for SSE event parsing (GAP-A05).
+// Version: 1.3.0
+// Audit Fixes:
+//   1. Renamed custom fallback method in `Policy` to `resolveScheduleIDs()` to resolve
+//      JVM platform declaration clash with auto-generated getter `getScheduleIDs()`.
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -52,12 +53,13 @@ data class Policy(
     @SerialName("target_id") val targetID: String = "",
     val action: String, // "allow", "block", "schedule"
     @SerialName("schedule_ids") val scheduleIDs: List<String> = emptyList(),
-    @SerialName("schedule_id") val scheduleID: String? = null, // Deprecated but handled
+    @SerialName("schedule_id") val scheduleID: String? = null, // Deprecated but handled for migration
     val priority: Int = 50,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = ""
 ) {
-    fun getScheduleIDs(): List<String> {
+    // Audit Fix: Renamed method to resolve JVM getter name collision
+    fun resolveScheduleIDs(): List<String> {
         if (scheduleIDs.isNotEmpty()) return scheduleIDs
         if (!scheduleID.isNullOrEmpty()) return listOf(scheduleID)
         return emptyList()
@@ -94,7 +96,6 @@ data class Conflict(
     @SerialName("action_b") val actionB: String
 )
 
-// SSE Event Wrapper
 @Serializable
 data class LiasEvent(
     val type: String,
@@ -111,7 +112,6 @@ data class DeviceReidentifiedPayload(
     @SerialName("migrated_macs") val migratedMacs: List<String> = emptyList()
 )
 
-// GAP-A05 Fix: Added payload model to parse `confirmed_by` sources
 @Serializable
 data class DeviceEventPayload(
     val pdid: String = "",
