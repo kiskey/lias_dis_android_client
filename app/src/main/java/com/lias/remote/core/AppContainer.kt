@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/AppContainer.kt
-// Version: 1.1.0
-// Audit Fixes: 
-//   1. Added missing imports for DI components.
-//   2. Removed unused okhttp logging import.
+// Version: 1.2.0
+// Audit Fixes:
+//   1. Provided dedicated `sseOkHttpClient` instance with `readTimeout(0, TimeUnit.SECONDS)`
+//      to prevent OkHttp from killing long-lived SSE connections between 15s server pings.
 // ====================================================================
 
 package com.lias.remote.core
@@ -22,8 +22,15 @@ class AppContainer(context: Context) {
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(0, TimeUnit.SECONDS) 
+            .writeTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    // Dedicated SSE OkHttpClient with infinite readTimeout (0) for long-lived streams
+    val sseOkHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .readTimeout(0, TimeUnit.SECONDS)
             .build()
     }
 
@@ -36,7 +43,7 @@ class AppContainer(context: Context) {
     }
 
     val liasSseClient: LiasSseClient by lazy {
-        LiasSseClient(okHttpClient)
+        LiasSseClient(sseOkHttpClient)
     }
 
     val eventRepository: EventRepository by lazy {
