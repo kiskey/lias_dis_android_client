@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.0.0
-// Purpose: Reusable Composable representing a single network device.
-//          Shows status indicator, metadata, and an inline tag selector.
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Implemented full DisplayName fallback chain (GAP-U11).
+//   2. Added Tag Color Badge visualization (GAP-U07).
+//   3. Added Device Type display (GAP-U10).
+//   4. Added Service Pills (GAP-U09).
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Card
@@ -52,6 +56,17 @@ fun DeviceCard(
     val currentTagId = device.tags.firstOrNull() ?: "generic"
     val currentTag = tags.find { it.id == currentTagId }
 
+    // GAP-U11 Fix: Full DisplayName fallback chain
+    val displayName = device.hostname.ifBlank { 
+        device.friendlyName.ifBlank { 
+            (device.vendor + " " + device.model).trim().ifBlank { 
+                device.currentMAC.ifBlank { 
+                    device.pdid 
+                } 
+            } 
+        } 
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -59,8 +74,18 @@ fun DeviceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // GAP-U07 Fix: Tag Color Badge
+                currentTag?.let {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color(android.graphics.Color.parseColor(it.color)), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                
                 Text(
-                    text = device.hostname.ifBlank { device.friendlyName.ifBlank { device.vendor.ifBlank { "Unknown Device" } } },
+                    text = displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -86,6 +111,33 @@ fun DeviceCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // GAP-U10 Fix: Device Type Display
+            Text(
+                text = "Type: ${device.deviceType.ifBlank { "Unclassified" }}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            // GAP-U09 Fix: Service Pills
+            if (device.services.isNotEmpty()) {
+                Spacer(modifier = Modifier.size(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    device.services.take(3).forEach { service ->
+                        Box(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = service,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+            
             Spacer(modifier = Modifier.size(12.dp))
             
             // Tag Dropdown
