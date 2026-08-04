@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Changed _uiEvents visibility to internal to allow ViewModel access.
+//   1. Ensured URL updates apply thread-safely across API and SSE clients.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -14,7 +14,6 @@ import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
-import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.core.network.DeviceListResponse
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.EventConstants
@@ -57,8 +56,10 @@ class EventRepository(
                 api.baseUrl = url
                 sse.baseUrl = url
                 sse.disconnect()
-                sse.connect(scope)
-                refreshAll()
+                if (url.isNotBlank()) {
+                    sse.connect(scope)
+                    refreshAll()
+                }
             }
         }
         scope.launch {
@@ -84,6 +85,7 @@ class EventRepository(
     }
 
     internal suspend fun refreshAll() {
+        if (api.baseUrl.isBlank()) return
         coroutineScope {
             val devs = async { api.get<DeviceListResponse>(Endpoints.DEVICES) }
             val tags = async { api.get<List<Tag>>(Endpoints.TAGS) }
