@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.2.1
+// Version: 1.2.2
 // Audit Fixes: 
-//   1. Added @PublishedApi to internal inline functions to fix visibility errors.
+//   1. Refactored parseResponse to accept KSerializer to fix @PublishedApi visibility issues.
 // ====================================================================
 
 package com.lias.remote.core.network
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import okhttp3.MediaType.Companion.toMediaType
@@ -49,7 +50,7 @@ class LiasApiClient(
 
     @Suppress("UNCHECKED_CAST")
     @PublishedApi
-    internal inline fun <reified T> parseResponse(response: Response): ApiResult<T> {
+    internal fun <T> parseResponse(response: Response, serializer: KSerializer<T>): ApiResult<T> {
         val bodyString = response.body?.string() ?: ""
         return when {
             response.isSuccessful -> {
@@ -57,7 +58,7 @@ class LiasApiClient(
                     ApiResult.Success(Unit as T)
                 } else {
                     try {
-                        ApiResult.Success(json.decodeFromString(bodyString))
+                        ApiResult.Success(json.decodeFromString(serializer, bodyString))
                     } catch (e: Exception) {
                         ApiResult.NetworkError(e)
                     }
@@ -65,7 +66,7 @@ class LiasApiClient(
             }
             response.code == 409 -> {
                 try {
-                    val errorResp = json.decodeFromString<ConflictResponse>(bodyString)
+                    val errorResp = json.decodeFromString(ConflictResponse.serializer(), bodyString)
                     ApiResult.ConflictError(errorResp.conflicts)
                 } catch (e: Exception) {
                     ApiResult.HttpError(409, "Conflict parsing failed")
@@ -73,7 +74,7 @@ class LiasApiClient(
             }
             else -> {
                 val errorMsg = try { 
-                    json.decodeFromString<ConflictResponse>(bodyString).message 
+                    json.decodeFromString(ConflictResponse.serializer(), bodyString).message 
                 } catch (e: Exception) { bodyString }
                 ApiResult.HttpError(response.code, errorMsg ?: "HTTP ${response.code}")
             }
@@ -84,7 +85,7 @@ class LiasApiClient(
         try {
             val request = buildRequest(path, "GET")
             val response = client.newCall(request).execute()
-            parseResponse(response)
+            parseResponse(response, serializer())
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
@@ -92,11 +93,11 @@ class LiasApiClient(
 
     suspend inline fun <reified T, reified B> post(path: String, body: B): ApiResult<T> = withContext(Dispatchers.IO) {
         try {
-            val bodyStr = json.encodeToString(serializer(), body)
+            val bodyStr = json.encodeToString(serializer<B>(), body)
             val reqBody = bodyStr.toRequestBody("application/json".toMediaType())
             val request = buildRequest(path, "POST", reqBody)
             val response = client.newCall(request).execute()
-            parseResponse(response)
+            parseResponse(response, serializer())
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
@@ -104,11 +105,11 @@ class LiasApiClient(
 
     suspend inline fun <reified T, reified B> put(path: String, body: B): ApiResult<T> = withContext(Dispatchers.IO) {
         try {
-            val bodyStr = json.encodeToString(serializer(), body)
+            val bodyStr = json.encodeToString(serializer<B>(), body)
             val reqBody = bodyStr.toRequestBody("application/json".toMediaType())
             val request = buildRequest(path, "PUT", reqBody)
             val response = client.newCall(request).execute()
-            parseResponse(response)
+            parseResponse(response, serializer())
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
@@ -118,7 +119,7 @@ class LiasApiClient(
         try {
             val request = buildRequest(path, "DELETE")
             val response = client.newCall(request).execute()
-            parseResponse(response)
+            parseResponse(response, serializer())
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
