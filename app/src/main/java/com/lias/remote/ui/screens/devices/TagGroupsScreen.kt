@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added FAB and Long-Press menu for Tag CRUD (GAP-C03).
-//   2. Added Tag Color visualization (GAP-V02).
-//   3. Added Infrastructure "IMMUNE" lock badge (GAP-U08).
+//   1. Added global search bar for devices (GAP-U05).
+//   2. Added empty state UI for Tag Groups (GAP-U41).
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -32,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +41,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,14 +69,25 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
     var showEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
+    
+    // GAP-U05 Fix: Search Query State
+    var searchQuery by remember { mutableStateOf("") }
 
-    val groupedDevices = remember(state.devices) {
-        state.devices.groupBy { it.tags.firstOrNull() ?: "generic" }
+    val groupedDevices = remember(state.devices, searchQuery) {
+        val filtered = if (searchQuery.isBlank()) {
+            state.devices
+        } else {
+            state.devices.filter { d ->
+                d.hostname.contains(searchQuery, ignoreCase = true) ||
+                d.currentMAC.contains(searchQuery, ignoreCase = true) ||
+                d.currentIP.contains(searchQuery, ignoreCase = true)
+            }
+        }
+        filtered.groupBy { it.tags.firstOrNull() ?: "generic" }
     }
 
     Scaffold(
         floatingActionButton = {
-            // GAP-C03 Fix: FAB to create tags
             FloatingActionButton(
                 onClick = {
                     editingTag = null
@@ -87,28 +99,54 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(16.dp)
         ) {
-            items(state.tags, key = { it.id }) { tag ->
-                val devicesInGroup = groupedDevices[tag.id] ?: emptyList()
-                ExpandableTagGroup(
-                    tag = tag,
-                    devices = devicesInGroup,
-                    allTags = state.tags,
-                    onTagSelected = { pdid, tagId -> viewModel.assignTag(pdid, tagId) },
-                    onEditClick = {
-                        editingTag = tag
-                        showEditor = true
-                    },
-                    onDeleteClick = {
-                        tagToDelete = tag
-                    }
-                )
+            // GAP-U05 Fix: Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search devices...") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.size(16.dp))
+
+            // GAP-U41 Fix: Empty State
+            if (state.tags.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No tags yet. Tap + to create one.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                return@Column
+            }
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(state.tags, key = { it.id }) { tag ->
+                    val devicesInGroup = groupedDevices[tag.id] ?: emptyList()
+                    ExpandableTagGroup(
+                        tag = tag,
+                        devices = devicesInGroup,
+                        allTags = state.tags,
+                        onTagSelected = { pdid, tagId -> viewModel.assignTag(pdid, tagId) },
+                        onEditClick = {
+                            editingTag = tag
+                            showEditor = true
+                        },
+                        onDeleteClick = {
+                            tagToDelete = tag
+                        }
+                    )
+                }
             }
         }
     }
@@ -170,7 +208,6 @@ private fun ExpandableTagGroup(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // GAP-V02 Fix: Tag Color Badge
                 Box(
                     modifier = Modifier
                         .size(12.dp)
@@ -186,7 +223,6 @@ private fun ExpandableTagGroup(
                     modifier = Modifier.weight(1f)
                 )
                 
-                // GAP-U08 Fix: Infrastructure Lock Badge
                 if (tag.id == "infrastructure") {
                     Icon(Icons.Filled.Lock, contentDescription = "Immune", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.size(8.dp))
@@ -198,7 +234,6 @@ private fun ExpandableTagGroup(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                // GAP-C03 Fix: Kebab menu for Edit/Delete
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Filled.ExpandMore, contentDescription = "Menu")
