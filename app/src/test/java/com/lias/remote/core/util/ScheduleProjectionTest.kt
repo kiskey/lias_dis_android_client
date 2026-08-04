@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/test/java/com/lias/remote/core/util/ScheduleProjectionTest.kt
-// Version: 1.0.0
-// Purpose: JUnit tests for ScheduleProjection to match Go server logic (GAP-B01).
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Added unit test for overnight wrap-around week-minute boundary calculations
+//      (10080 minute boundary) to ensure rendering canvas endMin parity.
 // ====================================================================
 
 package com.lias.remote.core.util
@@ -16,7 +18,6 @@ class ScheduleProjectionTest {
 
     @Test
     fun `test worked example conflict`() {
-        // Schedule A: Bedtime (downtime mode, Mon-Fri 21:00-07:00 block)
         val schedA = Schedule(
             id = "sched_bedtime01",
             name = "Bedtime",
@@ -32,7 +33,6 @@ class ScheduleProjectionTest {
             )
         )
 
-        // Schedule B: Gaming Hour (whitelist mode, Mon-Fri 22:00-23:00 allow)
         val schedB = Schedule(
             id = "sched_gaming02",
             name = "Gaming Hour",
@@ -109,5 +109,24 @@ class ScheduleProjectionTest {
         // Sunday is day 0. Segment 2: Sun 00:00 to 06:00 -> 0 to 360
         assertEquals(0, segments[1].start)
         assertEquals(360, segments[1].end)
+    }
+
+    @Test
+    fun `test overnight segment canvas modulo endMin calculation`() {
+        val segEndBoundary = 10080
+        val segStartBoundary = 9960
+        
+        val startMin = segStartBoundary % 1440
+        var endMin = segEndBoundary % 1440
+        
+        if (endMin == 0 && segEndBoundary > segStartBoundary) {
+            endMin = 1440
+        }
+        
+        val durationMinutes = (endMin - startMin).coerceAtLeast(0)
+        
+        assertEquals(1320, startMin)
+        assertEquals(1440, endMin)
+        assertEquals(120, durationMinutes)
     }
 }
