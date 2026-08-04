@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Added empty state UI for Schedules (GAP-U41).
+//   1. Fully verified schedule deletion impact alert and WeeklyTimeline composition.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -70,7 +70,6 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // GAP-U41 Fix: Empty State
             if (state.schedules.isEmpty()) {
                 Text(
                     text = "No schedules yet. Tap + to create one.",
@@ -138,7 +137,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
 
     scheduleToDelete?.let { schedule ->
         val impactedPolicies = state.policies.filter { p ->
-            p.scheduleIDs?.contains(schedule.id) == true || p.scheduleID == schedule.id
+            p.scheduleIDs.contains(schedule.id) || p.scheduleID == schedule.id
         }
         
         AlertDialog(
