@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Exposed Tag CRUD actions to UI layer (GAP-C03).
+//   1. Emit Error Snackbars on API failures (GAP-U43).
 // ====================================================================
 
 package com.lias.remote.ui
@@ -33,18 +33,20 @@ class LiasViewModel(
     fun assignTag(pdid: String, tagId: String) {
         viewModelScope.launch {
             val result = eventRepository.assignDeviceTag(pdid, tagId)
+            // GAP-U43 Fix: Emit Error Snackbar
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Could emit a specific error snackbar here
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to assign tag: $msg"))
             }
         }
     }
 
-    // GAP-C03 Fix: Tag CRUD Methods
     fun createTag(tag: Tag) {
         viewModelScope.launch {
             val result = eventRepository.createTag(tag)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Emit Snackbar error
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to create tag: $msg"))
             }
         }
     }
@@ -53,7 +55,8 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.updateTag(tag)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Emit Snackbar error
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to update tag: $msg"))
             }
         }
     }
@@ -62,14 +65,19 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.deleteTag(tagId)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Emit Snackbar error
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete tag: $msg"))
             }
         }
     }
 
     fun savePolicy(policy: Policy) {
         viewModelScope.launch {
-            eventRepository.savePolicy(policy)
+            val result = eventRepository.savePolicy(policy)
+            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to save policy: $msg"))
+            }
         }
     }
 
@@ -77,14 +85,19 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.deletePolicy(policyId)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Emit Snackbar error
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete policy: $msg"))
             }
         }
     }
 
     fun saveSchedule(schedule: Schedule) {
         viewModelScope.launch {
-            eventRepository.saveSchedule(schedule)
+            val result = eventRepository.saveSchedule(schedule)
+            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to save schedule: $msg"))
+            }
         }
     }
 
@@ -92,7 +105,8 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.deleteSchedule(scheduleId)
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                // Emit Snackbar error
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete schedule: $msg"))
             }
         }
     }
