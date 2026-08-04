@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes:
-//   1. Annotated baseUrl and authToken as @Volatile for thread-safe cross-coroutine reads/writes.
-//   2. Added automatic URL scheme normalization (http:// prefixing) to prevent
-//      OkHttp IllegalArgumentException crashes on bare IP inputs.
-//   3. Refactored parseResponse to safely handle empty/204 responses without ClassCastException.
+//   1. Promoted `client` and `json` to `@PublishedApi internal` to resolve 
+//      Kotlin compiler error: 'Public-API inline function cannot access non-public-API'.
+//   2. Maintained URL scheme normalization and safe Unit response parsing.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -23,9 +22,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 class LiasApiClient(
-    private val client: OkHttpClient
+    @PublishedApi
+    internal val client: OkHttpClient
 ) {
-    private val json = Json {
+    @PublishedApi
+    internal val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
