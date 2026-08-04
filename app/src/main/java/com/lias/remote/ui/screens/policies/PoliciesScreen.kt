@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes: 
-//   1. Updated attached schedule resolution to use `policy.getScheduleIDs()`
-//      for complete single-and-multi-schedule field compatibility.
-//   2. Fixed empty policy state alignment and dialog dismiss action safety.
+//   1. Updated schedule resolution to invoke `policy.resolveScheduleIDs()`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -197,7 +195,7 @@ private fun PolicyCard(
             )
 
             if (policy.action == "schedule") {
-                val scheduleIDs = policy.getScheduleIDs()
+                val scheduleIDs = policy.resolveScheduleIDs()
                 val attachedSchedules = scheduleIDs.mapNotNull { id ->
                     schedules.find { it.id == id }
                 }
