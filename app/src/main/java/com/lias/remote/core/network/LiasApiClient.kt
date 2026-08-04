@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.2.2
-// Audit Fixes: 
-//   1. Refactored parseResponse to accept KSerializer to fix @PublishedApi visibility issues.
+// Version: 1.3.0
+// Audit Fixes:
+//   1. Annotated baseUrl and authToken as @Volatile for thread-safe cross-coroutine reads/writes.
+//   2. Added automatic URL scheme normalization (http:// prefixing) to prevent
+//      OkHttp IllegalArgumentException crashes on bare IP inputs.
+//   3. Refactored parseResponse to safely handle empty/204 responses without ClassCastException.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -27,12 +30,24 @@ class LiasApiClient(
         encodeDefaults = true
     }
 
+    @Volatile
     var baseUrl: String = "http://127.0.0.1:8081"
+
+    @Volatile
     var authToken: String? = null
+
+    private fun normalizeUrl(raw: String): String {
+        var url = raw.trim()
+        if (url.isBlank()) return ""
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        return url.trimEnd('/')
+    }
 
     @PublishedApi
     internal fun buildRequest(path: String, method: String, body: RequestBody? = null): Request {
-        val sanitizedBase = baseUrl.trimEnd('/')
+        val sanitizedBase = normalizeUrl(baseUrl)
         val builder = Request.Builder()
             .url("$sanitizedBase$path")
             .header("Accept", "application/json")
@@ -55,7 +70,11 @@ class LiasApiClient(
         return when {
             response.isSuccessful -> {
                 if (bodyString.isBlank() || response.code == 204) {
-                    ApiResult.Success(Unit as T)
+                    if (serializer.descriptor.serialName == "kotlin.Unit") {
+                        ApiResult.Success(Unit as T)
+                    } else {
+                        ApiResult.HttpError(response.code, "Empty payload returned for expected ${serializer.descriptor.serialName}")
+                    }
                 } else {
                     try {
                         ApiResult.Success(json.decodeFromString(serializer, bodyString))
