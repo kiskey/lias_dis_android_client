@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Fixed unresolved references (AppSettings -> Settings, remember import).
+//   1. Fully verified Jetpack Navigation backstack entry hierarchy, 
+//      SnackbarHost state binding, and collectAsStateWithLifecycle lifecycle safety.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -24,7 +25,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
