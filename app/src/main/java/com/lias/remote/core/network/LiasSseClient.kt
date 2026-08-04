@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.3.0
-// Audit Fixes: 
-//   1. Implemented Last-Event-ID tracking and header injection on reconnect (GAP-A02).
+// Version: 1.4.0
+// Audit Fixes:
+//   1. Retained reference to active okhttp3.Call and invoked call.cancel() inside disconnect()
+//      to fix background socket read leaks on Java I/O.
+//   2. Annotated baseUrl, authToken, and activeCall as @Volatile.
+//   3. Integrated URL scheme normalization to prevent invalid URL crashes.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -21,9 +24,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import okio.use
 
 class LiasSseClient(
@@ -31,7 +34,10 @@ class LiasSseClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    @Volatile
     var baseUrl: String = "http://127.0.0.1:8081"
+
+    @Volatile
     var authToken: String? = null
 
     private val _events = MutableSharedFlow<LiasEvent>(
@@ -45,11 +51,13 @@ class LiasSseClient(
 
     private var sseJob: Job? = null
     
-    // GAP-A02 Fix: Track Last-Event-ID for replay support
+    @Volatile
+    private var activeCall: Call? = null
+    
     private var lastEventId: Long = 0L
 
     fun connect(scope: kotlinx.coroutines.CoroutineScope) {
-        sseJob?.cancel()
+        disconnect()
         sseJob = scope.launch(Dispatchers.IO) {
             var backoff = 1000L
             val maxBackoff = 30000L
@@ -72,26 +80,40 @@ class LiasSseClient(
     }
 
     fun disconnect() {
+        activeCall?.cancel()
+        activeCall = null
         sseJob?.cancel()
+        sseJob = null
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 
+    private fun normalizeUrl(raw: String): String {
+        var url = raw.trim()
+        if (url.isBlank()) return ""
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        return url.trimEnd('/')
+    }
+
     private suspend fun consumeSseStream() {
-        val sanitizedBase = baseUrl.trimEnd('/')
+        val sanitizedBase = normalizeUrl(baseUrl)
         val request = Request.Builder()
             .url("$sanitizedBase${Endpoints.EVENTS_SSE}")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
             .apply { 
                 authToken?.takeIf { it.isNotBlank() }?.let { header("Authorization", "Bearer $it") }
-                // GAP-A02 Fix: Send Last-Event-ID header if we have one
                 if (lastEventId > 0) {
                     header("Last-Event-ID", lastEventId.toString())
                 }
             }
             .build()
 
-        val response = client.newCall(request).execute()
+        val call = client.newCall(request)
+        activeCall = call
+        val response = call.execute()
+
         response.use { resp ->
             if (!resp.isSuccessful) {
                 throw Exception("SSE returned HTTP ${resp.code}")
@@ -100,7 +122,7 @@ class LiasSseClient(
 
             val source = resp.body?.source() ?: throw Exception("Empty SSE body")
             var eventType = ""
-            var dataBuilder = StringBuilder()
+            val dataBuilder = StringBuilder()
 
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
@@ -120,13 +142,12 @@ class LiasSseClient(
                             } catch (_: Exception) { }
                             
                             eventType = ""
-                            dataBuilder = StringBuilder()
+                            dataBuilder.clear()
                         }
                     }
                     line.startsWith("event: ") -> eventType = line.removePrefix("event: ").trim()
                     line.startsWith("data: ") -> dataBuilder.append(line.removePrefix("data: "))
                     line.startsWith("id: ") -> {
-                        // GAP-A02 Fix: Persist the latest event ID
                         lastEventId = line.removePrefix("id: ").trim().toLongOrNull() ?: lastEventId
                     }
                 }
