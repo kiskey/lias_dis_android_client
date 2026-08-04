@@ -1,18 +1,18 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Updated Snackbar listener to handle error events distinctly (GAP-U43).
+//   1. Fixed unresolved references (AppSettings -> Settings, remember import).
 // ====================================================================
 
 package com.lias.remote.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AppSettings
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SpaceDashboard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,7 +50,7 @@ sealed class LiasScreen(val route: String, val label: String, val icon: ImageVec
     data object Devices : LiasScreen("devices", "Tags", Icons.Filled.Devices)
     data object Schedules : LiasScreen("schedules", "Schedules", Icons.Filled.Schedule)
     data object Policies : LiasScreen("policies", "Rules", Icons.Filled.Security)
-    data object Settings : LiasScreen("settings", "Config", Icons.Filled.AppSettings)
+    data object Settings : LiasScreen("settings", "Config", Icons.Filled.Settings)
 }
 
 @Composable
@@ -69,7 +70,6 @@ fun LiasNavHost(
     val snackbarHostState = remember { SnackbarHostState() }
     val uiEvents by liasViewModel.uiEvents.collectAsStateWithLifecycle(initialValue = null)
 
-    // GAP-U43 Fix: Handle both standard and error snackbars
     LaunchedEffect(uiEvents) {
         uiEvents?.let { event ->
             when (event) {
