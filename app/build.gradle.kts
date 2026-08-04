@@ -1,16 +1,16 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.2.0
-// Audit Fixes: 
-//   1. Applied `compose.compiler` plugin.
-//   2. Removed deprecated `composeOptions` block.
+// Version: 1.3.0
+// Audit Fixes:
+//   1. Incremented versionCode to 2 and versionName to 1.3.0.
+//   2. Preserved Compose compiler plugin alignment for Kotlin 2.0.0.
 // ====================================================================
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.compose.compiler) // FIX 1.1: Kotlin 2.0 Compose Compiler
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -21,8 +21,8 @@ android {
         applicationId = "com.lias.remote"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.2.0"
+        versionCode = 2
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,7 +65,6 @@ android {
         compose = true
         buildConfig = true
     }
-    // FIX 1.1: Removed `composeOptions` block entirely as it's handled by the plugin
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -77,7 +76,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose) // For collectAsStateWithLifecycle
+    implementation(libs.androidx.lifecycle.runtime.compose)
     
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -95,5 +94,6 @@ dependencies {
     
     implementation(libs.androidx.datastore.preferences)
     
+    testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)
 }
