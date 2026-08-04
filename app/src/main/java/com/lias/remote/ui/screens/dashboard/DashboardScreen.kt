@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes:
-//   1. Updated global policy schedule mapping to invoke `globalPolicy.resolveScheduleIDs()`.
+//   1. Updated device state rendering to use `device.safeTags` to guarantee safe rendering.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
