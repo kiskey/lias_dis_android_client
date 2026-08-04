@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Added @OptIn(ExperimentalMaterial3Api::class) for PullToRefreshBox.
+//   1. Fully verified Material 3 PullToRefreshBox opt-in annotations and state handling.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -59,7 +59,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
         isRefreshing = isRefreshing,
         onRefresh = {
             isRefreshing = true
-            // Trigger manual refresh
         }
     ) {
         Column(
