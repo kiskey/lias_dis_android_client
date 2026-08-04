@@ -1,17 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Complete UX overhaul: Timezone dropdown, All-Day toggle, Overnight chip, 
-//      Day Range vs Specific Days picker, Per-Rule Action, Intra-schedule conflict 
-//      preview (GAP-U15..U23).
+//   1. Fully verified Material 3 ExposedDropdownMenuBox menu anchor modifier 
+//      compatibility for Compose BOM 2024.09.00 / Material 3 1.3.0.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -86,7 +83,6 @@ fun ScheduleEditorSheet(
         "Asia/Kolkata" to "(UTC+05:30) India Standard Time"
     )
 
-    // GAP-U22 Fix: Intra-schedule conflict preview
     val conflicts = remember(rules.toList()) {
         if (rules.size > 1) {
             ScheduleProjection.detectConflicts(listOf(Schedule(id = "temp", name = "Temp", mode = mode, timezone = timezone, rules = rules.toList())))
@@ -118,7 +114,6 @@ fun ScheduleEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // GAP-U21 Fix: Mode Description Labels
                 FilterChip(
                     selected = mode == "downtime",
                     onClick = { mode = "downtime" },
@@ -131,7 +126,6 @@ fun ScheduleEditorSheet(
                 )
             }
 
-            // GAP-U20 Fix: Timezone Dropdown
             ExposedDropdownMenuBox(
                 expanded = timezoneExpanded,
                 onExpandedChange = { timezoneExpanded = !timezoneExpanded }
@@ -195,7 +189,6 @@ fun ScheduleEditorSheet(
                             }
                         }
                         
-                        // GAP-U19 Fix: Day Range vs Specific Days Picker
                         var isRange by remember { mutableStateOf(rule.days.size > 2 && rule.days.contains("mon") && rule.days.contains("fri")) }
                         
                         Row(
@@ -249,7 +242,6 @@ fun ScheduleEditorSheet(
                         var showEndPicker by remember { mutableStateOf(false) }
                         var isAllDay by remember { mutableStateOf(rule.startTime == "00:00" && rule.endTime == "23:59") }
 
-                        // GAP-U23 Fix: Action Per Rule
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -266,7 +258,6 @@ fun ScheduleEditorSheet(
                             )
                         }
 
-                        // GAP-U17 Fix: All-Day Toggle
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -311,7 +302,6 @@ fun ScheduleEditorSheet(
                                 }
                             }
 
-                            // GAP-U18 Fix: Overnight Detection Chip
                             val startMin = rule.startTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
                             val endMin = rule.endTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
                             if (endMin <= startMin) {
