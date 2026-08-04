@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes:
-//   1. Retained reference to active okhttp3.Call and invoked call.cancel() inside disconnect()
-//      to fix background socket read leaks on Java I/O.
-//   2. Annotated baseUrl, authToken, and activeCall as @Volatile.
-//   3. Integrated URL scheme normalization to prevent invalid URL crashes.
+//   1. Retained active `okhttp3.Call` reference and invoked `call.cancel()` inside
+//      `disconnect()` to fix background socket read leaks on Java I/O.
+//   2. Verified zero non-public inline access hazards.
 // ====================================================================
 
 package com.lias.remote.core.network
