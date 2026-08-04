@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Extracted and displayed `confirmed_by` source verification in Snackbars (GAP-A05, E02).
+//   1. Changed _uiEvents visibility to internal to allow ViewModel access.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -45,7 +45,7 @@ class EventRepository(
     internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    private val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
+    internal val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -114,7 +114,6 @@ class EventRepository(
                 }
                 EventConstants.DEVICE_ONLINE -> {
                     refreshSingleDevice(event.deviceID)
-                    // GAP-A05 Fix: Extract confirmed_by sources
                     val confirmedBy = event.payload?.let {
                         try { json.decodeFromJsonElement<DeviceEventPayload>(it).confirmedBy } catch (e: Exception) { emptyList() }
                     } ?: emptyList()
