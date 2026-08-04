@@ -1,13 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added Delete Confirmation Dialog warning about dependent policies (Gap 3.3).
+//   1. Added empty state UI for Schedules (GAP-U41).
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,7 +50,6 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
     
-    // FIX 3.3: Delete Confirmation State
     var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
 
     Scaffold(
@@ -65,47 +65,60 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(state.schedules, key = { it.id }) { schedule ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            // GAP-U41 Fix: Empty State
+            if (state.schedules.isEmpty()) {
+                Text(
+                    text = "No schedules yet. Tap + to create one.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    schedule.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Mode: ${schedule.mode} | TZ: ${schedule.timezone}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(onClick = {
-                                editingSchedule = schedule
-                                showEditor = true
-                            }) {
-                                Icon(Icons.Filled.Edit, contentDescription = "Edit")
-                            }
-                            IconButton(onClick = {
-                                // FIX 3.3: Trigger dialog instead of immediate deletion
-                                scheduleToDelete = schedule
-                            }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    items(state.schedules, key = { it.id }) { schedule ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            schedule.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "Mode: ${schedule.mode} | TZ: ${schedule.timezone}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        editingSchedule = schedule
+                                        showEditor = true
+                                    }) {
+                                        Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                                    }
+                                    IconButton(onClick = {
+                                        scheduleToDelete = schedule
+                                    }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                
+                                WeeklyTimeline(schedules = listOf(schedule))
                             }
                         }
-                        
-                        WeeklyTimeline(schedules = listOf(schedule))
                     }
                 }
             }
@@ -123,7 +136,6 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
         )
     }
 
-    // FIX 3.3: Delete Confirmation Dialog
     scheduleToDelete?.let { schedule ->
         val impactedPolicies = state.policies.filter { p ->
             p.scheduleIDs?.contains(schedule.id) == true || p.scheduleID == schedule.id
