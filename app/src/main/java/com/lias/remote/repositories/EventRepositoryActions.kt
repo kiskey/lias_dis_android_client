@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Implemented `validatePolicy` to call server-side `/policies/validate` (GAP-A01).
+//   1. Fixed return type mismatch in validatePolicy.
+//   2. Updated ApiResult.Conflict to ApiResult.ConflictError.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -38,17 +39,13 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
     return result
 }
 
-// GAP-A01 Fix: Server-side validation action
 suspend fun EventRepository.validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
-    return try {
-        when (val result = api.post<ConflictResponse, PolicyValidateRequest>(Endpoints.POLICIES_VALIDATE, PolicyValidateRequest(scheduleIds))) {
-            is ApiResult.Success -> ApiResult.Success(result.data.conflicts)
-            is ApiResult.Conflict -> ApiResult.Success(result.conflicts)
-            is ApiResult.HttpError -> result
-            is ApiResult.NetworkError -> result
-        }
-    } catch (e: Exception) {
-        ApiResult.NetworkError(e)
+    val result = api.post<ConflictResponse, PolicyValidateRequest>(Endpoints.POLICIES_VALIDATE, PolicyValidateRequest(scheduleIds))
+    return when (result) {
+        is ApiResult.Success -> ApiResult.Success(result.data.conflicts)
+        is ApiResult.ConflictError -> ApiResult.Success(result.conflicts)
+        is ApiResult.HttpError -> result
+        is ApiResult.NetworkError -> result
     }
 }
 
