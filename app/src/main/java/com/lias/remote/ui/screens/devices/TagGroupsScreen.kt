@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.4.0
-// Audit Fixes: 
-//   1. Fully verified global device search filtering, expandable card state, and tag deletion callbacks.
+// Version: 1.5.0
+// Audit Fixes:
+//   1. Updated device grouping logic to use `d.safeTags.firstOrNull() ?: "generic"`,
+//      guaranteeing all inventory devices render under their respective tag headers.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +82,7 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
         }
-        filtered.groupBy { it.tags.firstOrNull() ?: "generic" }
+        filtered.groupBy { it.safeTags.firstOrNull() ?: "generic" }
     }
 
     Scaffold(
@@ -232,11 +235,11 @@ private fun ExpandableTagGroup(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Filled.ExpandMore, contentDescription = "Menu")
                     }
-                    androidx.compose.material3.DropdownMenu(
+                    DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
-                        androidx.compose.material3.DropdownMenuItem(
+                        DropdownMenuItem(
                             text = { Text("Edit Tag") },
                             onClick = {
                                 menuExpanded = false
@@ -245,7 +248,7 @@ private fun ExpandableTagGroup(
                             leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) }
                         )
                         if (!tag.builtin) {
-                            androidx.compose.material3.DropdownMenuItem(
+                            DropdownMenuItem(
                                 text = { Text("Delete Tag") },
                                 onClick = {
                                     menuExpanded = false
