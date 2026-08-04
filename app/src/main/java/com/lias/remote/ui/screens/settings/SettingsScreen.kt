@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Added URL format helper hints (`e.g., http://192.168.1.1:8081`).
+//   1. Verified input field hints, cleartext connection guidance, and dialog state management.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
