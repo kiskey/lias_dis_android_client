@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 1.0.0
-// Purpose: Global UI State representation. Combines all REST models
-//          and SSE connection status into a single immutable snapshot
-//          for declarative Compose rendering.
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Added ShowSnackbarError event for save failures (GAP-U43).
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -23,3 +22,11 @@ data class UiState(
     val isInitialLoaded: Boolean = false,
     val errorMessage: String? = null
 )
+
+// Defines transient UI events for Snackbars
+sealed class UiEvent {
+    data class ShowSnackbar(val message: String) : UiEvent()
+    
+    // GAP-U43 Fix: Dedicated error event for save failures
+    data class ShowSnackbarError(val message: String) : UiEvent()
+}
