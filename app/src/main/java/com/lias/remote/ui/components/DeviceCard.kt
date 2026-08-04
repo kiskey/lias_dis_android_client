@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Wrapped Color(parseColor) in a try-catch remember block to prevent 
-//      unhandled IllegalArgumentException crashes on invalid hex input.
-//   2. Applied incoming `modifier` parameter directly to root Card.
+//   1. Updated tag selection and service pill rendering to use `device.safeTags`
+//      and `device.safeServices`.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -52,7 +51,7 @@ fun DeviceCard(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val currentTagId = device.tags.firstOrNull() ?: "generic"
+    val currentTagId = device.safeTags.firstOrNull() ?: "generic"
     val currentTag = tags.find { it.id == currentTagId }
 
     val tagColor = remember(currentTag?.color) {
@@ -122,10 +121,10 @@ fun DeviceCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            if (device.services.isNotEmpty()) {
+            if (device.safeServices.isNotEmpty()) {
                 Spacer(modifier = Modifier.size(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    device.services.take(3).forEach { service ->
+                    device.safeServices.take(3).forEach { service ->
                         Box(
                             modifier = Modifier
                                 .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
