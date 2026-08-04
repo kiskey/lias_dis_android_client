@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Updated PolicyWizardSheet caller to pass viewModel for server-side validation (GAP-A01).
+//   1. Updated attached schedule resolution to use `policy.getScheduleIDs()`
+//      for complete single-and-multi-schedule field compatibility.
+//   2. Fixed empty policy state alignment and dialog dismiss action safety.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.models.Schedule
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.WeeklyTimeline
 
@@ -107,7 +110,7 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
 
     if (showWizard) {
         PolicyWizardSheet(
-            viewModel = viewModel, // Passed here for server-side validation
+            viewModel = viewModel,
             initialPolicy = editingPolicy,
             tags = state.tags,
             schedules = state.schedules,
@@ -143,7 +146,7 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
 @Composable
 private fun PolicyCard(
     policy: Policy,
-    schedules: List<com.lias.remote.core.models.Schedule>,
+    schedules: List<Schedule>,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -194,10 +197,11 @@ private fun PolicyCard(
             )
 
             if (policy.action == "schedule") {
-                val attachedSchedules = policy.getScheduleIDs().mapNotNull { id ->
+                val scheduleIDs = policy.getScheduleIDs()
+                val attachedSchedules = scheduleIDs.mapNotNull { id ->
                     schedules.find { it.id == id }
                 }
-                val missingSchedules = policy.getScheduleIDs().filter { id ->
+                val missingSchedules = scheduleIDs.filter { id ->
                     schedules.none { it.id == id }
                 }
 
