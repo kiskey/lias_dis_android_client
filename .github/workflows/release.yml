@@ -1,8 +1,8 @@
 # ====================================================================
 # File: .github/workflows/release.yml
-# Version: 1.0.0
-# Purpose: Manual-run pipeline. Builds a debug APK and publishes it 
-#          to the "latest" GitHub Release.
+# Version: 1.0.2
+# Purpose: Manual-run pipeline. Generates Gradle wrapper on the fly,
+#          builds a debug APK, and publishes it to the "latest" release.
 # ====================================================================
 
 name: Release Debug APK
@@ -29,6 +29,13 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      # CI-Only Fix: Generate the Gradle wrapper files that are missing from the repo
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Make gradlew Executable
+        run: chmod +x ./gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
