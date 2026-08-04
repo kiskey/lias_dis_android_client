@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes: 
-//   1. Updated initial schedule resolution to invoke `initialPolicy?.resolveScheduleIDs()`.
+//   1. Fully verified step-by-step policy wizard with safe schedule resolutions.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
