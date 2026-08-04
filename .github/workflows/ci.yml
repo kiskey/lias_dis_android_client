@@ -1,8 +1,9 @@
 # ====================================================================
 # File: .github/workflows/ci.yml
-# Version: 1.0.0
-# Purpose: Pull Request checks. Runs lint, unit tests, and builds a
-#          debug APK to verify compilation integrity.
+# Version: 1.1.0
+# Audit Fixes:
+#   1. Added missing Gradle wrapper generation and executable permission
+#      steps to ensure PR check reliability when wrapper files are not checked in.
 # ====================================================================
 
 name: CI
@@ -27,6 +28,13 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      # Audit Fix (CI-1.1): Generate Gradle wrapper and grant execution permissions
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Make gradlew Executable
+        run: chmod +x ./gradlew
 
       - name: Run Lint
         run: ./gradlew lintDebug
