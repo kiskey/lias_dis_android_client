@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Added Edit button to policy row (GAP-C01).
+//   1. Added missing schedule warnings (GAP-U25, U26).
+//   2. Added attached schedule summary text (GAP-U27).
+//   3. Added inline weekly timeline preview per policy (GAP-U28).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -45,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.WeeklyTimeline
 
 @Composable
 fun PoliciesScreen(viewModel: LiasViewModel) {
@@ -76,59 +80,17 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(state.policies, key = { it.id }) { policy ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                policy.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            // GAP-C01 Fix: Add Edit Button
-                            IconButton(onClick = { 
-                                editingPolicy = policy
-                                showWizard = true
-                            }) {
-                                Icon(Icons.Filled.Edit, contentDescription = "Edit Policy")
-                            }
-                            IconButton(onClick = { 
-                                policyToDelete = policy 
-                            }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                            val actionColor = when (policy.action) {
-                                "allow" -> MaterialTheme.colorScheme.primary
-                                "block" -> MaterialTheme.colorScheme.error
-                                else -> MaterialTheme.colorScheme.tertiary
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(actionColor, CircleShape)
-                            )
-                            Text(
-                                text = " ${policy.action.uppercase()}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = actionColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Text(
-                            text = "Scope: ${policy.type} | Target: ${policy.targetID.ifBlank { "Global" }} | Priority: ${policy.priority}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                PolicyCard(
+                    policy = policy,
+                    schedules = state.schedules,
+                    onEditClick = {
+                        editingPolicy = policy
+                        showWizard = true
+                    },
+                    onDeleteClick = {
+                        policyToDelete = policy
                     }
-                }
+                )
             }
         }
     }
@@ -164,5 +126,102 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
                 TextButton(onClick = { policyToDelete = null }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun PolicyCard(
+    policy: Policy,
+    schedules: List<com.lias.remote.core.models.Schedule>,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    policy.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit Policy")
+                }
+                IconButton(onClick = onDeleteClick) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                val actionColor = when (policy.action) {
+                    "allow" -> MaterialTheme.colorScheme.primary
+                    "block" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.tertiary
+                }
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(actionColor, CircleShape)
+                )
+                Text(
+                    text = " ${policy.action.uppercase()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = actionColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Text(
+                text = "Scope: ${policy.type} | Target: ${policy.targetID.ifBlank { "Global" }} | Priority: ${policy.priority}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            // GAP-U25, U26, U27 Fix: Schedule Summaries & Warnings
+            if (policy.action == "schedule") {
+                val attachedSchedules = policy.getScheduleIDs().mapNotNull { id ->
+                    schedules.find { it.id == id }
+                }
+                val missingSchedules = policy.getScheduleIDs().filter { id ->
+                    schedules.none { it.id == id }
+                }
+
+                Spacer(modifier = Modifier.size(12.dp))
+                
+                if (attachedSchedules.isEmpty() && missingSchedules.isEmpty()) {
+                    Text(
+                        text = "⚠️ No schedules attached. Defaults to ALLOW ALL.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        text = "Attached Schedules (${attachedSchedules.size}): ${attachedSchedules.joinToString { it.name }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (missingSchedules.isNotEmpty()) {
+                    Text(
+                        text = "⚠️ Missing Schedule(s): ${missingSchedules.joinToString()} (Fails Closed: BLOCK)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                // GAP-U28 Fix: Inline Weekly Timeline Preview
+                if (attachedSchedules.isNotEmpty()) {
+                    Spacer(modifier = Modifier.size(8.dp))
+                    WeeklyTimeline(schedules = attachedSchedules)
+                }
+            }
+        }
     }
 }
