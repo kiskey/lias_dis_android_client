@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Exposed `validatePolicy` to UI layer (GAP-A01).
+//   1. Added imports for repository extension functions.
+//   2. Updated ApiResult.Conflict to ApiResult.ConflictError.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -17,6 +18,15 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
+import com.lias.remote.repositories.assignDeviceTag
+import com.lias.remote.repositories.createTag
+import com.lias.remote.repositories.deletePolicy
+import com.lias.remote.repositories.deleteSchedule
+import com.lias.remote.repositories.deleteTag
+import com.lias.remote.repositories.savePolicy
+import com.lias.remote.repositories.saveSchedule
+import com.lias.remote.repositories.updateTag
+import com.lias.remote.repositories.validatePolicy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -31,7 +41,6 @@ class LiasViewModel(
         eventRepository.start()
     }
 
-    // GAP-A01 Fix: Expose validation to UI
     suspend fun validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
         return eventRepository.validatePolicy(scheduleIds)
     }
