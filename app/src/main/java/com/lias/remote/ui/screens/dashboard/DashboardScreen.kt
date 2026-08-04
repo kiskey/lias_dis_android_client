@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.7.0
-// Audit Fixes: 
-//   1. Fully verified Material 3 PullToRefreshBox opt-in annotations and state handling.
+// Version: 1.8.0
+// Audit Fixes:
+//   1. Updated global policy schedule mapping to invoke `globalPolicy.resolveScheduleIDs()`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -113,7 +113,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                         exit = shrinkVertically()
                     ) {
                         Column(modifier = Modifier.padding(top = 16.dp)) {
-                            val globalSchedules = state.schedules.filter { it.id in globalPolicy.getScheduleIDs() }
+                            val globalSchedules = state.schedules.filter { it.id in globalPolicy.resolveScheduleIDs() }
                             
                             if (globalSchedules.isNotEmpty()) {
                                 Text(
