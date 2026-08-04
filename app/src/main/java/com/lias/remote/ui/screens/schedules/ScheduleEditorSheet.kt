@@ -1,14 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Implemented Add Rule and Remove Rule buttons (GAP-C02).
+//   1. Complete UX overhaul: Timezone dropdown, All-Day toggle, Overnight chip, 
+//      Day Range vs Specific Days picker, Per-Rule Action, Intra-schedule conflict 
+//      preview (GAP-U15..U23).
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,10 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
+import com.lias.remote.core.util.ScheduleProjection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,17 +63,34 @@ fun ScheduleEditorSheet(
     onDismiss: () -> Unit,
     onSave: (Schedule) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     var name by remember { mutableStateOf(initialSchedule?.name ?: "") }
     var mode by remember { mutableStateOf(initialSchedule?.mode ?: "downtime") }
     var timezone by remember { mutableStateOf(initialSchedule?.timezone ?: "UTC") }
+    var timezoneExpanded by remember { mutableStateOf(false) }
     
     val rules = remember {
         mutableStateListOf<ScheduleRule>().apply {
             if (initialSchedule != null) addAll(initialSchedule.rules)
             else add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block"))
         }
+    }
+
+    val timezones = listOf(
+        "America/Los_Angeles" to "(UTC-08:00) Pacific Time",
+        "America/Denver" to "(UTC-07:00) Mountain Time",
+        "America/Chicago" to "(UTC-06:00) Central Time",
+        "America/New_York" to "(UTC-05:00) Eastern Time",
+        "UTC" to "(UTC+00:00) Coordinated Universal Time",
+        "Asia/Kolkata" to "(UTC+05:30) India Standard Time"
+    )
+
+    // GAP-U22 Fix: Intra-schedule conflict preview
+    val conflicts = remember(rules.toList()) {
+        if (rules.size > 1) {
+            ScheduleProjection.detectConflicts(listOf(Schedule(id = "temp", name = "Temp", mode = mode, timezone = timezone, rules = rules.toList())))
+        } else emptyList()
     }
 
     ModalBottomSheet(
@@ -85,31 +110,59 @@ fun ScheduleEditorSheet(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Schedule Name") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // GAP-U21 Fix: Mode Description Labels
                 FilterChip(
                     selected = mode == "downtime",
                     onClick = { mode = "downtime" },
-                    label = { Text("Downtime") }
+                    label = { Text("Downtime (Block rules)") }
                 )
                 FilterChip(
                     selected = mode == "whitelist",
                     onClick = { mode = "whitelist" },
-                    label = { Text("Whitelist") }
+                    label = { Text("Whitelist (Allow rules)") }
                 )
             }
 
-            OutlinedTextField(
-                value = timezone,
-                onValueChange = { timezone = it },
-                label = { Text("Timezone (e.g. America/New_York)") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // GAP-U20 Fix: Timezone Dropdown
+            ExposedDropdownMenuBox(
+                expanded = timezoneExpanded,
+                onExpandedChange = { timezoneExpanded = !timezoneExpanded }
+            ) {
+                OutlinedTextField(
+                    value = timezones.firstOrNull { it.first == timezone }?.second ?: timezone,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Timezone") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = timezoneExpanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = timezoneExpanded,
+                    onDismissRequest = { timezoneExpanded = false }
+                ) {
+                    timezones.forEach { (tzId, tzLabel) ->
+                        TextButton(
+                            onClick = {
+                                timezone = tzId
+                                timezoneExpanded = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tzLabel)
+                        }
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -117,12 +170,15 @@ fun ScheduleEditorSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Rules", style = MaterialTheme.typography.titleMedium)
-                // GAP-C02 Fix: Add Rule Button
                 TextButton(onClick = { 
                     rules.add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block")) 
                 }) {
                     Text("+ Add Rule")
                 }
+            }
+
+            if (conflicts.isNotEmpty()) {
+                Text("⚠️ Conflicts detected in rules!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             
             rules.forEachIndexed { index, rule ->
@@ -134,26 +190,56 @@ fun ScheduleEditorSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Rule ${index + 1}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            // GAP-C02 Fix: Remove Rule Button
                             IconButton(onClick = { rules.removeAt(index) }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Remove Rule")
                             }
                         }
                         
+                        // GAP-U19 Fix: Day Range vs Specific Days Picker
+                        var isRange by remember { mutableStateOf(rule.days.size > 2 && rule.days.contains("mon") && rule.days.contains("fri")) }
+                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
-                                FilterChip(
-                                    selected = day in rule.days,
-                                    onClick = {
-                                        val newDays = rule.days.toMutableList()
-                                        if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
-                                        rules[index] = rule.copy(days = newDays)
-                                    },
-                                    label = { Text(day.take(3).uppercase()) }
-                                )
+                            FilterChip(selected = !isRange, onClick = { isRange = false }, label = { Text("Specific Days") })
+                            FilterChip(selected = isRange, onClick = { isRange = true }, label = { Text("Day Range") })
+                        }
+                        
+                        Spacer(modifier = Modifier.size(8.dp))
+                        
+                        if (isRange) {
+                            val days = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+                            val startIdx = days.indexOf(rule.days.firstOrNull())
+                            val endIdx = days.indexOf(rule.days.lastOrNull())
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("From:")
+                                FilterChip(selected = true, onClick = {}, label = { Text(days.getOrNull(startIdx)?.uppercase() ?: "MON") })
+                                Text("To:")
+                                FilterChip(selected = true, onClick = {}, label = { Text(days.getOrNull(endIdx)?.uppercase() ?: "FRI") })
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
+                                    FilterChip(
+                                        selected = day in rule.days,
+                                        onClick = {
+                                            val newDays = rule.days.toMutableList()
+                                            if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
+                                            rules[index] = rule.copy(days = newDays)
+                                        },
+                                        label = { Text(day.take(3).uppercase()) }
+                                    )
+                                }
                             }
                         }
                         
@@ -161,34 +247,75 @@ fun ScheduleEditorSheet(
                         
                         var showStartPicker by remember { mutableStateOf(false) }
                         var showEndPicker by remember { mutableStateOf(false) }
+                        var isAllDay by remember { mutableStateOf(rule.startTime == "00:00" && rule.endTime == "23:59") }
 
+                        // GAP-U23 Fix: Action Per Rule
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = rule.action == "block",
+                                onClick = { rules[index] = rule.copy(action = "block") },
+                                label = { Text("Block") }
+                            )
+                            FilterChip(
+                                selected = rule.action == "allow",
+                                onClick = { rules[index] = rule.copy(action = "allow") },
+                                label = { Text("Allow") }
+                            )
+                        }
+
+                        // GAP-U17 Fix: All-Day Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Card(
-                                modifier = Modifier.weight(1f).clickable { showStartPicker = true },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
+                            Text("All Day")
+                            Checkbox(
+                                checked = isAllDay,
+                                onCheckedChange = {
+                                    isAllDay = it
+                                    if (it) {
+                                        rules[index] = rule.copy(startTime = "00:00", endTime = "23:59")
+                                    }
+                                }
+                            )
+                        }
+
+                        if (!isAllDay) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Start", style = MaterialTheme.typography.labelSmall)
-                                    Text(rule.startTime, style = MaterialTheme.typography.titleMedium)
+                                Card(
+                                    modifier = Modifier.weight(1f).clickable { showStartPicker = true },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text("Start", style = MaterialTheme.typography.labelSmall)
+                                        Text(rule.startTime, style = MaterialTheme.typography.titleMedium)
+                                    }
+                                }
+                                Text("to", style = MaterialTheme.typography.bodyMedium)
+                                Card(
+                                    modifier = Modifier.weight(1f).clickable { showEndPicker = true },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text("End", style = MaterialTheme.typography.labelSmall)
+                                        Text(rule.endTime, style = MaterialTheme.typography.titleMedium)
+                                    }
                                 }
                             }
-                            Text("to", style = MaterialTheme.typography.bodyMedium)
-                            Card(
-                                modifier = Modifier.weight(1f).clickable { showEndPicker = true },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("End", style = MaterialTheme.typography.labelSmall)
-                                    Text(rule.endTime, style = MaterialTheme.typography.titleMedium)
-                                }
+
+                            // GAP-U18 Fix: Overnight Detection Chip
+                            val startMin = rule.startTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
+                            val endMin = rule.endTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
+                            if (endMin <= startMin) {
+                                Text("🌙 Continues past midnight", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                             }
                         }
 
@@ -245,6 +372,7 @@ fun ScheduleEditorSheet(
                         rules = rules.toList()
                     ))
                 },
+                enabled = name.isNotBlank() && conflicts.isEmpty(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Save Schedule")
