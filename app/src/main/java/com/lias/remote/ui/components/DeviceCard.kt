@@ -1,11 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Implemented full DisplayName fallback chain (GAP-U11).
-//   2. Added Tag Color Badge visualization (GAP-U07).
-//   3. Added Device Type display (GAP-U10).
-//   4. Added Service Pills (GAP-U09).
+//   1. Applied incoming `modifier` parameter to root Card component.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -56,7 +53,6 @@ fun DeviceCard(
     val currentTagId = device.tags.firstOrNull() ?: "generic"
     val currentTag = tags.find { it.id == currentTagId }
 
-    // GAP-U11 Fix: Full DisplayName fallback chain
     val displayName = device.hostname.ifBlank { 
         device.friendlyName.ifBlank { 
             (device.vendor + " " + device.model).trim().ifBlank { 
@@ -74,7 +70,6 @@ fun DeviceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // GAP-U07 Fix: Tag Color Badge
                 currentTag?.let {
                     Box(
                         modifier = Modifier
@@ -111,14 +106,12 @@ fun DeviceCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            // GAP-U10 Fix: Device Type Display
             Text(
                 text = "Type: ${device.deviceType.ifBlank { "Unclassified" }}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // GAP-U09 Fix: Service Pills
             if (device.services.isNotEmpty()) {
                 Spacer(modifier = Modifier.size(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -140,7 +133,6 @@ fun DeviceCard(
             
             Spacer(modifier = Modifier.size(12.dp))
             
-            // Tag Dropdown
             Box {
                 Row(
                     modifier = Modifier
