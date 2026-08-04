@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added SnackbarHost to the Scaffold to display transient SSE events.
-//   2. Collected `uiEvents` from `LiasViewModel` to trigger Snackbars.
+//   1. Updated Snackbar listener to handle error events distinctly (GAP-U43).
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -19,13 +18,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,15 +66,25 @@ fun LiasNavHost(
         LiasScreen.Settings
     )
 
-    // FIX 3.1: Snackbar Host State
     val snackbarHostState = remember { SnackbarHostState() }
     val uiEvents by liasViewModel.uiEvents.collectAsStateWithLifecycle(initialValue = null)
 
-    // FIX 3.1: Collect transient events
+    // GAP-U43 Fix: Handle both standard and error snackbars
     LaunchedEffect(uiEvents) {
         uiEvents?.let { event ->
             when (event) {
-                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+                is UiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is UiEvent.ShowSnackbarError -> {
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        duration = SnackbarDuration.Long
+                    )
+                }
             }
         }
     }
