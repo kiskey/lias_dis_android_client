@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Fully verified schedule deletion impact alert and WeeklyTimeline composition.
+//   1. Updated policy impact lookup to invoke `p.resolveScheduleIDs()`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -137,7 +137,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
 
     scheduleToDelete?.let { schedule ->
         val impactedPolicies = state.policies.filter { p ->
-            p.scheduleIDs.contains(schedule.id) || p.scheduleID == schedule.id
+            p.resolveScheduleIDs().contains(schedule.id)
         }
         
         AlertDialog(
