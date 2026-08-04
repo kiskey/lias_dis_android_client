@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes:
-//   1. Made `macs`, `ips`, `services`, and `tags` nullable in Kotlin (`List<String>?`)
-//      to prevent kotlinx.serialization crashes when Go json.Marshal sends `"macs": null`.
-//   2. Added `safeMacs`, `safeIps`, `safeServices`, and `safeTags` helper properties.
-//   3. Maintained `resolveScheduleIDs()` to prevent JVM platform declaration clashes.
+//   1. Provided `safeRules` on `Schedule` and `safeDays` on `ScheduleRule`
+//      to ensure 100% type-safe access across projection engines and UI sheets.
+//   2. Preserved `resolveScheduleIDs()` to prevent JVM platform declaration clashes.
 // ====================================================================
 
 package com.lias.remote.core.models
