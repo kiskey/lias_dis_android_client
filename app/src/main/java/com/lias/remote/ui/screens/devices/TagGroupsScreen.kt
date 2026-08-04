@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.5.0
-// Audit Fixes:
-//   1. Updated device grouping logic to use `d.safeTags.firstOrNull() ?: "generic"`,
-//      guaranteeing all inventory devices render under their respective tag headers.
+// Version: 1.6.0
+// Audit Fixes: 
+//   1. Fully verified tag group rendering using `d.safeTags`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
