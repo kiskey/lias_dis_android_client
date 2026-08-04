@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ==================================================================== -->
+<!-- File: app/src/main/res/values-night/colors.xml                        -->
+<!-- Version: 1.0.0                                                       -->
+<!-- Purpose: Dark mode background color to prevent white flash (GAP-V01). -->
+<!-- ==================================================================== -->
+
+<resources>
+    <color name="background_dark">#000000</color>
+</resources>
