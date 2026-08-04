@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Added imports for repository extension functions.
-//   2. Updated ApiResult.Conflict to ApiResult.ConflictError.
+//   1. Propagated detailed conflict/error events directly to UI event stream.
 // ====================================================================
 
 package com.lias.remote.ui
