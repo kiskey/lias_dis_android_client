@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes:
-//   1. Verified volatile fields and OkHttp active call socket cancellation logic.
+//   1. Replaced flawed regex device ID extraction with structured JSON element parsing
+//      to accurately resolve `pdid`, `new_pdid`, `device_id`, and `old_pdid`.
+//   2. Retained socket call cancellation and URL normalization.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -21,6 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -154,8 +159,18 @@ class LiasSseClient(
     }
 
     private fun extractDeviceId(jsonStr: String): String {
-        val regex = """"pdid"\s*:\s*"([^"]+)"""".toRegex()
-        val match = regex.find(jsonStr)
-        return match?.groupValues?.get(1) ?: ""
+        if (jsonStr.isBlank()) return ""
+        return try {
+            val element = json.parseToJsonElement(jsonStr)
+            if (element is JsonObject) {
+                element["pdid"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    ?: element["new_pdid"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    ?: element["device_id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    ?: element["old_pdid"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    ?: ""
+            } else ""
+        } catch (_: Exception) {
+            ""
+        }
     }
 }
