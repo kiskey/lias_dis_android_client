@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Fully verified Material 3 ExposedDropdownMenuBox menu anchor modifier 
-//      compatibility for Compose BOM 2024.09.00 / Material 3 1.3.0.
+//   1. Updated all `rule.days` and `initialSchedule.rules` calls to use `safeDays`
+//      and `safeRules`, completely resolving Kotlin nullable receiver errors.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -69,7 +69,7 @@ fun ScheduleEditorSheet(
     
     val rules = remember {
         mutableStateListOf<ScheduleRule>().apply {
-            if (initialSchedule != null) addAll(initialSchedule.rules)
+            if (initialSchedule != null) addAll(initialSchedule.safeRules)
             else add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block"))
         }
     }
@@ -189,7 +189,8 @@ fun ScheduleEditorSheet(
                             }
                         }
                         
-                        var isRange by remember { mutableStateOf(rule.days.size > 2 && rule.days.contains("mon") && rule.days.contains("fri")) }
+                        val safeDays = rule.safeDays
+                        var isRange by remember { mutableStateOf(safeDays.size > 2 && safeDays.contains("mon") && safeDays.contains("fri")) }
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -204,8 +205,8 @@ fun ScheduleEditorSheet(
                         
                         if (isRange) {
                             val days = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-                            val startIdx = days.indexOf(rule.days.firstOrNull())
-                            val endIdx = days.indexOf(rule.days.lastOrNull())
+                            val startIdx = days.indexOf(safeDays.firstOrNull())
+                            val endIdx = days.indexOf(safeDays.lastOrNull())
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -224,9 +225,9 @@ fun ScheduleEditorSheet(
                             ) {
                                 listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
                                     FilterChip(
-                                        selected = day in rule.days,
+                                        selected = day in safeDays,
                                         onClick = {
-                                            val newDays = rule.days.toMutableList()
+                                            val newDays = safeDays.toMutableList()
                                             if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
                                             rules[index] = rule.copy(days = newDays)
                                         },
