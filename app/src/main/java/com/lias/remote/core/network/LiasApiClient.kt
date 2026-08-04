@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added missing `import kotlinx.serialization.serializer`.
-//   2. Fixed unsafe 204 No Content casting with @Suppress.
+//   1. Changed parseResponse and buildRequest visibility to internal to fix inline function access.
+//   2. Updated Conflict parsing to use ConflictError.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -30,7 +30,7 @@ class LiasApiClient(
     var baseUrl: String = "http://127.0.0.1:8081"
     var authToken: String? = null
 
-    private fun buildRequest(path: String, method: String, body: RequestBody? = null): Request {
+    internal fun buildRequest(path: String, method: String, body: RequestBody? = null): Request {
         val sanitizedBase = baseUrl.trimEnd('/')
         val builder = Request.Builder()
             .url("$sanitizedBase$path")
@@ -48,12 +48,11 @@ class LiasApiClient(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private inline fun <reified T> parseResponse(response: Response): ApiResult<T> {
+    internal inline fun <reified T> parseResponse(response: Response): ApiResult<T> {
         val bodyString = response.body?.string() ?: ""
         return when {
             response.isSuccessful -> {
                 if (bodyString.isBlank() || response.code == 204) {
-                    // Safely cast Unit to T for 204 No Content responses
                     ApiResult.Success(Unit as T)
                 } else {
                     try {
@@ -66,7 +65,7 @@ class LiasApiClient(
             response.code == 409 -> {
                 try {
                     val errorResp = json.decodeFromString<ConflictResponse>(bodyString)
-                    ApiResult.Conflict(errorResp.conflicts)
+                    ApiResult.ConflictError(errorResp.conflicts)
                 } catch (e: Exception) {
                     ApiResult.HttpError(409, "Conflict parsing failed")
                 }
