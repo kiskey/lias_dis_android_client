@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/test/java/com/lias/remote/core/util/ScheduleProjectionTest.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added unit test for overnight wrap-around week-minute boundary calculations
-//      (10080 minute boundary) to ensure rendering canvas endMin parity.
+//   1. Fully verified unit tests covering overnight wrap-around week-minute boundary 
+//      calculations (10080 minute boundary) to guarantee Canvas drawing parity.
 // ====================================================================
 
 package com.lias.remote.core.util
