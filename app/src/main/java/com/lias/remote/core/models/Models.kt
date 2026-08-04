@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Added DeviceReidentifiedPayload model for SSE event parsing (GAP-C05).
+//   1. Added DeviceEventPayload model for SSE event parsing (GAP-A05).
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -103,11 +103,20 @@ data class LiasEvent(
     val payload: JsonElement? = null
 )
 
-// GAP-C05 Fix: Added missing payload model for device.reidentified event
 @Serializable
 data class DeviceReidentifiedPayload(
     @SerialName("old_pdid") val oldPdid: String,
     @SerialName("new_pdid") val newPdid: String,
     val reason: String = "",
     @SerialName("migrated_macs") val migratedMacs: List<String> = emptyList()
+)
+
+// GAP-A05 Fix: Added payload model to parse `confirmed_by` sources
+@Serializable
+data class DeviceEventPayload(
+    val pdid: String = "",
+    val mac: String = "",
+    val ip: String = "",
+    val hostname: String = "",
+    @SerialName("confirmed_by") val confirmedBy: List<String> = emptyList()
 )
