@@ -1,18 +1,21 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Implemented Tag CRUD (create/edit/delete) with optimistic UI updates (GAP-C03).
+//   1. Implemented `validatePolicy` to call server-side `/policies/validate` (GAP-A01).
 // ====================================================================
 
 package com.lias.remote.repositories
 
+import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.network.ConflictResponse
 import com.lias.remote.core.network.DeviceTagRequest
 import com.lias.remote.core.network.Endpoints
+import com.lias.remote.core.network.PolicyValidateRequest
 
 suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiResult<Unit> {
     val previousTags = _state.value.devices.find { it.pdid == pdid }?.tags
@@ -35,7 +38,20 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
     return result
 }
 
-// GAP-C03 Fix: Tag CRUD Operations
+// GAP-A01 Fix: Server-side validation action
+suspend fun EventRepository.validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
+    return try {
+        when (val result = api.post<ConflictResponse, PolicyValidateRequest>(Endpoints.POLICIES_VALIDATE, PolicyValidateRequest(scheduleIds))) {
+            is ApiResult.Success -> ApiResult.Success(result.data.conflicts)
+            is ApiResult.Conflict -> ApiResult.Success(result.conflicts)
+            is ApiResult.HttpError -> result
+            is ApiResult.NetworkError -> result
+        }
+    } catch (e: Exception) {
+        ApiResult.NetworkError(e)
+    }
+}
+
 suspend fun EventRepository.createTag(tag: Tag): ApiResult<Tag> {
     val result = api.post<Tag, Tag>(Endpoints.TAGS, tag)
     if (result is ApiResult.Success) {
@@ -56,7 +72,7 @@ suspend fun EventRepository.updateTag(tag: Tag): ApiResult<Tag> {
             tags = _state.value.tags.map { if (it.id == result.data.id) result.data else it }
         )
     } else {
-        refreshAll() // Rollback by fetching true state
+        refreshAll() 
     }
     return result
 }
