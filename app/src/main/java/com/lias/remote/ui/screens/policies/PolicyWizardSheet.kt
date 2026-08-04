@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.5.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Resolved UI deadlock on step 3 save handler when server validation returns
-//      conflicts or HTTP errors by rendering inline actionable error banners and
-//      re-enabling inputs.
+//   1. Updated initial schedule resolution to invoke `initialPolicy?.resolveScheduleIDs()`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -44,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
@@ -75,7 +72,7 @@ fun PolicyWizardSheet(
     var priority by remember { mutableStateOf(initialPolicy?.priority?.toString() ?: "50") }
     
     val selectedSchedules = remember {
-        mutableStateListOf<String>().apply { addAll(initialPolicy?.scheduleIDs ?: emptyList()) }
+        mutableStateListOf<String>().apply { addAll(initialPolicy?.resolveScheduleIDs() ?: emptyList()) }
     }
 
     var shadowWarning by remember { mutableStateOf<String?>(null) }
