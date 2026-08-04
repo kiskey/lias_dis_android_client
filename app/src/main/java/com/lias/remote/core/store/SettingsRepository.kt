@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/store/SettingsRepository.kt
-// Version: 1.0.0
-// Purpose: Zero-waste DataStore wrapper for persisting server URL,
-// auth token, and theme preferences. Replaces Room/SQLite overhead.
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Removed hardcoded default server URL to force first-run configuration (GAP-S03).
 // ====================================================================
 
 package com.lias.remote.core.store
@@ -25,8 +25,9 @@ class SettingsRepository(private val context: Context) {
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
     }
 
+    // GAP-S03 Fix: Default to empty string instead of hardcoded IP
     val serverUrl: Flow<String> = context.dataStore.data
-        .map { preferences -> preferences[SERVER_URL] ?: "http://192.168.1.1:8081" }
+        .map { preferences -> preferences[SERVER_URL] ?: "" }
 
     val authToken: Flow<String?> = context.dataStore.data
         .map { preferences -> preferences[AUTH_TOKEN] }
