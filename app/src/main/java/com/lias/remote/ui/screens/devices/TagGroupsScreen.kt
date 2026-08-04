@@ -1,16 +1,22 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.6.0
-// Audit Fixes: 
-//   1. Fully verified tag group rendering using `d.safeTags`.
+// Version: 1.7.0
+// Audit Fixes:
+//   1. Defaulted tag group cards to collapsed state (`expanded = false`) on launch
+//      to prevent long scrolling and visual clutter.
+//   2. Made the entire tag header row clickable to toggle expand/collapse.
+//   3. Added animated rotating chevron indicator (`ExpandMore`).
+//   4. Separated Edit/Delete tag options into a distinct `MoreVert` (3-dots) menu.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +36,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -54,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
@@ -189,8 +197,22 @@ private fun ExpandableTagGroup(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(true) }
+    // Audit Fix: Default collapsed view on app launch (`expanded = false`)
+    var expanded by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+
+    val rotationState by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "ChevronRotation"
+    )
+
+    val tagColor = remember(tag.color) {
+        try {
+            Color(android.graphics.Color.parseColor(tag.color))
+        } catch (e: Exception) {
+            Color.Gray
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -198,9 +220,11 @@ private fun ExpandableTagGroup(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
+            // Clickable Header Row: Toggles expand / collapse
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { expanded = !expanded }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -208,7 +232,7 @@ private fun ExpandableTagGroup(
                     modifier = Modifier
                         .size(12.dp)
                         .clip(CircleShape)
-                        .background(Color(android.graphics.Color.parseColor(tag.color)))
+                        .background(tagColor)
                 )
                 Spacer(modifier = Modifier.size(12.dp))
                 
@@ -230,9 +254,31 @@ private fun ExpandableTagGroup(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
+                Spacer(modifier = Modifier.size(8.dp))
+
+                // Animated Rotating Chevron Indicator
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = rotationState },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.size(4.dp))
+
+                // 3-Dots Action Menu (Edit / Delete)
                 Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Filled.ExpandMore, contentDescription = "Menu")
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Tag Actions",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -260,21 +306,31 @@ private fun ExpandableTagGroup(
                 }
             }
             
+            // Expandable Content Body
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    devices.forEach { device ->
-                        DeviceCard(
-                            device = device,
-                            tags = allTags,
-                            onTagSelected = { tagId -> onTagSelected(device.pdid, tagId) }
+                    if (devices.isEmpty()) {
+                        Text(
+                            text = "No devices in this tag group.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
+                    } else {
+                        devices.forEach { device ->
+                            DeviceCard(
+                                device = device,
+                                tags = allTags,
+                                onTagSelected = { tagId -> onTagSelected(device.pdid, tagId) }
+                            )
+                        }
                     }
                 }
             }
