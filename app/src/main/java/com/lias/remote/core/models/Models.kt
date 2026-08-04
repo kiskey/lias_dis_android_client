@@ -1,9 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes:
-//   1. Renamed custom fallback method in `Policy` to `resolveScheduleIDs()` to resolve
-//      JVM platform declaration clash with auto-generated getter `getScheduleIDs()`.
+//   1. Made `macs`, `ips`, `services`, and `tags` nullable in Kotlin (`List<String>?`)
+//      to prevent kotlinx.serialization crashes when Go json.Marshal sends `"macs": null`.
+//   2. Added `safeMacs`, `safeIps`, `safeServices`, and `safeTags` helper properties.
+//   3. Maintained `resolveScheduleIDs()` to prevent JVM platform declaration clashes.
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -14,27 +16,32 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class Device(
-    val pdid: String,
+    val pdid: String = "",
     @SerialName("identity_tier") val identityTier: String = "tentative",
     @SerialName("identity_anchor") val identityAnchor: String = "",
     @SerialName("canonical_hostname") val canonicalHostname: String = "",
     @SerialName("current_mac") val currentMAC: String = "",
-    val macs: List<String> = emptyList(),
+    val macs: List<String>? = emptyList(),
     @SerialName("current_ip") val currentIP: String = "",
-    val ips: List<String> = emptyList(),
+    val ips: List<String>? = emptyList(),
     val hostname: String = "",
     @SerialName("friendly_name") val friendlyName: String = "",
     val manufacturer: String = "",
     val vendor: String = "",
     val model: String = "",
     @SerialName("device_type") val deviceType: String = "",
-    val services: List<String> = emptyList(),
+    val services: List<String>? = emptyList(),
     val online: Boolean = false,
     @SerialName("first_seen") val firstSeen: String = "",
     @SerialName("last_seen") val lastSeen: String = "",
     val confidence: Double = 0.0,
-    val tags: List<String> = emptyList()
-)
+    val tags: List<String>? = emptyList()
+) {
+    val safeMacs: List<String> get() = macs ?: emptyList()
+    val safeIps: List<String> get() = ips ?: emptyList()
+    val safeServices: List<String> get() = services ?: emptyList()
+    val safeTags: List<String> get() = tags ?: emptyList()
+}
 
 @Serializable
 data class Tag(
@@ -49,18 +56,20 @@ data class Tag(
 data class Policy(
     val id: String,
     val name: String,
-    val type: String, // "global", "tag", "device"
+    val type: String,
     @SerialName("target_id") val targetID: String = "",
-    val action: String, // "allow", "block", "schedule"
-    @SerialName("schedule_ids") val scheduleIDs: List<String> = emptyList(),
-    @SerialName("schedule_id") val scheduleID: String? = null, // Deprecated but handled for migration
+    val action: String,
+    @SerialName("schedule_ids") val scheduleIDs: List<String>? = emptyList(),
+    @SerialName("schedule_id") val scheduleID: String? = null,
     val priority: Int = 50,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = ""
 ) {
-    // Audit Fix: Renamed method to resolve JVM getter name collision
+    val safeScheduleIDs: List<String> get() = scheduleIDs ?: emptyList()
+
     fun resolveScheduleIDs(): List<String> {
-        if (scheduleIDs.isNotEmpty()) return scheduleIDs
+        val ids = safeScheduleIDs
+        if (ids.isNotEmpty()) return ids
         if (!scheduleID.isNullOrEmpty()) return listOf(scheduleID)
         return emptyList()
     }
@@ -70,18 +79,22 @@ data class Policy(
 data class Schedule(
     val id: String,
     val name: String,
-    val mode: String, // "whitelist", "downtime"
-    val timezone: String,
-    val rules: List<ScheduleRule>
-)
+    val mode: String = "downtime",
+    val timezone: String = "UTC",
+    val rules: List<ScheduleRule>? = emptyList()
+) {
+    val safeRules: List<ScheduleRule> get() = rules ?: emptyList()
+}
 
 @Serializable
 data class ScheduleRule(
-    val days: List<String>,
-    @SerialName("start_time") val startTime: String,
-    @SerialName("end_time") val endTime: String,
-    val action: String // "allow", "block"
-)
+    val days: List<String>? = emptyList(),
+    @SerialName("start_time") val startTime: String = "00:00",
+    @SerialName("end_time") val endTime: String = "23:59",
+    val action: String = "block"
+) {
+    val safeDays: List<String> get() = days ?: emptyList()
+}
 
 @Serializable
 data class Conflict(
@@ -100,17 +113,19 @@ data class Conflict(
 data class LiasEvent(
     val type: String,
     val timestamp: String,
-    @SerialName("device_id") val deviceID: String,
+    @SerialName("device_id") val deviceID: String = "",
     val payload: JsonElement? = null
 )
 
 @Serializable
 data class DeviceReidentifiedPayload(
-    @SerialName("old_pdid") val oldPdid: String,
-    @SerialName("new_pdid") val newPdid: String,
+    @SerialName("old_pdid") val oldPdid: String = "",
+    @SerialName("new_pdid") val newPdid: String = "",
     val reason: String = "",
-    @SerialName("migrated_macs") val migratedMacs: List<String> = emptyList()
-)
+    @SerialName("migrated_macs") val migratedMacs: List<String>? = emptyList()
+) {
+    val safeMigratedMacs: List<String> get() = migratedMacs ?: emptyList()
+}
 
 @Serializable
 data class DeviceEventPayload(
@@ -118,5 +133,7 @@ data class DeviceEventPayload(
     val mac: String = "",
     val ip: String = "",
     val hostname: String = "",
-    @SerialName("confirmed_by") val confirmedBy: List<String> = emptyList()
-)
+    @SerialName("confirmed_by") val confirmedBy: List<String>? = emptyList()
+) {
+    val safeConfirmedBy: List<String> get() = confirmedBy ?: emptyList()
+}
