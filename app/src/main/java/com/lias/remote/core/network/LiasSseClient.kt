@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Hardened empty payload parsing to prevent silent exceptions on pings (GAP-E05).
+//   1. Implemented Last-Event-ID tracking and header injection on reconnect (GAP-A02).
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -44,18 +44,21 @@ class LiasSseClient(
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     private var sseJob: Job? = null
+    
+    // GAP-A02 Fix: Track Last-Event-ID for replay support
+    private var lastEventId: Long = 0L
 
     fun connect(scope: kotlinx.coroutines.CoroutineScope) {
         sseJob?.cancel()
         sseJob = scope.launch(Dispatchers.IO) {
-            var backoff = 1000L // 1 second
-            val maxBackoff = 30000L // 30 seconds
+            var backoff = 1000L
+            val maxBackoff = 30000L
 
             while (isActive) {
                 try {
                     _connectionState.value = ConnectionState.CONNECTING
                     consumeSseStream()
-                    backoff = 1000L // Reset on clean disconnect
+                    backoff = 1000L
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -79,7 +82,13 @@ class LiasSseClient(
             .url("$sanitizedBase${Endpoints.EVENTS_SSE}")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
-            .apply { authToken?.takeIf { it.isNotBlank() }?.let { header("Authorization", "Bearer $it") } }
+            .apply { 
+                authToken?.takeIf { it.isNotBlank() }?.let { header("Authorization", "Bearer $it") }
+                // GAP-A02 Fix: Send Last-Event-ID header if we have one
+                if (lastEventId > 0) {
+                    header("Last-Event-ID", lastEventId.toString())
+                }
+            }
             .build()
 
         val response = client.newCall(request).execute()
@@ -92,7 +101,6 @@ class LiasSseClient(
             val source = resp.body?.source() ?: throw Exception("Empty SSE body")
             var eventType = ""
             var dataBuilder = StringBuilder()
-            var eventId = 0L
 
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
@@ -106,11 +114,10 @@ class LiasSseClient(
                                     type = eventType.ifEmpty { "message" },
                                     timestamp = "", 
                                     deviceID = extractDeviceId(payloadStr),
-                                    // GAP-E05 Fix: Safely handle empty payloads like pings
                                     payload = if (payloadStr.isNotBlank()) json.parseToJsonElement(payloadStr) else null
                                 )
                                 _events.emit(event)
-                            } catch (_: Exception) { /* Ignore parse error for pings */ }
+                            } catch (_: Exception) { }
                             
                             eventType = ""
                             dataBuilder = StringBuilder()
@@ -118,10 +125,13 @@ class LiasSseClient(
                     }
                     line.startsWith("event: ") -> eventType = line.removePrefix("event: ").trim()
                     line.startsWith("data: ") -> dataBuilder.append(line.removePrefix("data: "))
-                    line.startsWith("id: ") -> eventId = line.removePrefix("id: ").trim().toLongOrNull() ?: 0L
+                    line.startsWith("id: ") -> {
+                        // GAP-A02 Fix: Persist the latest event ID
+                        lastEventId = line.removePrefix("id: ").trim().toLongOrNull() ?: lastEventId
+                    }
                 }
             }
-            throw Exception("SSE stream closed by server") // Triggers backoff
+            throw Exception("SSE stream closed by server")
         }
     }
 
