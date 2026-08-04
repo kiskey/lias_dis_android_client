@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Emit Error Snackbars on API failures (GAP-U43).
+//   1. Exposed `validatePolicy` to UI layer (GAP-A01).
 // ====================================================================
 
 package com.lias.remote.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
@@ -30,10 +31,14 @@ class LiasViewModel(
         eventRepository.start()
     }
 
+    // GAP-A01 Fix: Expose validation to UI
+    suspend fun validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
+        return eventRepository.validatePolicy(scheduleIds)
+    }
+
     fun assignTag(pdid: String, tagId: String) {
         viewModelScope.launch {
             val result = eventRepository.assignDeviceTag(pdid, tagId)
-            // GAP-U43 Fix: Emit Error Snackbar
             if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to assign tag: $msg"))
