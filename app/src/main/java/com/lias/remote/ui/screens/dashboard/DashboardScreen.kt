@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Updated PolicyWizardSheet caller to pass viewModel for server-side validation (GAP-A01).
+//   1. Added @OptIn(ExperimentalMaterial3Api::class) for PullToRefreshBox.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -47,6 +48,7 @@ import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.components.WeeklyTimeline
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
@@ -182,7 +184,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
 
     if (showGlobalWizard) {
         PolicyWizardSheet(
-            viewModel = viewModel, // Passed here for server-side validation
+            viewModel = viewModel,
             initialPolicy = state.policies.find { it.id == "global_default" },
             tags = state.tags,
             schedules = state.schedules,
