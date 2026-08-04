@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/util/ScheduleProjection.kt
-// Version: 1.0.0
-// Purpose: Port of scheduleConflict.js. Calculates overlapping 
-//          schedule rules on the client-side for instant UI conflict
-//          feedback without hitting the server.
+// Version: 1.1.0
+// Audit Fixes: 
+//   1. Updated projection engine to use `schedule.safeRules` and `rule.safeDays`
+//      to eliminate Kotlin nullable receiver compilation errors.
 // ====================================================================
 
 package com.lias.remote.core.util
@@ -54,12 +54,12 @@ object ScheduleProjection {
     fun projectSchedule(schedule: Schedule): List<Segment> {
         val segments = mutableListOf<Segment>()
         
-        schedule.rules.forEachIndexed { ruleIdx, rule ->
+        schedule.safeRules.forEachIndexed { ruleIdx, rule ->
             val startMin = parseTime(rule.startTime)
             val endMin = parseTime(rule.endTime)
             if (startMin == endMin) return@forEachIndexed
 
-            rule.days.forEach { dStr ->
+            rule.safeDays.forEach { dStr ->
                 val dayIdx = dayToIndex[dStr.lowercase().trim()] ?: return@forEach
                 
                 if (startMin < endMin) {
