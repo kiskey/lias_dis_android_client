@@ -1,13 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed unsafe `= viewModel()` default parameter to prevent crashes 
-//      when no ViewModelProvider.Factory is provided.
+//   1. Added Global Switch Schedule Drawer with Weekly Timeline (GAP-U01).
+//   2. Added "Manage Schedules" button that opens Policy Wizard on global policy (GAP-U02).
+//   3. Added Initial Loading Skeleton check (GAP-U39).
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,26 +23,36 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
 import com.lias.remote.ui.components.DeviceCard
 import com.lias.remote.ui.components.SegmentedControl
+import com.lias.remote.ui.components.WeeklyTimeline
+import com.lias.remote.ui.screens.policies.PolicyWizardSheet
 
 @Composable
 fun DashboardScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
+    
+    var showGlobalWizard by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -47,6 +61,20 @@ fun DashboardScreen(viewModel: LiasViewModel) {
     ) {
         ConnectionStatusBanner(state.connectionState)
         Spacer(modifier = Modifier.size(16.dp))
+
+        // GAP-U39 Fix: Initial Loading Skeleton
+        if (!state.isInitialLoaded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("Loading LIAS Dashboard...")
+            }
+            return@Column
+        }
 
         // Global Switch Banner
         Card(
@@ -73,6 +101,35 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // GAP-U01 Fix: Global Switch Schedule Drawer
+                AnimatedVisibility(
+                    visible = globalPolicy.action == "schedule",
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.padding(top = 16.dp)) {
+                        val globalSchedules = state.schedules.filter { it.id in globalPolicy.getScheduleIDs() }
+                        
+                        if (globalSchedules.isNotEmpty()) {
+                            Text(
+                                "Attached Schedules (${globalSchedules.size})",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            WeeklyTimeline(schedules = globalSchedules)
+                        }
+                        
+                        // GAP-U02 Fix: Manage Schedules Button
+                        Button(
+                            onClick = { showGlobalWizard = true },
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                        ) {
+                            Text("Manage Schedules")
+                        }
+                    }
+                }
             }
         }
 
@@ -107,6 +164,19 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                 )
             }
         }
+    }
+
+    if (showGlobalWizard) {
+        PolicyWizardSheet(
+            initialPolicy = state.policies.find { it.id == "global_default" },
+            tags = state.tags,
+            schedules = state.schedules,
+            onDismiss = { showGlobalWizard = false },
+            onSave = { 
+                viewModel.savePolicy(it) 
+                showGlobalWizard = false
+            }
+        )
     }
 }
 
