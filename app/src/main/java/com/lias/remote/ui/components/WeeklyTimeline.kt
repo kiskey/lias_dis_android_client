@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/WeeklyTimeline.kt
-// Version: 1.1.1
-// Audit Fixes: 
-//   1. Rewrote Canvas drawing logic to use ScheduleProjection segments.
-//      This accurately handles overnight wrap-around drawing across midnight.
-//   2. Added `conflicts` parameter to render red hatch patterns over 
-//      overlapping contradictory windows, matching web dashboard UI parity.
+// Version: 1.2.0
+// Audit Fixes:
+//   1. Fixed critical overnight Canvas calculation bug where endMin modulo 1440
+//      evaluated to 0, causing negative rectangle width calculations and rendering crashes.
+//   2. Added non-zero width coercion to guarantee safe drawing.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -49,7 +48,6 @@ fun WeeklyTimeline(
     val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
     val dayNames = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
 
-    // FIX 4.1 & 4.2: Use ScheduleProjection for accurate segments
     val allSegments = remember(schedules) {
         schedules.flatMap { ScheduleProjection.projectSchedule(it) }
     }
@@ -83,43 +81,54 @@ fun WeeklyTimeline(
                         val canvasHeight = size.height
                         val canvasWidth = size.width
                         
-                        // Draw Schedule Bands
                         allSegments.forEach { seg ->
                             val segDayIdx = seg.start / 1440
                             if (segDayIdx == dayIdx) {
                                 val startMin = seg.start % 1440
-                                val endMin = seg.end % 1440
+                                var endMin = seg.end % 1440
+                                // Audit Fix: Handle overnight boundary endMin = 0 (10080 % 1440)
+                                if (endMin == 0 && seg.end > seg.start) {
+                                    endMin = 1440
+                                }
                                 
                                 val schedIdx = schedules.indexOfFirst { it.id == seg.scheduleId }
                                 val color = colors[if (schedIdx != -1) schedIdx % colors.size else 0]
                                 
                                 val left = (startMin / 1440f) * canvasWidth
-                                val width = ((endMin - startMin) / 1440f) * canvasWidth
+                                val durationMinutes = (endMin - startMin).coerceAtLeast(0)
+                                val width = (durationMinutes / 1440f) * canvasWidth
                                 
-                                drawRect(
-                                    color = color,
-                                    topLeft = Offset(left, 2f),
-                                    size = Size(width, canvasHeight - 4f)
-                                )
+                                if (width > 0f) {
+                                    drawRect(
+                                        color = color,
+                                        topLeft = Offset(left, 2f),
+                                        size = Size(width, canvasHeight - 4f)
+                                    )
+                                }
                             }
                         }
                         
-                        // Draw Conflicts
                         val dayNameStr = dayNames[dayIdx]
                         conflicts.filter { it.day.equals(dayNameStr, ignoreCase = true) }.forEach { c ->
                             val startParts = c.overlapStart.split(":")
                             val endParts = c.overlapEnd.split(":")
                             val startMin = (startParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
-                            val endMin = (endParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                            var endMin = (endParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                            if (endMin == 0 && endMin < startMin) {
+                                endMin = 1440
+                            }
                             
                             val left = (startMin / 1440f) * canvasWidth
-                            val width = ((endMin - startMin) / 1440f) * canvasWidth
+                            val durationMinutes = (endMin - startMin).coerceAtLeast(0)
+                            val width = (durationMinutes / 1440f) * canvasWidth
                             
-                            drawRect(
-                                color = Color.Red.copy(alpha = 0.6f),
-                                topLeft = Offset(left, 0f),
-                                size = Size(width, canvasHeight)
-                            )
+                            if (width > 0f) {
+                                drawRect(
+                                    color = Color.Red.copy(alpha = 0.6f),
+                                    topLeft = Offset(left, 0f),
+                                    size = Size(width, canvasHeight)
+                                )
+                            }
                         }
                     }
                 }
