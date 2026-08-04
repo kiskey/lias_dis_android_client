@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Added empty state UI for Policies (GAP-U42).
+//   1. Updated PolicyWizardSheet caller to pass viewModel for server-side validation (GAP-A01).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -74,7 +74,6 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // GAP-U42 Fix: Empty State for Policies
             if (state.policies.isEmpty() && state.isInitialLoaded) {
                 Text(
                     text = "No policies yet. Tap + to create one.",
@@ -108,6 +107,7 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
 
     if (showWizard) {
         PolicyWizardSheet(
+            viewModel = viewModel, // Passed here for server-side validation
             initialPolicy = editingPolicy,
             tags = state.tags,
             schedules = state.schedules,
