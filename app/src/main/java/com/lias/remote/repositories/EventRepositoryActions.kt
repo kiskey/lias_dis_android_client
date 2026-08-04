@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Fixed return type mismatch in validatePolicy.
-//   2. Updated ApiResult.Conflict to ApiResult.ConflictError.
+//   1. Ensured detailed conflict payloads propagate through validatePolicy.
 // ====================================================================
 
 package com.lias.remote.repositories
