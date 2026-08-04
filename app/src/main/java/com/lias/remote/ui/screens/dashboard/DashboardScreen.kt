@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added Global Switch Schedule Drawer with Weekly Timeline (GAP-U01).
-//   2. Added "Manage Schedules" button that opens Policy Wizard on global policy (GAP-U02).
-//   3. Added Initial Loading Skeleton check (GAP-U39).
+//   1. Added empty state UI for Devices (GAP-U40).
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -13,6 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
-import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
 import com.lias.remote.ui.components.DeviceCard
@@ -51,7 +49,6 @@ import com.lias.remote.ui.screens.policies.PolicyWizardSheet
 @Composable
 fun DashboardScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
-    
     var showGlobalWizard by remember { mutableStateOf(false) }
 
     Column(
@@ -62,7 +59,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
         ConnectionStatusBanner(state.connectionState)
         Spacer(modifier = Modifier.size(16.dp))
 
-        // GAP-U39 Fix: Initial Loading Skeleton
         if (!state.isInitialLoaded) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -102,7 +98,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // GAP-U01 Fix: Global Switch Schedule Drawer
                 AnimatedVisibility(
                     visible = globalPolicy.action == "schedule",
                     enter = expandVertically(),
@@ -121,7 +116,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                             WeeklyTimeline(schedules = globalSchedules)
                         }
                         
-                        // GAP-U02 Fix: Manage Schedules Button
                         Button(
                             onClick = { showGlobalWizard = true },
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
@@ -149,19 +143,32 @@ fun DashboardScreen(viewModel: LiasViewModel) {
         Text("Recent Devices", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.size(8.dp))
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(state.devices.take(10)) { device ->
-                DeviceCard(
-                    device = device,
-                    tags = state.tags,
-                    onTagSelected = { tagId ->
-                        viewModel.assignTag(device.pdid, tagId)
-                    }
+        // GAP-U40 Fix: Empty State for Devices
+        if (state.devices.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Waiting for Discovery Service to report inventory...",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(state.devices.take(10)) { device ->
+                    DeviceCard(
+                        device = device,
+                        tags = state.tags,
+                        onTagSelected = { tagId ->
+                            viewModel.assignTag(device.pdid, tagId)
+                        }
+                    )
+                }
             }
         }
     }
