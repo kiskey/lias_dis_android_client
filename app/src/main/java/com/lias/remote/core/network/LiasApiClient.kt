@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.2.0
+// Version: 1.2.1
 // Audit Fixes: 
-//   1. Changed parseResponse and buildRequest visibility to internal to fix inline function access.
-//   2. Updated Conflict parsing to use ConflictError.
+//   1. Added @PublishedApi to internal inline functions to fix visibility errors.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -30,6 +29,7 @@ class LiasApiClient(
     var baseUrl: String = "http://127.0.0.1:8081"
     var authToken: String? = null
 
+    @PublishedApi
     internal fun buildRequest(path: String, method: String, body: RequestBody? = null): Request {
         val sanitizedBase = baseUrl.trimEnd('/')
         val builder = Request.Builder()
@@ -48,6 +48,7 @@ class LiasApiClient(
     }
 
     @Suppress("UNCHECKED_CAST")
+    @PublishedApi
     internal inline fun <reified T> parseResponse(response: Response): ApiResult<T> {
         val bodyString = response.body?.string() ?: ""
         return when {
