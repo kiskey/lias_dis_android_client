@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.6.0
-// Audit Fixes: 
-//   1. Ensured URL updates apply thread-safely across API and SSE clients.
+// Version: 1.7.0
+// Audit Fixes:
+//   1. Ensured device inventory collection gracefully handles null list deserialization.
+//   2. Preserved SSE reconnection and single device refresh state logic.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -97,8 +98,10 @@ class EventRepository(
             val policiesResult = pols.await()
             val schedulesResult = scheds.await()
 
+            val fetchedDevices = (devicesResult as? ApiResult.Success)?.data?.devices ?: emptyList()
+
             _state.value = _state.value.copy(
-                devices = (devicesResult as? ApiResult.Success)?.data?.devices ?: emptyList(),
+                devices = fetchedDevices,
                 tags = (tagsResult as? ApiResult.Success)?.data ?: emptyList(),
                 policies = (policiesResult as? ApiResult.Success)?.data ?: emptyList(),
                 schedules = (schedulesResult as? ApiResult.Success)?.data ?: emptyList(),
@@ -117,7 +120,7 @@ class EventRepository(
                 EventConstants.DEVICE_ONLINE -> {
                     refreshSingleDevice(event.deviceID)
                     val confirmedBy = event.payload?.let {
-                        try { json.decodeFromJsonElement<DeviceEventPayload>(it).confirmedBy } catch (e: Exception) { emptyList() }
+                        try { json.decodeFromJsonElement<DeviceEventPayload>(it).safeConfirmedBy } catch (e: Exception) { emptyList() }
                     } ?: emptyList()
                     val verifiedText = if (confirmedBy.isNotEmpty()) " ✓ ${confirmedBy.size} sources" else ""
                     _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}$verifiedText"))
