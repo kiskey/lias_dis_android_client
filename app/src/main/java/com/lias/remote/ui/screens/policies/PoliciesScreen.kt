@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Added missing schedule warnings (GAP-U25, U26).
-//   2. Added attached schedule summary text (GAP-U27).
-//   3. Added inline weekly timeline preview per policy (GAP-U28).
+//   1. Added empty state UI for Policies (GAP-U42).
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -56,7 +54,6 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
     
     var showWizard by remember { mutableStateOf(false) }
     var editingPolicy by remember { mutableStateOf<Policy?>(null) }
-    
     var policyToDelete by remember { mutableStateOf<Policy?>(null) }
 
     Scaffold(
@@ -72,25 +69,39 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(state.policies, key = { it.id }) { policy ->
-                PolicyCard(
-                    policy = policy,
-                    schedules = state.schedules,
-                    onEditClick = {
-                        editingPolicy = policy
-                        showWizard = true
-                    },
-                    onDeleteClick = {
-                        policyToDelete = policy
-                    }
+            // GAP-U42 Fix: Empty State for Policies
+            if (state.policies.isEmpty() && state.isInitialLoaded) {
+                Text(
+                    text = "No policies yet. Tap + to create one.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center)
                 )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(state.policies, key = { it.id }) { policy ->
+                        PolicyCard(
+                            policy = policy,
+                            schedules = state.schedules,
+                            onEditClick = {
+                                editingPolicy = policy
+                                showWizard = true
+                            },
+                            onDeleteClick = {
+                                policyToDelete = policy
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -182,7 +193,6 @@ private fun PolicyCard(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
-            // GAP-U25, U26, U27 Fix: Schedule Summaries & Warnings
             if (policy.action == "schedule") {
                 val attachedSchedules = policy.getScheduleIDs().mapNotNull { id ->
                     schedules.find { it.id == id }
@@ -216,7 +226,6 @@ private fun PolicyCard(
                     )
                 }
 
-                // GAP-U28 Fix: Inline Weekly Timeline Preview
                 if (attachedSchedules.isNotEmpty()) {
                     Spacer(modifier = Modifier.size(8.dp))
                     WeeklyTimeline(schedules = attachedSchedules)
