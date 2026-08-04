@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/ConnectionStatusBanner.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Wrapped the Box in an `if` block so it doesn't render at all when 
-//      connected, preventing the 4dp layout jump.
+//   1. Fully guarded against layout jumps and updated M3 theme color mappings.
 // ====================================================================
 
 package com.lias.remote.ui.components
