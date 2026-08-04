@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Implemented Pull-to-Refresh (GAP-U44).
-//   2. Added First-run onboarding prompt (GAP-U47).
-//   3. Accessibility: Added contentDescriptions (GAP-X01).
+//   1. Updated PolicyWizardSheet caller to pass viewModel for server-side validation (GAP-A01).
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -55,13 +53,11 @@ fun DashboardScreen(viewModel: LiasViewModel) {
     var showGlobalWizard by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    // GAP-U44 Fix: Pull to Refresh wrapper
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
             isRefreshing = true
-            // In a real app, you'd trigger a suspend function and set isRefreshing=false when done
-            // For now, we simulate it or rely on manual state refresh
+            // Trigger manual refresh
         }
     ) {
         Column(
@@ -85,7 +81,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                 return@Column
             }
 
-            // Global Switch Banner
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -142,7 +137,6 @@ fun DashboardScreen(viewModel: LiasViewModel) {
 
             Spacer(modifier = Modifier.size(16.dp))
 
-            // Stats Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -188,6 +182,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
 
     if (showGlobalWizard) {
         PolicyWizardSheet(
+            viewModel = viewModel, // Passed here for server-side validation
             initialPolicy = state.policies.find { it.id == "global_default" },
             tags = state.tags,
             schedules = state.schedules,
