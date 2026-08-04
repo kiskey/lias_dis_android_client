@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.2.0
+// Version: 1.2.1
 // Audit Fixes: 
-//   1. Added `flushNftables()` function to support Danger Zone UI (Gap 3.2).
+//   1. Updated ApiResult.Conflict to ApiResult.ConflictError in when branches.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -74,7 +74,7 @@ class SettingsViewModel(
                     is ApiResult.Success -> "Connection successful! Server Version: ${result.data.version}"
                     is ApiResult.HttpError -> "HTTP Error: ${result.code}"
                     is ApiResult.NetworkError -> "Failed: ${result.cause.message}"
-                    is ApiResult.Conflict -> "Conflict"
+                    is ApiResult.ConflictError -> "Conflict"
                 }
             )
         }
@@ -97,7 +97,7 @@ class SettingsViewModel(
                     is ApiResult.Success -> "Nftables table flushed successfully."
                     is ApiResult.HttpError -> "Flush failed: HTTP ${result.code}"
                     is ApiResult.NetworkError -> "Flush failed: ${result.cause.message}"
-                    is ApiResult.Conflict -> "Conflict"
+                    is ApiResult.ConflictError -> "Conflict"
                 }
             )
         }
