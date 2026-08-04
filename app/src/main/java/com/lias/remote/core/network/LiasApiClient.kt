@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes:
-//   1. Promoted `client` and `json` to `@PublishedApi internal` to resolve 
-//      Kotlin compiler error: 'Public-API inline function cannot access non-public-API'.
-//   2. Maintained URL scheme normalization and safe Unit response parsing.
+//   1. Retained `@PublishedApi internal val client` and `@PublishedApi internal val json`
+//      to ensure public inline functions (`get`, `post`, `put`, `delete`) maintain valid access.
 // ====================================================================
 
 package com.lias.remote.core.network
