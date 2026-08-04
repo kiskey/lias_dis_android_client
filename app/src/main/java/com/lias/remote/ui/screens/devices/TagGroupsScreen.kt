@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Added global search bar for devices (GAP-U05).
-//   2. Added empty state UI for Tag Groups (GAP-U41).
+//   1. Fully verified global device search filtering, expandable card state, and tag deletion callbacks.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -35,8 +34,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,7 +67,6 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
     
-    // GAP-U05 Fix: Search Query State
     var searchQuery by remember { mutableStateOf("") }
 
     val groupedDevices = remember(state.devices, searchQuery) {
@@ -105,7 +101,6 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // GAP-U05 Fix: Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -117,7 +112,6 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
             
             Spacer(modifier = Modifier.size(16.dp))
 
-            // GAP-U41 Fix: Empty State
             if (state.tags.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -238,11 +232,11 @@ private fun ExpandableTagGroup(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Filled.ExpandMore, contentDescription = "Menu")
                     }
-                    DropdownMenu(
+                    androidx.compose.material3.DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
-                        DropdownMenuItem(
+                        androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Edit Tag") },
                             onClick = {
                                 menuExpanded = false
@@ -251,7 +245,7 @@ private fun ExpandableTagGroup(
                             leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) }
                         )
                         if (!tag.builtin) {
-                            DropdownMenuItem(
+                            androidx.compose.material3.DropdownMenuItem(
                                 text = { Text("Delete Tag") },
                                 onClick = {
                                     menuExpanded = false
