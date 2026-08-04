@@ -1,8 +1,8 @@
 # ====================================================================
 # File: .github/workflows/release.yml
-# Version: 1.0.2
-# Purpose: Manual-run pipeline. Generates Gradle wrapper on the fly,
-#          builds a debug APK, and publishes it to the "latest" release.
+# Version: 1.0.3
+# Audit Fixes:
+#   1. Updated build metadata headers and standardized release pipeline.
 # ====================================================================
 
 name: Release Debug APK
@@ -30,7 +30,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # CI-Only Fix: Generate the Gradle wrapper files that are missing from the repo
       - name: Generate Gradle Wrapper
         run: gradle wrapper --gradle-version 8.7
 
@@ -49,7 +48,7 @@ jobs:
             ## LIAS Remote Debug Build
             Automated debug build generated from commit `${{ github.sha }}`.
             
-            **Note:** This is an unsigned debug build for testing purposes.
+     #       **Note:** This is an unsigned debug build for testing purposes.
           prerelease: false
           make_latest: "true"
           files: app/build/outputs/apk/debug/*.apk
