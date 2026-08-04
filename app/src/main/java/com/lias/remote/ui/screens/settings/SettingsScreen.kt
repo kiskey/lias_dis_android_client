@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Added "Flush Nftables" Danger Zone section as planned (Gap 3.2).
+//   1. Added URL format helper hints (`e.g., http://192.168.1.1:8081`).
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
@@ -51,7 +52,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         Text(
             text = "Server Connection",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.size(24.dp))
 
@@ -67,6 +68,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     value = uiState.serverUrl,
                     onValueChange = viewModel::updateServerUrl,
                     label = { Text("LIAS Server URL") },
+                    placeholder = { Text("e.g., http://192.168.1.1:8081") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -109,11 +111,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         Spacer(modifier = Modifier.size(32.dp))
 
-        // FIX 3.2: Danger Zone Section
         Text(
             text = "Danger Zone",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.error
         )
         Spacer(modifier = Modifier.size(16.dp))
