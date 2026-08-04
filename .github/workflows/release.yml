@@ -1,25 +1,21 @@
 # ====================================================================
 # File: .github/workflows/release.yml
 # Version: 1.0.0
-# Purpose: Tag-triggered Release Pipeline. Decodes keystore secrets,
-#          builds a shrinked/obfuscated release APK, signs it, and
-#          publishes it to GitHub Releases.
+# Purpose: Manual-run pipeline. Builds a debug APK and publishes it 
+#          to the "latest" GitHub Release.
 # ====================================================================
 
-name: Release
+name: Release Debug APK
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build and Publish Signed Release
+  build:
+    name: Build and Publish Debug APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -34,21 +30,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Decode Signing Keystore
-        env:
-          ENCODED_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-        run: |
-          echo "$ENCODED_KEYSTORE" | base64 -d > app/release.keystore
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
 
-      - name: Build Signed Release APK
-        env:
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew assembleRelease
-
-      - name: Create GitHub Release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          files: app/build/outputs/apk/release/*.apk
+          tag_name: latest
+          name: "Latest Debug Build"
+          body: |
+            ## LIAS Remote Debug Build
+            Automated debug build generated from commit `${{ github.sha }}`.
+            
+            **Note:** This is an unsigned debug build for testing purposes.
+          prerelease: false
+          make_latest: "true"
+          files: app/build/outputs/apk/debug/*.apk
