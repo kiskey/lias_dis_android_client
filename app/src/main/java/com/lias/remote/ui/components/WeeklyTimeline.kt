@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/WeeklyTimeline.kt
-// Version: 1.2.0
-// Audit Fixes:
-//   1. Fixed critical overnight Canvas calculation bug where endMin modulo 1440
-//      evaluated to 0, causing negative rectangle width calculations and rendering crashes.
-//   2. Added non-zero width coercion to guarantee safe drawing.
+// Version: 1.3.0
+// Audit Fixes: 
+//   1. Fully guarded conflict calculation against midnight boundary zero-duration
+//      width coercion to prevent any potential Canvas exceptions.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -86,7 +85,6 @@ fun WeeklyTimeline(
                             if (segDayIdx == dayIdx) {
                                 val startMin = seg.start % 1440
                                 var endMin = seg.end % 1440
-                                // Audit Fix: Handle overnight boundary endMin = 0 (10080 % 1440)
                                 if (endMin == 0 && seg.end > seg.start) {
                                     endMin = 1440
                                 }
@@ -114,7 +112,7 @@ fun WeeklyTimeline(
                             val endParts = c.overlapEnd.split(":")
                             val startMin = (startParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
                             var endMin = (endParts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
-                            if (endMin == 0 && endMin < startMin) {
+                            if (endMin <= startMin && endMin == 0) {
                                 endMin = 1440
                             }
                             
