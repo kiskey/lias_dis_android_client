@@ -1,14 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Implemented SSE disconnect/reconnect on server URL change (GAP-C04).
-//   2. Implemented `device.reidentified` event handling to prune old PDID and fetch new PDID (GAP-C05).
+//   1. Extracted and displayed `confirmed_by` source verification in Snackbars (GAP-A05, E02).
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -37,11 +37,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 
-// Defines transient UI events for Snackbars
-sealed class UiEvent {
-    data class ShowSnackbar(val message: String) : UiEvent()
-}
-
 class EventRepository(
     internal val api: LiasApiClient,
     private val sse: LiasSseClient,
@@ -61,7 +56,6 @@ class EventRepository(
             settings.serverUrl.collectLatest { url ->
                 api.baseUrl = url
                 sse.baseUrl = url
-                // GAP-C04 Fix: Safely tear down old SSE connection and reconnect with new URL
                 sse.disconnect()
                 sse.connect(scope)
                 refreshAll()
@@ -120,7 +114,12 @@ class EventRepository(
                 }
                 EventConstants.DEVICE_ONLINE -> {
                     refreshSingleDevice(event.deviceID)
-                    _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}"))
+                    // GAP-A05 Fix: Extract confirmed_by sources
+                    val confirmedBy = event.payload?.let {
+                        try { json.decodeFromJsonElement<DeviceEventPayload>(it).confirmedBy } catch (e: Exception) { emptyList() }
+                    } ?: emptyList()
+                    val verifiedText = if (confirmedBy.isNotEmpty()) " ✓ ${confirmedBy.size} sources" else ""
+                    _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}$verifiedText"))
                 }
                 EventConstants.DEVICE_OFFLINE -> {
                     refreshSingleDevice(event.deviceID)
@@ -138,13 +137,8 @@ class EventRepository(
                     )
                 }
                 EventConstants.DEVICE_REIDENTIFIED -> {
-                    // GAP-C05 Fix: Handle device.reidentified event
                     val payload = event.payload?.let {
-                        try { 
-                            json.decodeFromJsonElement<DeviceReidentifiedPayload>(it) 
-                        } catch (e: Exception) { 
-                            null 
-                        }
+                        try { json.decodeFromJsonElement<DeviceReidentifiedPayload>(it) } catch (e: Exception) { null }
                     }
                     if (payload != null) {
                         _state.value = _state.value.copy(
