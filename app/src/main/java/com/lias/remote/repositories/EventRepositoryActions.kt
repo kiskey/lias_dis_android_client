@@ -1,15 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Fixed optimistic UI rollback on deletion to only restore the specific 
-//      item, preventing accidental overwrite of concurrent SSE updates.
+//   1. Implemented Tag CRUD (create/edit/delete) with optimistic UI updates (GAP-C03).
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.DeviceTagRequest
 import com.lias.remote.core.network.Endpoints
@@ -30,6 +30,49 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
             devices = _state.value.devices.map { d ->
                 if (d.pdid == pdid) d.copy(tags = previousTags ?: listOf("generic")) else d
             }
+        )
+    }
+    return result
+}
+
+// GAP-C03 Fix: Tag CRUD Operations
+suspend fun EventRepository.createTag(tag: Tag): ApiResult<Tag> {
+    val result = api.post<Tag, Tag>(Endpoints.TAGS, tag)
+    if (result is ApiResult.Success) {
+        _state.value = _state.value.copy(tags = _state.value.tags + result.data)
+    }
+    return result
+}
+
+suspend fun EventRepository.updateTag(tag: Tag): ApiResult<Tag> {
+    _state.value = _state.value.copy(
+        tags = _state.value.tags.map { if (it.id == tag.id) tag else it }
+    )
+    
+    val result = api.put<Tag, Tag>(Endpoints.tag(tag.id), tag)
+    
+    if (result is ApiResult.Success) {
+        _state.value = _state.value.copy(
+            tags = _state.value.tags.map { if (it.id == result.data.id) result.data else it }
+        )
+    } else {
+        refreshAll() // Rollback by fetching true state
+    }
+    return result
+}
+
+suspend fun EventRepository.deleteTag(tagId: String): ApiResult<Unit> {
+    val deletedTag = _state.value.tags.find { it.id == tagId }
+    
+    _state.value = _state.value.copy(
+        tags = _state.value.tags.filterNot { it.id == tagId }
+    )
+
+    val result = api.delete<Unit>(Endpoints.tag(tagId))
+    
+    if (result !is ApiResult.Success && deletedTag != null) {
+        _state.value = _state.value.copy(
+            tags = _state.value.tags + deletedTag
         )
     }
     return result
@@ -63,7 +106,6 @@ suspend fun EventRepository.savePolicy(policy: Policy): ApiResult<Policy> {
     return result
 }
 
-// FIX 4.2: Granular rollback for deletePolicy
 suspend fun EventRepository.deletePolicy(policyId: String): ApiResult<Unit> {
     val deletedPolicy = _state.value.policies.find { it.id == policyId }
     
@@ -74,7 +116,6 @@ suspend fun EventRepository.deletePolicy(policyId: String): ApiResult<Unit> {
     val result = api.delete<Unit>(Endpoints.policy(policyId))
     
     if (result !is ApiResult.Success && deletedPolicy != null) {
-        // Restore only the deleted item instead of overwriting the whole list
         _state.value = _state.value.copy(
             policies = _state.value.policies + deletedPolicy
         )
@@ -110,7 +151,6 @@ suspend fun EventRepository.saveSchedule(schedule: Schedule): ApiResult<Schedule
     return result
 }
 
-// FIX 4.2: Granular rollback for deleteSchedule
 suspend fun EventRepository.deleteSchedule(scheduleId: String): ApiResult<Unit> {
     val deletedSchedule = _state.value.schedules.find { it.id == scheduleId }
     
@@ -121,7 +161,6 @@ suspend fun EventRepository.deleteSchedule(scheduleId: String): ApiResult<Unit> 
     val result = api.delete<Unit>(Endpoints.schedule(scheduleId))
     
     if (result !is ApiResult.Success && deletedSchedule != null) {
-        // Restore only the deleted item instead of overwriting the whole list
         _state.value = _state.value.copy(
             schedules = _state.value.schedules + deletedSchedule
         )
