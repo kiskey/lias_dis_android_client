@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed unsafe `= viewModel()` default parameter.
+//   1. Added FAB and Long-Press menu for Tag CRUD (GAP-C03).
+//   2. Added Tag Color visualization (GAP-V02).
+//   3. Added Infrastructure "IMMUNE" lock badge (GAP-U08).
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -10,23 +12,38 @@ package com.lias.remote.ui.screens.devices
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,7 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
@@ -46,27 +64,85 @@ import com.lias.remote.ui.components.DeviceCard
 @Composable
 fun TagGroupsScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
+    
+    var showEditor by remember { mutableStateOf(false) }
+    var editingTag by remember { mutableStateOf<Tag?>(null) }
+    var tagToDelete by remember { mutableStateOf<Tag?>(null) }
 
-    // Group devices by their first tag
     val groupedDevices = remember(state.devices) {
         state.devices.groupBy { it.tags.firstOrNull() ?: "generic" }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(state.tags, key = { it.id }) { tag ->
-            val devicesInGroup = groupedDevices[tag.id] ?: emptyList()
-            ExpandableTagGroup(
-                tag = tag,
-                devices = devicesInGroup,
-                allTags = state.tags,
-                onTagSelected = { pdid, tagId -> viewModel.assignTag(pdid, tagId) }
-            )
+    Scaffold(
+        floatingActionButton = {
+            // GAP-C03 Fix: FAB to create tags
+            FloatingActionButton(
+                onClick = {
+                    editingTag = null
+                    showEditor = true
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Add Tag Group")
+            }
         }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(state.tags, key = { it.id }) { tag ->
+                val devicesInGroup = groupedDevices[tag.id] ?: emptyList()
+                ExpandableTagGroup(
+                    tag = tag,
+                    devices = devicesInGroup,
+                    allTags = state.tags,
+                    onTagSelected = { pdid, tagId -> viewModel.assignTag(pdid, tagId) },
+                    onEditClick = {
+                        editingTag = tag
+                        showEditor = true
+                    },
+                    onDeleteClick = {
+                        tagToDelete = tag
+                    }
+                )
+            }
+        }
+    }
+
+    if (showEditor) {
+        TagEditorSheet(
+            initialTag = editingTag,
+            onDismiss = { showEditor = false },
+            onSave = { tag ->
+                if (editingTag == null) viewModel.createTag(tag)
+                else viewModel.updateTag(tag)
+                showEditor = false
+            }
+        )
+    }
+
+    tagToDelete?.let { tag ->
+        AlertDialog(
+            onDismissRequest = { tagToDelete = null },
+            title = { Text("Delete Tag") },
+            text = { Text("Are you sure you want to delete the tag '${tag.name}'? Devices will revert to 'Generic'.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTag(tag.id)
+                        tagToDelete = null
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { tagToDelete = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -75,9 +151,12 @@ private fun ExpandableTagGroup(
     tag: Tag,
     devices: List<Device>,
     allTags: List<Tag>,
-    onTagSelected: (String, String) -> Unit
+    onTagSelected: (String, String) -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -91,23 +170,62 @@ private fun ExpandableTagGroup(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // GAP-V02 Fix: Tag Color Badge
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(Color(android.graphics.Color.parseColor(tag.color)))
+                )
+                Spacer(modifier = Modifier.size(12.dp))
+                
                 Text(
                     text = tag.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
+                
+                // GAP-U08 Fix: Infrastructure Lock Badge
+                if (tag.id == "infrastructure") {
+                    Icon(Icons.Filled.Lock, contentDescription = "Immune", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.size(8.dp))
+                }
+                
                 Text(
                     text = "(${devices.size})",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        imageVector = Icons.Filled.ExpandMore,
-                        contentDescription = "Expand",
-                        modifier = Modifier.rotate(if (expanded) 180f else 0f)
-                    )
+                
+                // GAP-C03 Fix: Kebab menu for Edit/Delete
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Filled.ExpandMore, contentDescription = "Menu")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Tag") },
+                            onClick = {
+                                menuExpanded = false
+                                onEditClick()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) }
+                        )
+                        if (!tag.builtin) {
+                            DropdownMenuItem(
+                                text = { Text("Delete Tag") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteClick()
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) }
+                            )
+                        }
+                    }
                 }
             }
             
