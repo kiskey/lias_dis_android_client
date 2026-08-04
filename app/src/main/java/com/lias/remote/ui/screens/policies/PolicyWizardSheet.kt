@@ -1,8 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Added server-side `/policies/validate` call before saving (GAP-A01).
+//   1. Resolved UI deadlock on step 3 save handler when server validation returns
+//      conflicts or HTTP errors by rendering inline actionable error banners and
+//      re-enabling inputs.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -42,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
@@ -76,6 +79,7 @@ fun PolicyWizardSheet(
     }
 
     var shadowWarning by remember { mutableStateOf<String?>(null) }
+    var serverConflictWarning by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
     val selectedScheduleObjects = schedules.filter { it.id in selectedSchedules }
@@ -207,6 +211,10 @@ fun PolicyWizardSheet(
                     if (localConflicts.isNotEmpty()) {
                         Text("⚠️ Local conflicts detected! Saving disabled.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
+
+                    serverConflictWarning?.let { warning ->
+                        Text(warning, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                     
                     LazyColumn(modifier = Modifier.size(150.dp)) {
                         items(schedules) { sched ->
@@ -214,6 +222,7 @@ fun PolicyWizardSheet(
                                 Checkbox(
                                     checked = sched.id in selectedSchedules,
                                     onCheckedChange = { 
+                                        serverConflictWarning = null
                                         if (it) selectedSchedules.add(sched.id) 
                                         else selectedSchedules.remove(sched.id)
                                     }
@@ -234,20 +243,32 @@ fun PolicyWizardSheet(
                         Button(
                             onClick = { 
                                 isSaving = true
+                                serverConflictWarning = null
                                 scope.launch {
-                                    // GAP-A01 Fix: Server-side validation pre-save
                                     val serverResult = viewModel.validatePolicy(selectedSchedules.toList())
                                     isSaving = false
-                                    if (serverResult is ApiResult.Success && serverResult.data.isEmpty()) {
-                                        onSave(Policy(
-                                            id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}",
-                                            name = name, type = type, targetID = targetID, 
-                                            action = action, priority = priority.toIntOrNull() ?: 50,
-                                            scheduleIDs = selectedSchedules.toList()
-                                        ))
-                                    } else if (serverResult is ApiResult.Success) {
-                                        // Server found conflicts despite local check
-                                        // In a full UX, we'd render these server conflicts here
+                                    when (serverResult) {
+                                        is ApiResult.Success -> {
+                                            if (serverResult.data.isEmpty()) {
+                                                onSave(Policy(
+                                                    id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}",
+                                                    name = name, type = type, targetID = targetID, 
+                                                    action = action, priority = priority.toIntOrNull() ?: 50,
+                                                    scheduleIDs = selectedSchedules.toList()
+                                                ))
+                                            } else {
+                                                serverConflictWarning = "⚠️ Server detected ${serverResult.data.size} schedule conflict(s). Please adjust attached schedules."
+                                            }
+                                        }
+                                        is ApiResult.HttpError -> {
+                                            serverConflictWarning = "⚠️ Validation error: ${serverResult.message}"
+                                        }
+                                        is ApiResult.NetworkError -> {
+                                            serverConflictWarning = "⚠️ Network error: ${serverResult.cause.message}"
+                                        }
+                                        else -> {
+                                            serverConflictWarning = "⚠️ Unexpected validation error occurred."
+                                        }
                                     }
                                 }
                             },
