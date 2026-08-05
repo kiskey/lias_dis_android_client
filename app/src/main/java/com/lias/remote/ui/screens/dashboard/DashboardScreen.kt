@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.10.0
+// Version: 1.11.0
 // Audit Fixes: 
-//   1. Updated global policy resolution to use `globalPolicy.resolveScheduleIDs()`.
+//   1. Added Active Enforcements Live Activity section displaying live active
+//      schedules, status (Blocked/Allowed), tag colors, and DST pills.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -10,6 +11,7 @@ package com.lias.remote.ui.screens.dashboard
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,18 +19,30 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -38,15 +52,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.models.Tag
+import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
 import com.lias.remote.ui.components.DeviceCard
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.components.WeeklyTimeline
+import com.lias.remote.ui.screens.devices.DeviceDetailsSheet
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
+import java.util.Calendar
+import java.util.TimeZone
+
+data class ActiveEnforcementItem(
+    val policyName: String,
+    val targetName: String,
+    val targetColor: Color,
+    val scheduleName: String,
+    val action: String,
+    val timezone: String,
+    val isDST: Boolean
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +87,15 @@ fun DashboardScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     var showGlobalWizard by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+
+    var selectedDeviceForDetails by remember { mutableStateOf<Device?>(null) }
+    var deviceToPause by remember { mutableStateOf<Device?>(null) }
+    var deviceToUnpause by remember { mutableStateOf<Device?>(null) }
+    var deviceToRename by remember { mutableStateOf<Device?>(null) }
+
+    val activeEnforcements = remember(state.policies, state.schedules, state.tags, state.devices) {
+        computeActiveEnforcements(state.policies, state.schedules, state.tags, state.devices)
+    }
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -81,6 +123,19 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                 }
                 return@Column
             }
+
+            // Live Active Enforcements Section
+            Text("Active Enforcements", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.size(4.dp))
+            Text(
+                "Live status of scheduled policies currently in effect",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+
+            ActiveEnforcementsList(items = activeEnforcements)
+            Spacer(modifier = Modifier.size(16.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -168,12 +223,16 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(state.devices.take(10)) { device ->
+                        val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
                         DeviceCard(
                             device = device,
                             tags = state.tags,
-                            onTagSelected = { tagId ->
-                                viewModel.assignTag(device.pdid, tagId)
-                            }
+                            isPaused = isPaused,
+                            onTagsSelected = { tagIds -> viewModel.assignTags(device.pdid, tagIds) },
+                            onPauseClick = { deviceToPause = device },
+                            onUnpauseClick = { deviceToUnpause = device },
+                            onRenameClick = { deviceToRename = device },
+                            onDetailsClick = { selectedDeviceForDetails = device }
                         )
                     }
                 }
@@ -194,6 +253,146 @@ fun DashboardScreen(viewModel: LiasViewModel) {
             }
         )
     }
+
+    selectedDeviceForDetails?.let { device ->
+        DeviceDetailsSheet(
+            device = device,
+            viewModel = viewModel,
+            onDismiss = { selectedDeviceForDetails = null }
+        )
+    }
+
+    deviceToPause?.let { device ->
+        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
+        AlertDialog(
+            onDismissRequest = { deviceToPause = null },
+            title = { Text("Pause Internet") },
+            text = { Text("Are you sure you want to pause internet access for $name for 1 hour?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.pauseInternet(device.pdid)
+                    deviceToPause = null
+                }) { Text("Pause") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToPause = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deviceToUnpause?.let { device ->
+        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
+        AlertDialog(
+            onDismissRequest = { deviceToUnpause = null },
+            title = { Text("Resume Internet") },
+            text = { Text("Are you sure you want to resume internet access for $name?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.unpauseInternet(device.pdid)
+                    deviceToUnpause = null
+                }) { Text("Unpause") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToUnpause = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deviceToRename?.let { device ->
+        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        AlertDialog(
+            onDismissRequest = { deviceToRename = null },
+            title = { Text("Rename Device") },
+            text = {
+                Column {
+                    Text("Enter a new friendly name:")
+                    Spacer(modifier = Modifier.size(8.dp))
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newName.isNotBlank()) {
+                        viewModel.renameDevice(device.pdid, newName)
+                    }
+                    deviceToRename = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToRename = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
+    if (items.isEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("No Active Schedules", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("All devices are currently operating under default rules", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.forEach { item ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val isBlock = item.action == "block"
+                        Icon(
+                            imageVector = if (isBlock) Icons.Filled.Block else Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = if (isBlock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isBlock) "Internet Blocked" else "Internet Allowed",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isBlock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(item.targetColor))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(item.targetName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(item.scheduleName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (item.isDST) {
+                            Text("DST Active", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -211,3 +410,71 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
         }
     }
 }
+
+private fun computeActiveEnforcements(
+    policies: List<Policy>,
+    schedules: List<Schedule>,
+    tags: List<Tag>,
+    devices: List<Device>
+): List<ActiveEnforcementItem> {
+    val items = mutableListOf<ActiveEnforcementItem>()
+
+    policies.forEach { p ->
+        if (p.action == "schedule" && p.type != "global") {
+            val targetTag = tags.find { it.id == p.targetID }
+            val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.hostname ?: p.targetID)
+            val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color.Gray
+
+            val schedIDs = p.resolveScheduleIDs()
+            val attachedScheds = schedules.filter { it.id in schedIDs }
+
+            for (s in attachedScheds) {
+                val activeAction = evaluateScheduleActiveAction(s)
+                if (activeAction != null) {
+                    val isDST = try {
+                        TimeZone.getTimeZone(s.timezone).inDaylightTime(Calendar.getInstance().time)
+                    } catch (e: Exception) { false }
+
+                    items.add(
+                        ActiveEnforcementItem(
+                            policyName = p.name,
+                            targetName = targetName,
+                            targetColor = targetColor,
+                            scheduleName = s.name,
+                            action = activeAction,
+                            timezone = s.timezone,
+                            isDST = isDST
+                        )
+                    )
+                    break
+                }
+            }
+        }
+    }
+    return items
+}
+
+private fun evaluateScheduleActiveAction(s: Schedule): String? {
+    try {
+        val cal = Calendar.getInstance(TimeZone.getTimeZone(s.timezone))
+        val currentDayIdx = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=Sun
+        val currentMin = currentDayIdx * 1440 + cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+
+        val segments = ScheduleProjection.projectSchedule(s)
+        for (seg in segments) {
+            if (currentMin >= seg.start && currentMin < seg.end) {
+                return seg.action
+            }
+        }
+    } catch (_: Exception) {}
+    return null
+}
+
+private fun parseColor(colorHex: String?): Color {
+    if (colorHex.isNull_or_blank()) return Color.Gray
+    return try {
+        Color(android.graphics.Color.parseColor(colorHex))
+    } catch (_: Exception) { Color.Gray }
+}
+
+private fun String?.isNull_or_blank(): Boolean = this == null || this.isBlank()
