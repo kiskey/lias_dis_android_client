@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
-// Version: 1.0.0
-// Purpose: Centralized constants for LIAS SSE event types. Mirrors
-//          the EventType constants in shared/models/event.go.
+// Version: 1.1.0
+// Audit Fixes:
+//   1. Added SECURITY_ALERT constant matching DIS/LIAS server event.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -17,5 +17,6 @@ object EventConstants {
     const val IP_CHANGED = "device.ip_changed"
     const val MAC_CHANGED = "device.mac_changed"
     const val DEVICE_REIDENTIFIED = "device.reidentified"
+    const val SECURITY_ALERT = "security.alert"
     const val PING = "ping"
 }
