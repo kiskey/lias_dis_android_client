@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.12.0
+// Version: 1.13.0
 // Audit Fixes: 
-//   1. Cleaned up color parsing using Kotlin stdlib isNullOrBlank().
+//   1. Adaptive GridCells.Adaptive(minSize = 280.dp) for Recent Devices so cards rendering
+//      on mobile use 1 full column, giving buttons and labels clean single-line spacing.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -109,7 +110,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
             ConnectionStatusBanner(state.connectionState)
             Spacer(modifier = Modifier.size(16.dp))
 
-            if (!state.isInitialLoaded) {
+            if (!state.isInitialLoaded && state.devices.isEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -117,7 +118,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                 ) {
                     CircularProgressIndicator()
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("Loading LIAS Dashboard...")
+                    Text("Connecting to LIAS...")
                 }
                 return@Column
             }
@@ -215,8 +216,9 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                     )
                 }
             } else {
+                // Adaptive layout: 1 column on phones (280dp min width), 2+ on tablets
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Adaptive(minSize = 280.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
