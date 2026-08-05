@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes:
-//   1. Added SECURITY_ALERT SSE event handling.
-//   2. Updated refreshAll to asynchronously gather stats along with core data.
+//   1. Incremental loading: updates state and unlocks UI immediately when devices arrive,
+//      loading secondary metadata in parallel.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -90,26 +90,31 @@ class EventRepository(
     internal suspend fun refreshAll() {
         if (api.baseUrl.isBlank()) return
         coroutineScope {
-            val devs = async { api.get<DeviceListResponse>(Endpoints.DEVICES) }
-            val tags = async { api.get<List<Tag>>(Endpoints.TAGS) }
-            val pols = async { api.get<List<Policy>>(Endpoints.POLICIES) }
-            val scheds = async { api.get<List<Schedule>>(Endpoints.SCHEDULES) }
-            val stats = async { api.get<NetworkStats>(Endpoints.STATS) }
+            // Priority 1: Fetch devices and render UI immediately
+            val devsResult = api.get<DeviceListResponse>(Endpoints.DEVICES)
+            if (devsResult is ApiResult.Success) {
+                _state.value = _state.value.copy(
+                    devices = devsResult.data.devices,
+                    isInitialLoaded = true
+                )
+            }
 
-            val devicesResult = devs.await()
-            val tagsResult = tags.await()
-            val policiesResult = pols.await()
-            val schedulesResult = scheds.await()
-            val statsResult = stats.await()
+            // Priority 2: Concurrently fetch metadata
+            val tagsDeferred = async { api.get<List<Tag>>(Endpoints.TAGS) }
+            val polsDeferred = async { api.get<List<Policy>>(Endpoints.POLICIES) }
+            val schedsDeferred = async { api.get<List<Schedule>>(Endpoints.SCHEDULES) }
+            val statsDeferred = async { api.get<NetworkStats>(Endpoints.STATS) }
 
-            val fetchedDevices = (devicesResult as? ApiResult.Success)?.data?.devices ?: emptyList()
+            val tagsResult = tagsDeferred.await()
+            val policiesResult = polsDeferred.await()
+            val schedulesResult = schedsDeferred.await()
+            val statsResult = statsDeferred.await()
 
             _state.value = _state.value.copy(
-                devices = fetchedDevices,
-                tags = (tagsResult as? ApiResult.Success)?.data ?: emptyList(),
-                policies = (policiesResult as? ApiResult.Success)?.data ?: emptyList(),
-                schedules = (schedulesResult as? ApiResult.Success)?.data ?: emptyList(),
-                stats = (statsResult as? ApiResult.Success)?.data,
+                tags = (tagsResult as? ApiResult.Success)?.data ?: _state.value.tags,
+                policies = (policiesResult as? ApiResult.Success)?.data ?: _state.value.policies,
+                schedules = (schedulesResult as? ApiResult.Success)?.data ?: _state.value.schedules,
+                stats = (statsResult as? ApiResult.Success)?.data ?: _state.value.stats,
                 isInitialLoaded = true
             )
         }
