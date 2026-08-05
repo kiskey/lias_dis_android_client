@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes:
-//   1. Retained `@PublishedApi internal val client` and `@PublishedApi internal val json`
-//      to ensure public inline functions (`get`, `post`, `put`, `delete`) maintain valid access.
+//   1. Added getRaw and postRaw helper methods to handle policy JSON exports and imports.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -110,6 +109,21 @@ class LiasApiClient(
         }
     }
 
+    suspend fun getRaw(path: String): ApiResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val request = buildRequest(path, "GET")
+            val response = client.newCall(request).execute()
+            val bodyString = response.body?.string() ?: ""
+            if (response.isSuccessful) {
+                ApiResult.Success(bodyString)
+            } else {
+                ApiResult.HttpError(response.code, bodyString)
+            }
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e)
+        }
+    }
+
     suspend inline fun <reified T, reified B> post(path: String, body: B): ApiResult<T> = withContext(Dispatchers.IO) {
         try {
             val bodyStr = json.encodeToString(serializer<B>(), body)
@@ -117,6 +131,21 @@ class LiasApiClient(
             val request = buildRequest(path, "POST", reqBody)
             val response = client.newCall(request).execute()
             parseResponse(response, serializer())
+        } catch (e: Exception) {
+            ApiResult.NetworkError(e)
+        }
+    }
+
+    suspend fun postRawJson(path: String, jsonPayload: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val reqBody = jsonPayload.toRequestBody("application/json".toMediaType())
+            val request = buildRequest(path, "POST", reqBody)
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                ApiResult.Success(Unit)
+            } else {
+                ApiResult.HttpError(response.code, response.body?.string() ?: "Import failed")
+            }
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
