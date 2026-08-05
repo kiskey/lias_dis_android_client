@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Fully verified Jetpack Navigation backstack entry hierarchy, 
-//      SnackbarHost state binding, and collectAsStateWithLifecycle lifecycle safety.
+//   1. Added exhaustive 'is UiEvent.ShowSecurityAlert' branch to LaunchedEffect(uiEvents)
+//      when expression to fix Kotlin compiler FAILED error.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -82,6 +82,12 @@ fun LiasNavHost(
                 is UiEvent.ShowSnackbarError -> {
                     snackbarHostState.showSnackbar(
                         message = event.message,
+                        duration = SnackbarDuration.Long
+                    )
+                }
+                is UiEvent.ShowSecurityAlert -> {
+                    snackbarHostState.showSnackbar(
+                        message = "🚨 Security Alert: ${event.details}",
                         duration = SnackbarDuration.Long
                     )
                 }
