@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.2.1
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Updated ApiResult.Conflict to ApiResult.ConflictError in when branches.
+//   1. Added toggleVacationMode to SettingsViewModel for global kill-switch control.
+//   2. Added vacationMode property to SettingsUiState.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -13,6 +14,8 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.HealthResponse
 import com.lias.remote.core.network.LiasApiClient
+import com.lias.remote.core.network.VacationRequest
+import com.lias.remote.core.network.VacationResponse
 import com.lias.remote.core.store.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +25,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val serverUrl: String = "",
     val authToken: String = "",
+    val vacationMode: Boolean = false,
     val isTesting: Boolean = false,
     val testResult: String? = null,
     val isFlushing: Boolean = false 
@@ -84,6 +88,15 @@ class SettingsViewModel(
         viewModelScope.launch {
             settings.saveServerUrl(_uiState.value.serverUrl)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
+        }
+    }
+
+    fun toggleVacationMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
+            if (result is ApiResult.Success) {
+                _uiState.value = _uiState.value.copy(vacationMode = result.data.vacationMode)
+            }
         }
     }
 
