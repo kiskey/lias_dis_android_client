@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Ensured device inventory collection gracefully handles null list deserialization.
-//   2. Preserved SSE reconnection and single device refresh state logic.
+//   1. Added SECURITY_ALERT SSE event handling.
+//   2. Updated refreshAll to asynchronously gather stats along with core data.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -11,8 +11,10 @@ package com.lias.remote.repositories
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
+import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.DeviceListResponse
@@ -92,11 +94,13 @@ class EventRepository(
             val tags = async { api.get<List<Tag>>(Endpoints.TAGS) }
             val pols = async { api.get<List<Policy>>(Endpoints.POLICIES) }
             val scheds = async { api.get<List<Schedule>>(Endpoints.SCHEDULES) }
+            val stats = async { api.get<NetworkStats>(Endpoints.STATS) }
 
             val devicesResult = devs.await()
             val tagsResult = tags.await()
             val policiesResult = pols.await()
             val schedulesResult = scheds.await()
+            val statsResult = stats.await()
 
             val fetchedDevices = (devicesResult as? ApiResult.Success)?.data?.devices ?: emptyList()
 
@@ -105,6 +109,7 @@ class EventRepository(
                 tags = (tagsResult as? ApiResult.Success)?.data ?: emptyList(),
                 policies = (policiesResult as? ApiResult.Success)?.data ?: emptyList(),
                 schedules = (schedulesResult as? ApiResult.Success)?.data ?: emptyList(),
+                stats = (statsResult as? ApiResult.Success)?.data,
                 isInitialLoaded = true
             )
         }
@@ -151,6 +156,14 @@ class EventRepository(
                         refreshSingleDevice(payload.newPdid)
                         _uiEvents.emit(UiEvent.ShowSnackbar("🔄 Device identified: ${payload.newPdid.takeLast(8)} (promoted from ${payload.reason})"))
                     }
+                }
+                EventConstants.SECURITY_ALERT -> {
+                    val payload = event.payload?.let {
+                        try { json.decodeFromJsonElement<SecurityAlertPayload>(it) } catch (e: Exception) { null }
+                    }
+                    val details = payload?.details ?: "Anomaly detected"
+                    _uiEvents.emit(UiEvent.ShowSecurityAlert(details))
+                    _uiEvents.emit(UiEvent.ShowSnackbarError("🚨 Security Alert: $details"))
                 }
             }
         }
