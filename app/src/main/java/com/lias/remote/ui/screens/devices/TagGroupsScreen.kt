@@ -1,12 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Defaulted tag group cards to collapsed state (`expanded = false`) on launch
-//      to prevent long scrolling and visual clutter.
-//   2. Made the entire tag header row clickable to toggle expand/collapse.
-//   3. Added animated rotating chevron indicator (`ExpandMore`).
-//   4. Separated Edit/Delete tag options into a distinct `MoreVert` (3-dots) menu.
+//   1. Connected DeviceCard Quick Actions (Pause/Unpause, Rename, Details Sheet,
+//      and multi-tag assignment) to ViewModel and repository layer.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -79,6 +76,11 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
     
     var searchQuery by remember { mutableStateOf("") }
 
+    var selectedDeviceForDetails by remember { mutableStateOf<Device?>(null) }
+    var deviceToPause by remember { mutableStateOf<Device?>(null) }
+    var deviceToUnpause by remember { mutableStateOf<Device?>(null) }
+    var deviceToRename by remember { mutableStateOf<Device?>(null) }
+
     val groupedDevices = remember(state.devices, searchQuery) {
         val filtered = if (searchQuery.isBlank()) {
             state.devices
@@ -141,7 +143,12 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                         tag = tag,
                         devices = devicesInGroup,
                         allTags = state.tags,
-                        onTagSelected = { pdid, tagId -> viewModel.assignTag(pdid, tagId) },
+                        policies = state.policies,
+                        onTagsSelected = { pdid, tagIds -> viewModel.assignTags(pdid, tagIds) },
+                        onPauseClick = { deviceToPause = it },
+                        onUnpauseClick = { deviceToUnpause = it },
+                        onRenameClick = { deviceToRename = it },
+                        onDetailsClick = { selectedDeviceForDetails = it },
                         onEditClick = {
                             editingTag = tag
                             showEditor = true
@@ -163,6 +170,81 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                 if (editingTag == null) viewModel.createTag(tag)
                 else viewModel.updateTag(tag)
                 showEditor = false
+            }
+        )
+    }
+
+    selectedDeviceForDetails?.let { device ->
+        DeviceDetailsSheet(
+            device = device,
+            viewModel = viewModel,
+            onDismiss = { selectedDeviceForDetails = null }
+        )
+    }
+
+    deviceToPause?.let { device ->
+        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
+        AlertDialog(
+            onDismissRequest = { deviceToPause = null },
+            title = { Text("Pause Internet") },
+            text = { Text("Are you sure you want to pause internet access for $name for 1 hour?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.pauseInternet(device.pdid)
+                    deviceToPause = null
+                }) { Text("Pause") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToPause = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deviceToUnpause?.let { device ->
+        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
+        AlertDialog(
+            onDismissRequest = { deviceToUnpause = null },
+            title = { Text("Resume Internet") },
+            text = { Text("Are you sure you want to resume internet access for $name?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.unpauseInternet(device.pdid)
+                    deviceToUnpause = null
+                }) { Text("Unpause") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToUnpause = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deviceToRename?.let { device ->
+        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        AlertDialog(
+            onDismissRequest = { deviceToRename = null },
+            title = { Text("Rename Device") },
+            text = {
+                Column {
+                    Text("Enter a new friendly name:")
+                    Spacer(modifier = Modifier.size(8.dp))
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newName.isNotBlank()) {
+                        viewModel.renameDevice(device.pdid, newName)
+                    }
+                    deviceToRename = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToRename = null }) { Text("Cancel") }
             }
         )
     }
@@ -193,11 +275,15 @@ private fun ExpandableTagGroup(
     tag: Tag,
     devices: List<Device>,
     allTags: List<Tag>,
-    onTagSelected: (String, String) -> Unit,
+    policies: List<com.lias.remote.core.models.Policy>,
+    onTagsSelected: (String, List<String>) -> Unit,
+    onPauseClick: (Device) -> Unit,
+    onUnpauseClick: (Device) -> Unit,
+    onRenameClick: (Device) -> Unit,
+    onDetailsClick: (Device) -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    // Audit Fix: Default collapsed view on app launch (`expanded = false`)
     var expanded by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -220,7 +306,6 @@ private fun ExpandableTagGroup(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
-            // Clickable Header Row: Toggles expand / collapse
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -256,7 +341,6 @@ private fun ExpandableTagGroup(
                 
                 Spacer(modifier = Modifier.size(8.dp))
 
-                // Animated Rotating Chevron Indicator
                 Icon(
                     imageVector = Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Collapse" else "Expand",
@@ -268,7 +352,6 @@ private fun ExpandableTagGroup(
 
                 Spacer(modifier = Modifier.size(4.dp))
 
-                // 3-Dots Action Menu (Edit / Delete)
                 Box {
                     IconButton(
                         onClick = { menuExpanded = true },
@@ -306,7 +389,6 @@ private fun ExpandableTagGroup(
                 }
             }
             
-            // Expandable Content Body
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),
@@ -325,10 +407,16 @@ private fun ExpandableTagGroup(
                         )
                     } else {
                         devices.forEach { device ->
+                            val isPaused = policies.any { it.id == "pol_pause_${device.pdid}" }
                             DeviceCard(
                                 device = device,
                                 tags = allTags,
-                                onTagSelected = { tagId -> onTagSelected(device.pdid, tagId) }
+                                isPaused = isPaused,
+                                onTagsSelected = { tagIds -> onTagsSelected(device.pdid, tagIds) },
+                                onPauseClick = { onPauseClick(device) },
+                                onUnpauseClick = { onUnpauseClick(device) },
+                                onRenameClick = { onRenameClick(device) },
+                                onDetailsClick = { onDetailsClick(device) }
                             )
                         }
                     }
