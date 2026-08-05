@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Added multi-tag checkbox selection and Quick Actions (Pause/Unpause,
-//      Rename, Details) matching LIAS Web Dashboard parity.
+//   1. Fixed multi-tag selection bug: selecting a specific tag automatically
+//      strips the fallback 'generic' tag. Unchecking all tags restores 'generic'.
+//   2. Clean, spacious Apple HIG action row ensuring text and buttons never wrap awkwardly.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -159,9 +160,19 @@ fun DeviceCard(
                             Checkbox(
                                 checked = isChecked,
                                 onCheckedChange = { checked ->
-                                    val updated = assignedTags.toMutableList()
-                                    if (checked) updated.add(tag.id) else updated.remove(tag.id)
-                                    onTagsSelected(updated.ifEmpty { listOf("generic") })
+                                    val updated = assignedTags.filterNot { it == "generic" }.toMutableList()
+                                    if (checked) {
+                                        if (tag.id == "generic") {
+                                            updated.clear()
+                                            updated.add("generic")
+                                        } else {
+                                            if (!updated.contains(tag.id)) updated.add(tag.id)
+                                        }
+                                    } else {
+                                        updated.remove(tag.id)
+                                    }
+                                    val finalTags = if (updated.isEmpty()) listOf("generic") else updated
+                                    onTagsSelected(finalTags)
                                 }
                             )
                             Text(tag.name, style = MaterialTheme.typography.labelSmall)
