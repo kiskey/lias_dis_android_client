@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.11.0
+// Version: 1.12.0
 // Audit Fixes: 
-//   1. Added Active Enforcements Live Activity section displaying live active
-//      schedules, status (Blocked/Allowed), tag colors, and DST pills.
+//   1. Cleaned up color parsing using Kotlin stdlib isNullOrBlank().
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -471,10 +469,8 @@ private fun evaluateScheduleActiveAction(s: Schedule): String? {
 }
 
 private fun parseColor(colorHex: String?): Color {
-    if (colorHex.isNull_or_blank()) return Color.Gray
+    if (colorHex.isNullOrBlank()) return Color.Gray
     return try {
         Color(android.graphics.Color.parseColor(colorHex))
     } catch (_: Exception) { Color.Gray }
 }
-
-private fun String?.isNull_or_blank(): Boolean = this == null || this.isBlank()
