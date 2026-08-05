@@ -1,18 +1,19 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
-//   1. Updated tag selection and service pill rendering to use `device.safeTags`
-//      and `device.safeServices`.
+//   1. Added multi-tag checkbox selection and Quick Actions (Pause/Unpause,
+//      Rename, Details) matching LIAS Web Dashboard parity.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,14 +23,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,27 +49,25 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DeviceCard(
     device: Device,
     tags: List<Tag>,
-    onTagSelected: (String) -> Unit,
+    isPaused: Boolean = false,
+    onTagsSelected: (List<String>) -> Unit = {},
+    onPauseClick: () -> Unit = {},
+    onUnpauseClick: () -> Unit = {},
+    onRenameClick: () -> Unit = {},
+    onDetailsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val currentTagId = device.safeTags.firstOrNull() ?: "generic"
-    val currentTag = tags.find { it.id == currentTagId }
+    var tagsExpanded by remember { mutableStateOf(false) }
+    val assignedTags = device.safeTags.ifEmpty { listOf("generic") }
+    val isInfra = assignedTags.contains("infrastructure")
 
-    val tagColor = remember(currentTag?.color) {
-        try {
-            Color(android.graphics.Color.parseColor(currentTag?.color ?: "#8e8e93"))
-        } catch (e: Exception) {
-            Color.Gray
-        }
-    }
-
-    val displayName = device.hostname.ifBlank { 
-        device.friendlyName.ifBlank { 
+    val displayName = device.friendlyName.ifBlank { 
+        device.hostname.ifBlank { 
             (device.vendor + " " + device.model).trim().ifBlank { 
                 device.currentMAC.ifBlank { 
                     device.pdid 
@@ -79,15 +83,6 @@ fun DeviceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                currentTag?.let {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(tagColor, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.titleMedium,
@@ -141,34 +136,78 @@ fun DeviceCard(
             }
             
             Spacer(modifier = Modifier.size(12.dp))
-            
-            Box {
-                Row(
-                    modifier = Modifier
-                        .clickable { expanded = true }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = currentTag?.name ?: "Generic",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select Tag")
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+
+            // Multi-tag Assignment Drawer
+            TextButton(
+                onClick = { tagsExpanded = !tagsExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Assign Tags (${assignedTags.size})", style = MaterialTheme.typography.labelMedium)
+            }
+
+            if (tagsExpanded) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     tags.forEach { tag ->
-                        DropdownMenuItem(
-                            text = { Text(tag.name) },
-                            onClick = {
-                                onTagSelected(tag.id)
-                                expanded = false
-                            }
-                        )
+                        val isChecked = assignedTags.contains(tag.id)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(4.dp)
+                        ) {
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { checked ->
+                                    val updated = assignedTags.toMutableList()
+                                    if (checked) updated.add(tag.id) else updated.remove(tag.id)
+                                    onTagsSelected(updated.ifEmpty { listOf("generic") })
+                                }
+                            )
+                            Text(tag.name, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.size(8.dp))
+
+            // Quick Action Buttons Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!isInfra) {
+                    if (isPaused) {
+                        TextButton(
+                            onClick = onUnpauseClick,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Resume")
+                        }
+                    } else {
+                        TextButton(
+                            onClick = onPauseClick,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pause")
+                        }
+                    }
+                }
+
+                IconButton(onClick = onRenameClick, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                IconButton(onClick = onDetailsClick, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Assignment, contentDescription = "Details", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
