@@ -1,37 +1,139 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Ensured detailed conflict payloads propagate through validatePolicy.
+//   1. Added assignDeviceTags, pauseDeviceInternet, unpauseDeviceInternet,
+//      renameDevice, getDeviceLogs, toggleVacationMode, exportPolicies,
+//      importPolicies, getNetworkStats, createUser, and assignDeviceUser extensions.
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Conflict
+import com.lias.remote.core.models.FlowLog
+import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.ConflictResponse
 import com.lias.remote.core.network.DeviceTagRequest
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.PolicyValidateRequest
+import com.lias.remote.core.network.RenameDeviceRequest
+import com.lias.remote.core.network.UserDeviceRequest
+import com.lias.remote.core.network.VacationRequest
+import com.lias.remote.core.network.VacationResponse
 
-suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiResult<Unit> {
+suspend fun EventRepository.assignDeviceTags(pdid: String, tagIds: List<String>): ApiResult<Unit> {
     val previousTags = _state.value.devices.find { it.pdid == pdid }?.tags
 
     _state.value = _state.value.copy(
         devices = _state.value.devices.map { d ->
-            if (d.pdid == pdid) d.copy(tags = listOf(tagId)) else d
+            if (d.pdid == pdid) d.copy(tags = tagIds) else d
         }
     )
 
-    val result = api.post<Unit, DeviceTagRequest>(Endpoints.deviceTags(pdid), DeviceTagRequest(tagId))
+    val result = api.post<Unit, DeviceTagRequest>(Endpoints.deviceTags(pdid), DeviceTagRequest(tagIds = tagIds))
     
     if (result !is ApiResult.Success) {
         _state.value = _state.value.copy(
             devices = _state.value.devices.map { d ->
                 if (d.pdid == pdid) d.copy(tags = previousTags ?: listOf("generic")) else d
+            }
+        )
+    }
+    return result
+}
+
+suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiResult<Unit> {
+    return assignDeviceTags(pdid, listOf(tagId))
+}
+
+suspend fun EventRepository.pauseDeviceInternet(pdid: String): ApiResult<Unit> {
+    val result = api.post<Unit, Unit>(Endpoints.devicePause(pdid), Unit)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.unpauseDeviceInternet(pdid: String): ApiResult<Unit> {
+    val result = api.delete<Unit>(Endpoints.devicePause(pdid))
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.renameDevice(pdid: String, name: String): ApiResult<Unit> {
+    val previousName = _state.value.devices.find { it.pdid == pdid }?.friendlyName
+
+    _state.value = _state.value.copy(
+        devices = _state.value.devices.map { d ->
+            if (d.pdid == pdid) d.copy(friendlyName = name) else d
+        }
+    )
+
+    val result = api.post<Unit, RenameDeviceRequest>(Endpoints.deviceRename(pdid), RenameDeviceRequest(name))
+
+    if (result !is ApiResult.Success) {
+        _state.value = _state.value.copy(
+            devices = _state.value.devices.map { d ->
+                if (d.pdid == pdid) d.copy(friendlyName = previousName ?: "") else d
+            }
+        )
+    }
+    return result
+}
+
+suspend fun EventRepository.getDeviceLogs(pdid: String): ApiResult<List<FlowLog>> {
+    return api.get<List<FlowLog>>(Endpoints.deviceLogs(pdid))
+}
+
+suspend fun EventRepository.toggleVacationMode(enabled: Boolean): ApiResult<VacationResponse> {
+    val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.exportPolicies(): ApiResult<String> {
+    return api.getRaw(Endpoints.POLICIES_EXPORT)
+}
+
+suspend fun EventRepository.importPolicies(jsonPayload: String): ApiResult<Unit> {
+    val result = api.postRawJson(Endpoints.POLICIES_IMPORT, jsonPayload)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.getNetworkStats(): ApiResult<NetworkStats> {
+    val result = api.get<NetworkStats>(Endpoints.STATS)
+    if (result is ApiResult.Success) {
+        _state.value = _state.value.copy(stats = result.data)
+    }
+    return result
+}
+
+suspend fun EventRepository.createUser(user: User): ApiResult<User> {
+    val result = api.post<User, User>(Endpoints.USERS, user)
+    if (result is ApiResult.Success) {
+        _state.value = _state.value.copy(users = _state.value.users + result.data)
+    }
+    return result
+}
+
+suspend fun EventRepository.assignDeviceUser(pdid: String, userId: String): ApiResult<Unit> {
+    val result = api.post<Unit, UserDeviceRequest>(Endpoints.deviceUser(pdid), UserDeviceRequest(userId))
+    if (result is ApiResult.Success) {
+        _state.value = _state.value.copy(
+            devices = _state.value.devices.map { d ->
+                if (d.pdid == pdid) d.copy(userID = userId) else d
             }
         )
     }
