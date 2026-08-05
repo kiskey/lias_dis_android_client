@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes:
-//   1. Connected DeviceCard Quick Actions (Pause/Unpause, Rename, Details Sheet,
-//      and multi-tag assignment) to ViewModel and repository layer.
+//   1. Supports devices belonging to multiple tags by displaying devices in all assigned groups.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -81,7 +80,8 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
     var deviceToUnpause by remember { mutableStateOf<Device?>(null) }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
 
-    val groupedDevices = remember(state.devices, searchQuery) {
+    // Multi-tag grouping: devices appear under every tag group they belong to
+    val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) {
             state.devices
         } else {
@@ -91,7 +91,17 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
         }
-        filtered.groupBy { it.safeTags.firstOrNull() ?: "generic" }
+
+        val map = mutableMapOf<String, MutableList<Device>>()
+        state.tags.forEach { map[it.id] = mutableListOf() }
+
+        filtered.forEach { d ->
+            val assigned = d.safeTags.ifEmpty { listOf("generic") }
+            assigned.forEach { tagId ->
+                map.getOrPut(tagId) { mutableListOf() }.add(d)
+            }
+        }
+        map
     }
 
     Scaffold(
