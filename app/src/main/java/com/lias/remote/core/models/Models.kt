@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes:
-//   1. Provided `safeRules` on `Schedule` and `safeDays` on `ScheduleRule`
-//      to ensure 100% type-safe access across projection engines and UI sheets.
-//   2. Preserved `resolveScheduleIDs()` to prevent JVM platform declaration clashes.
+//   1. Added startDate and endDate to ScheduleRule for holiday/calendar scheduling.
+//   2. Added FlowLog, NetworkStats, and User models for complete LIAS feature parity.
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -34,7 +33,8 @@ data class Device(
     @SerialName("first_seen") val firstSeen: String = "",
     @SerialName("last_seen") val lastSeen: String = "",
     val confidence: Double = 0.0,
-    val tags: List<String>? = emptyList()
+    val tags: List<String>? = emptyList(),
+    @SerialName("user_id") val userID: String? = null
 ) {
     val safeMacs: List<String> get() = macs ?: emptyList()
     val safeIps: List<String> get() = ips ?: emptyList()
@@ -61,6 +61,7 @@ data class Policy(
     @SerialName("schedule_ids") val scheduleIDs: List<String>? = emptyList(),
     @SerialName("schedule_id") val scheduleID: String? = null,
     val priority: Int = 50,
+    val enabled: Boolean = true,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = ""
 ) {
@@ -90,7 +91,9 @@ data class ScheduleRule(
     val days: List<String>? = emptyList(),
     @SerialName("start_time") val startTime: String = "00:00",
     @SerialName("end_time") val endTime: String = "23:59",
-    val action: String = "block"
+    val action: String = "block",
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("end_date") val endDate: String? = null
 ) {
     val safeDays: List<String> get() = days ?: emptyList()
 }
@@ -106,6 +109,26 @@ data class Conflict(
     @SerialName("overlap_end") val overlapEnd: String,
     @SerialName("action_a") val actionA: String,
     @SerialName("action_b") val actionB: String
+)
+
+@Serializable
+data class FlowLog(
+    val timestamp: String = "",
+    val pdid: String = "",
+    val action: String = "",
+    val bytes: Long = 0
+)
+
+@Serializable
+data class NetworkStats(
+    @SerialName("blocked_events_24h") val blockedEvents24h: Long = 0,
+    @SerialName("top_blocked_device_pdid") val topBlockedDevicePDID: String = ""
+)
+
+@Serializable
+data class User(
+    val id: String = "",
+    val name: String = ""
 )
 
 @Serializable
@@ -136,3 +159,11 @@ data class DeviceEventPayload(
 ) {
     val safeConfirmedBy: List<String> get() = confirmedBy ?: emptyList()
 }
+
+@Serializable
+data class SecurityAlertPayload(
+    @SerialName("alert_type") val alertType: String = "",
+    val pdid: String = "",
+    val details: String = "",
+    val timestamp: String = ""
+)
