@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Replaced flawed regex device ID extraction with structured JSON element parsing
-//      to accurately resolve `pdid`, `new_pdid`, `device_id`, and `old_pdid`.
-//   2. Retained socket call cancellation and URL normalization.
+//   1. Optimized connection setup and reconnect backoff for fast local LAN streaming.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -61,14 +59,14 @@ class LiasSseClient(
     fun connect(scope: kotlinx.coroutines.CoroutineScope) {
         disconnect()
         sseJob = scope.launch(Dispatchers.IO) {
-            var backoff = 1000L
-            val maxBackoff = 30000L
+            var backoff = 500L
+            val maxBackoff = 10000L
 
             while (isActive) {
                 try {
                     _connectionState.value = ConnectionState.CONNECTING
                     consumeSseStream()
-                    backoff = 1000L
+                    backoff = 500L
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
