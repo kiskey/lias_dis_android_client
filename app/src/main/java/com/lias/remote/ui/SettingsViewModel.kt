@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.4.0
-// Audit Fixes: 
-//   1. Added explicit testResult text feedback for Vacation Mode toggle and
-//      nftables flush actions so the user receives immediate visual confirmation.
+// Version: 1.5.0
+// Audit Fixes:
+//   1. Separated draft `serverUrl` string from committed `savedServerUrl` state
+//      to fix premature navigation on keypress bug (AUD-02).
 // ====================================================================
 
 package com.lias.remote.ui
@@ -23,7 +23,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val serverUrl: String = "",
+    val serverUrl: String = "",        // Transient editing draft
+    val savedServerUrl: String = "",   // Committed URL from DataStore
     val authToken: String = "",
     val vacationMode: Boolean = false,
     val isTesting: Boolean = false,
@@ -42,7 +43,10 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             settings.serverUrl.collect { url ->
-                _uiState.value = _uiState.value.copy(serverUrl = url)
+                _uiState.value = _uiState.value.copy(
+                    serverUrl = if (_uiState.value.serverUrl.isBlank()) url else _uiState.value.serverUrl,
+                    savedServerUrl = url
+                )
             }
         }
         viewModelScope.launch {
@@ -86,9 +90,13 @@ class SettingsViewModel(
 
     fun saveSettings() {
         viewModelScope.launch {
-            settings.saveServerUrl(_uiState.value.serverUrl)
+            val urlToSave = _uiState.value.serverUrl.trim()
+            settings.saveServerUrl(urlToSave)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
-            _uiState.value = _uiState.value.copy(testResult = "Settings saved successfully.")
+            _uiState.value = _uiState.value.copy(
+                savedServerUrl = urlToSave,
+                testResult = "Settings saved successfully."
+            )
         }
     }
 
