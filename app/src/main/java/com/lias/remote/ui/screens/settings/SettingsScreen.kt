@@ -1,38 +1,33 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.7.0
-// Audit Fixes: 
-//   1. Retained credential lock state, connection test, Vacation Mode, and nftables flush intact.
-//   2. Ensured smooth HIG scrollability.
+// Version: 2.0.0
+// Purpose: HIG Settings screen matching iOS Settings.app with grouped rows,
+//          pushed Connection screen navigation, Vacation Mode, and Danger Zone.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FlightTakeoff
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,186 +36,94 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
+import com.lias.remote.ui.components.GroupedList
+import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.ListSectionHeader
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    onNavigateToConnection: () -> Unit
+) {
     val uiState by viewModel.uiState.collectAsState()
     var showFlushDialog by remember { mutableStateOf(false) }
-    var isEditingConnection by remember { mutableStateOf(uiState.serverUrl.isBlank()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Server Connection",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", style = MaterialTheme.typography.headlineLarge) }
             )
-            if (!isEditingConnection) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = "Locked",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
-        Spacer(modifier = Modifier.size(16.dp))
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.fillMaxWidth()
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = uiState.serverUrl,
-                    onValueChange = viewModel::updateServerUrl,
-                    enabled = isEditingConnection,
-                    label = { Text("LIAS Server URL") },
-                    placeholder = { Text("e.g., http://192.168.1.1:8081") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                OutlinedTextField(
-                    value = uiState.authToken,
-                    onValueChange = viewModel::updateAuthToken,
-                    enabled = isEditingConnection,
-                    label = { Text("Auth Token (Optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
-                )
-
-                if (isEditingConnection) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.saveSettings()
-                                isEditingConnection = false
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Save Connection")
-                        }
-                        if (uiState.serverUrl.isNotBlank()) {
-                            TextButton(onClick = { isEditingConnection = false }) {
-                                Text("Cancel")
+            GroupedList {
+                // Section 1 - Server
+                item { ListSectionHeader("Server") }
+                item {
+                    GroupedListRow(
+                        primaryText = "Connection",
+                        secondaryText = if (uiState.serverUrl.isNotBlank()) "${uiState.serverUrl} · Configured" else "Not configured",
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(7.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Language, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             }
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = viewModel::testConnection,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Test Connection")
-                        }
-                        Button(
-                            onClick = { isEditingConnection = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                        ) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.size(4.dp))
-                            Text("Edit")
-                        }
-                    }
-                }
-
-                if (uiState.isTesting) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-
-                uiState.testResult?.let { result ->
-                    Text(
-                        text = result,
-                        color = if (result.startsWith("Success") || result.startsWith("Connection")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        },
+                        trailingContent = {
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                        onClick = onNavigateToConnection
                     )
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.size(24.dp))
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Vacation Mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Immediately blocks all internet access for all devices (except Infrastructure)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = uiState.vacationMode,
-                        onCheckedChange = { viewModel.toggleVacationMode(it) }
+                // Section 2 - Controls
+                item { ListSectionHeader("Controls") }
+                item {
+                    GroupedListRow(
+                        primaryText = "Vacation Mode",
+                        secondaryText = "Block all non-infrastructure devices",
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(Color(0xFFFF9500), RoundedCornerShape(7.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.FlightTakeoff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = uiState.vacationMode,
+                                onCheckedChange = { viewModel.toggleVacationMode(it) }
+                            )
+                        }
                     )
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.size(32.dp))
-
-        Text(
-            text = "Danger Zone",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.size(16.dp))
-        
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("System Maintenance", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Flush the netdev lancontrol table on the LIAS server. LIAS will rebuild it on the next sync cycle.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                Button(
-                    onClick = { showFlushDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Flush Nftables Table")
+                // Section 3 - Danger Zone
+                item { ListSectionHeader("Danger Zone") }
+                item {
+                    GroupedListRow(
+                        primaryText = "Flush Nftables Table",
+                        secondaryText = "Rebuilds automatically on next sync",
+                        trailingContent = {
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                        onClick = { showFlushDialog = true }
+                    )
                 }
             }
         }
