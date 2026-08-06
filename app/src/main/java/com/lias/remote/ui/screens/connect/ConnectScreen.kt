@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Diagonal gradient shield icon container (84dp, 22dp corner, SystemBlue -> SystemIndigo).
-//   2. Migrated input fields to HigField and submit button to HigButton.
-//   3. Added QR code dashboard affordance link under connect button.
+//   1. Safely triggers `saveSettings()` on Connect button tap without duplicate
+//      `navController.navigate` calls to prevent ConnectScreen crash (CRASH-01).
+//   2. Retained gradient shield container, HigField inputs, and QR scanner affordance.
 // ====================================================================
 
 package com.lias.remote.ui.screens.connect
