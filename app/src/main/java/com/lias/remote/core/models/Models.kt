@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes:
-//   1. Added startDate and endDate to ScheduleRule for holiday/calendar scheduling.
-//   2. Added FlowLog, NetworkStats, and User models for complete LIAS feature parity.
+//   1. Added `displayName` computed property matching Go backend `DisplayName()`
+//      and Web Dashboard display logic (friendlyName -> hostname -> canonicalHostname -> vendor+model -> MAC -> PDID).
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -40,6 +40,20 @@ data class Device(
     val safeIps: List<String> get() = ips ?: emptyList()
     val safeServices: List<String> get() = services ?: emptyList()
     val safeTags: List<String> get() = tags ?: emptyList()
+
+    // AUD-01 Fix: 100% parity with Go backend models.Device.DisplayName()
+    val displayName: String
+        get() {
+            if (friendlyName.isNotBlank()) return friendlyName
+            if (hostname.isNotBlank()) return hostname
+            if (canonicalHostname.isNotBlank()) return canonicalHostname
+            val vm = (vendor + " " + model).trim()
+            if (vm.isNotBlank()) return vm
+            if (manufacturer.isNotBlank()) return manufacturer
+            if (currentMAC.isNotBlank()) return currentMAC
+            if (pdid.isNotBlank()) return pdid
+            return "Unknown Device"
+        }
 }
 
 @Serializable
