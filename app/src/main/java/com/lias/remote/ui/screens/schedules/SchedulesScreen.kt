@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 2.0.0
-// Purpose: HIG Schedules screen with mini weekly timelines, swipe actions,
-//          and copy/duplicate support.
+// Version: 2.0.1
+// Audit Fixes:
+//   1. Added `import androidx.compose.foundation.lazy.items` to resolve model parameter list overloading.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
