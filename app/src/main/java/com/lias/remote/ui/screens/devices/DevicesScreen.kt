@@ -1,9 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.0.1
+// Version: 2.1.0
 // Audit Fixes:
-//   1. Added `import androidx.compose.foundation.lazy.items` to fix model item parameter type resolution.
-//   2. Explicit `@Composable` lambda signature parameters on `GroupedListRow`.
+//   1. Migrated to HigLargeTitleScaffold with title "Devices" and HigSearchPill.
+//   2. Updated online status dot to SystemGreenDark (never blue).
+//   3. Configured HigSwipeRow (leading = Edit Tag, trailing = Pause/Resume).
+//   4. Attached HigContextMenu long-press menu (View Details, Rename, Pause/Resume).
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -12,24 +14,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,16 +40,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
+import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigContextMenu
+import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigSearchPill
+import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
-import com.lias.remote.ui.components.SwipeActionRow
+import com.lias.remote.ui.components.SwipeAction
+import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.SystemGreenDark
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesScreen(
     viewModel: LiasViewModel,
@@ -58,6 +67,7 @@ fun DevicesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showTagEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
+    var deviceToRename by remember { mutableStateOf<Device?>(null) }
 
     val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) {
@@ -65,6 +75,7 @@ fun DevicesScreen(
         } else {
             state.devices.filter { d ->
                 d.hostname.contains(searchQuery, ignoreCase = true) ||
+                d.friendlyName.contains(searchQuery, ignoreCase = true) ||
                 d.currentMAC.contains(searchQuery, ignoreCase = true) ||
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
@@ -82,18 +93,24 @@ fun DevicesScreen(
         map
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Devices", style = MaterialTheme.typography.headlineLarge) },
-                actions = {
-                    IconButton(onClick = {
-                        editingTag = null
-                        showTagEditor = true
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "New Tag Group")
-                    }
-                }
+    HigLargeTitleScaffold(
+        title = "Devices",
+        navTrailing = {
+            IconButton(
+                onClick = {
+                    editingTag = null
+                    showTagEditor = true
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New Tag Group", tint = MaterialTheme.colorScheme.primary)
+            }
+        },
+        searchField = {
+            HigSearchPill(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = "Search devices"
             )
         },
         floatingActionButton = {
@@ -102,66 +119,92 @@ fun DevicesScreen(
                     editingTag = null
                     showTagEditor = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(HigSpec.FabSize)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "New Tag Group")
+                Icon(Icons.Default.Add, contentDescription = "New Tag Group", tint = Color.White)
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search devices") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+    ) {
+        GroupedList {
+            state.tags.forEach { tag ->
+                val devicesInTag = groupedDevices[tag.id] ?: emptyList()
+                if (devicesInTag.isNotEmpty()) {
+                    item(key = "header_${tag.id}") {
+                        ListSectionHeader("${tag.name} ${if (tag.id == "infrastructure") "🔒" else ""} · ${devicesInTag.size}")
+                    }
+                    item(key = "card_${tag.id}") {
+                        GroupedListCard {
+                            devicesInTag.forEachIndexed { index, device ->
+                                val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
 
-            GroupedList {
-                state.tags.forEach { tag ->
-                    val devicesInTag = groupedDevices[tag.id] ?: emptyList()
-                    if (devicesInTag.isNotEmpty()) {
-                        item(key = "header_${tag.id}") {
-                            ListSectionHeader("${tag.name} ${if (tag.id == "infrastructure") "🔒" else ""} · ${devicesInTag.size}")
-                        }
-                        items(devicesInTag, key = { "${tag.id}_${it.pdid}" }) { device ->
-                            val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
-                            
-                            SwipeActionRow(
-                                onSwipeLeft = {
-                                    if (isPaused) viewModel.unpauseInternet(device.pdid)
-                                    else viewModel.pauseInternet(device.pdid)
-                                },
-                                onSwipeRight = {
-                                    editingTag = tag
-                                    showTagEditor = true
-                                }
-                            ) {
-                                GroupedListRow(
-                                    primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
-                                    secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
-                                    leadingContent = {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .background(
-                                                    color = if (device.online) MaterialTheme.colorScheme.primary else Color.Gray,
-                                                    shape = CircleShape
-                                                )
-                                        )
-                                    },
-                                    trailingContent = {
-                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    },
-                                    onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                val contextMenuItems = listOf(
+                                    ContextMenuItem(
+                                        label = "View Details",
+                                        icon = Icons.Default.Visibility,
+                                        onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                    ),
+                                    ContextMenuItem(
+                                        label = "Rename",
+                                        icon = Icons.Default.Edit,
+                                        onClick = { deviceToRename = device }
+                                    ),
+                                    ContextMenuItem(
+                                        label = if (isPaused) "Resume Internet" else "Pause Internet (1 hr)",
+                                        icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                        isDestructive = !isPaused,
+                                        onClick = {
+                                            if (isPaused) viewModel.unpauseInternet(device.pdid)
+                                            else viewModel.pauseInternet(device.pdid)
+                                        }
+                                    )
                                 )
+
+                                HigContextMenu(
+                                    items = contextMenuItems,
+                                    onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                ) {
+                                    HigSwipeRow(
+                                        leadingAction = SwipeAction(
+                                            label = "Edit Tag",
+                                            icon = Icons.Default.Edit,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            onTrigger = {
+                                                editingTag = tag
+                                                showTagEditor = true
+                                            }
+                                        ),
+                                        trailingAction = SwipeAction(
+                                            label = if (isPaused) "Resume" else "Pause",
+                                            icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                            color = if (isPaused) SystemGreenDark else MaterialTheme.colorScheme.error,
+                                            onTrigger = {
+                                                if (isPaused) viewModel.unpauseInternet(device.pdid)
+                                                else viewModel.pauseInternet(device.pdid)
+                                            }
+                                        )
+                                    ) {
+                                        GroupedListRow(
+                                            primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
+                                            secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
+                                            leadingContent = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(HigSpec.StatusDotSize)
+                                                        .background(
+                                                            color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                            shape = CircleShape
+                                                        )
+                                                )
+                                            },
+                                            trailingContent = {
+                                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            },
+                                            showDivider = index < devicesInTag.size - 1,
+                                            onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -178,6 +221,35 @@ fun DevicesScreen(
                 if (editingTag == null) viewModel.createTag(tag)
                 else viewModel.updateTag(tag)
                 showTagEditor = false
+            }
+        )
+    }
+
+    deviceToRename?.let { device ->
+        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        AlertDialog(
+            onDismissRequest = { deviceToRename = null },
+            title = { Text("Rename Device") },
+            text = {
+                Column {
+                    Text("Enter a new friendly name:")
+                    com.lias.remote.ui.components.HigField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = "Friendly Name"
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newName.isNotBlank()) {
+                        viewModel.renameDevice(device.pdid, newName)
+                    }
+                    deviceToRename = null
+                }) { Text("Save", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceToRename = null }) { Text("Cancel") }
             }
         )
     }
