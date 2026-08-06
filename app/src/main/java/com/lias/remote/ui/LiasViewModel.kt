@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes: 
-//   1. Added ViewModel wrapper methods for all extended repository actions:
+//   1. Added ViewModel wrapper methods for policy & schedule copying, policy enabling/disabling,
 //      pauseDeviceInternet, unpauseDeviceInternet, renameDevice, getDeviceLogs,
 //      assignDeviceTags, exportPolicies, importPolicies, createUser, and assignDeviceUser.
 // ====================================================================
