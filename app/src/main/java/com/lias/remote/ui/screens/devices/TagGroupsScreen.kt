@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes:
 //   1. Supports devices belonging to multiple tags by displaying devices in all assigned groups.
+//   2. Smooth HIG scrollability and full action row handling.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
