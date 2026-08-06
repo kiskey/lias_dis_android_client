@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/util/ScheduleProjection.kt
-// Version: 1.1.0
-// Audit Fixes: 
-//   1. Updated projection engine to use `schedule.safeRules` and `rule.safeDays`
+// Version: 1.2.0
+// Audit Fixes:
+//   1. Added expandDayRange helper method for continuous day range rule parsing.
+//   2. Updated projection engine to use `schedule.safeRules` and `rule.safeDays`
 //      to eliminate Kotlin nullable receiver compilation errors.
 // ====================================================================
 
@@ -25,6 +26,22 @@ object ScheduleProjection {
     )
 
     private val dayNames = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
+    val daysOrder = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+    fun expandDayRange(fromDay: String, toDay: String): List<String> {
+        val startIdx = daysOrder.indexOf(fromDay.lowercase().trim().take(3))
+        val endIdx = daysOrder.indexOf(toDay.lowercase().trim().take(3))
+        if (startIdx == -1 || endIdx == -1) return listOf(fromDay)
+
+        val result = mutableListOf<String>()
+        var curr = startIdx
+        while (true) {
+            result.add(daysOrder[curr])
+            if (curr == endIdx) break
+            curr = (curr + 1) % 7
+        }
+        return result
+    }
 
     data class Segment(
         val start: Int,
