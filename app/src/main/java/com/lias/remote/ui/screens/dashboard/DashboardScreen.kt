@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.14.0
+// Version: 1.15.0
 // Audit Fixes: 
-//   1. Full parity with LIAS web dashboard `renderActiveEnforcementsHtml()`:
-//      detects Global Kill-Switch (Block All) and Global Allow Override in active enforcements.
-//   2. Wrapped Dashboard layout in a single smooth LazyColumn to eliminate nested scrolling lag.
+//   1. Passed `existingPolicies = state.policies` to `PolicyWizardSheet` for explicit
+//      type-safe compilation and zero unresolved references.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -249,6 +248,7 @@ fun DashboardScreen(viewModel: LiasViewModel) {
             initialPolicy = state.policies.find { it.id == "global_default" },
             tags = state.tags,
             schedules = state.schedules,
+            existingPolicies = state.policies,
             onDismiss = { showGlobalWizard = false },
             onSave = { 
                 viewModel.savePolicy(it) 
