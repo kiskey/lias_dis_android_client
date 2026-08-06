@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Added read-only lock state for Server URL and Auth Token to prevent accidental edits.
-//   2. Provided "Edit Connection Settings" toggle button to unlock credentials for editing.
+//   1. Retained credential lock state, connection test, Vacation Mode, and nftables flush intact.
+//   2. Ensured smooth HIG scrollability.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
