@@ -1,11 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Scaffolded via HigLargeTitleScaffold with title "Home".
-//   2. Integrated MiniWeekStrip into All Access hero card.
-//   3. Rendered device online status dots in SystemGreenDark (never blue).
-//   4. Folded active enforcements contextually into grouped list block.
+//   1. Used `device.displayName` to show full friendly/hostname/vendor display name (AUD-01).
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -25,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -144,7 +142,7 @@ fun HomeScreen(
                         GroupedListCard {
                             state.devices.take(8).forEachIndexed { index, device ->
                                 GroupedListRow(
-                                    primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
+                                    primaryText = device.displayName,
                                     secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
                                     leadingContent = {
                                         Box(
@@ -331,7 +329,7 @@ private fun computeActiveEnforcements(
     policies.forEach { p ->
         if (p.action == "schedule" && p.type != "global" && p.enabled) {
             val targetTag = tags.find { it.id == p.targetID }
-            val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.hostname ?: p.targetID)
+            val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.displayName ?: p.targetID)
             val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color.Gray
 
             val schedIDs = p.resolveScheduleIDs()
