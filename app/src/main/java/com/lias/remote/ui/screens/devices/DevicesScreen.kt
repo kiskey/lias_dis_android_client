@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.0.0
-// Purpose: HIG Devices screen sectioned by tag group headers with search bar,
-//          FAB + Top Bar '+' button for tag editing, and pushed row navigation.
+// Version: 2.0.1
+// Audit Fixes:
+//   1. Added `import androidx.compose.foundation.lazy.items` to fix model item parameter type resolution.
+//   2. Explicit `@Composable` lambda signature parameters on `GroupedListRow`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -10,12 +11,11 @@ package com.lias.remote.ui.screens.devices
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -36,9 +36,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
@@ -59,7 +59,6 @@ fun DevicesScreen(
     var showTagEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
 
-    // Multi-tag grouping: devices appear under every tag group they belong to
     val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) {
             state.devices
@@ -114,7 +113,6 @@ fun DevicesScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
