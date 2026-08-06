@@ -1,11 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Migrated to HigLargeTitleScaffold with title "Devices" and HigSearchPill.
-//   2. Updated online status dot to SystemGreenDark (never blue).
-//   3. Configured HigSwipeRow (leading = Edit Tag, trailing = Pause/Resume).
-//   4. Attached HigContextMenu long-press menu (View Details, Rename, Pause/Resume).
+//   1. Used `device.displayName` to show full friendly/hostname/vendor display name (AUD-01).
+//   2. Eliminated text truncation in search bar and top header bar (AUD-04 & AUD-05).
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -74,8 +73,7 @@ fun DevicesScreen(
             state.devices
         } else {
             state.devices.filter { d ->
-                d.hostname.contains(searchQuery, ignoreCase = true) ||
-                d.friendlyName.contains(searchQuery, ignoreCase = true) ||
+                d.displayName.contains(searchQuery, ignoreCase = true) ||
                 d.currentMAC.contains(searchQuery, ignoreCase = true) ||
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
@@ -185,7 +183,7 @@ fun DevicesScreen(
                                         )
                                     ) {
                                         GroupedListRow(
-                                            primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
+                                            primaryText = device.displayName,
                                             secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
                                             leadingContent = {
                                                 Box(
@@ -226,7 +224,7 @@ fun DevicesScreen(
     }
 
     deviceToRename?.let { device ->
-        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        var newName by remember { mutableStateOf(device.displayName) }
         AlertDialog(
             onDismissRequest = { deviceToRename = null },
             title = { Text("Rename Device") },
