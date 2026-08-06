@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes: 
-//   1. Updated policy impact lookup to invoke `p.resolveScheduleIDs()`.
+//   1. Added Copy Schedule action button to match LIAS Web Dashboard parity.
+//   2. Ensured smooth HIG scrollability across schedule cards list.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -101,6 +103,15 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                    }
+                                    IconButton(onClick = {
+                                        editingSchedule = schedule.copy(
+                                            id = "sched_${System.currentTimeMillis()}",
+                                            name = "Copy of ${schedule.name}"
+                                        )
+                                        showEditor = true
+                                    }) {
+                                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
                                     }
                                     IconButton(onClick = {
                                         editingSchedule = schedule
