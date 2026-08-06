@@ -1,13 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 2.0.0
-// Purpose: HIG Dashboard HomeScreen featuring All Access hero switch card,
-//          active enforcements, metrics, and recent device rows.
+// Version: 2.0.1
+// Audit Fixes:
+//   1. Added missing imports `expandVertically`, `shrinkVertically`, and `androidx.compose.foundation.lazy.items`.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
