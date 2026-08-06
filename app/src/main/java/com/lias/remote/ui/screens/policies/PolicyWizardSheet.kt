@@ -1,9 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes: 
-//   1. Added Shadow Policy Warning parity on Step 1 when another policy targets the same group/device.
-//   2. Wrapped ModalBottomSheet body in smooth vertical scroll container.
+//   1. Added missing `import androidx.compose.runtime.collectAsState` to resolve compiler
+//      unresolved reference errors for `collectAsState`, `policies`, `it`, and `name`.
+//   2. Added explicit `existingPolicies: List<Policy>` parameter with default fallback.
+//   3. Retained all 3 wizard steps, shadow policy warnings, conflict checks, and HIG scrollability.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -35,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,12 +64,14 @@ fun PolicyWizardSheet(
     initialPolicy: Policy?,
     tags: List<Tag>,
     schedules: List<Schedule>,
+    existingPolicies: List<Policy> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (Policy) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val currentState by viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsState()
+    val allPolicies = if (existingPolicies.isNotEmpty()) existingPolicies else uiState.policies
     
     var step by remember { mutableStateOf(1) }
     var name by remember { mutableStateOf(initialPolicy?.name ?: "") }
@@ -88,9 +93,9 @@ fun PolicyWizardSheet(
         ScheduleProjection.detectConflicts(selectedScheduleObjects)
     }
 
-    LaunchedEffect(type, targetID, name) {
+    LaunchedEffect(type, targetID, name, allPolicies) {
         if (type != "global" && targetID.isNotBlank()) {
-            val existing = currentState.policies.find { 
+            val existing = allPolicies.find { 
                 it.id != initialPolicy?.id && it.type == type && it.targetID == targetID 
             }
             if (existing != null) {
