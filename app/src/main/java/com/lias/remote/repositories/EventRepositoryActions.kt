@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.8.0
-// Audit Fixes: 
-//   1. Added copyPolicy and copySchedule helper actions for full feature parity
-//      with LIAS Web Dashboard policy/schedule duplication features.
+// Version: 1.9.0
+// Audit Fixes:
+//   1. Added state rollback on API errors for optimistic toggles & actions (AUD-07).
 // ====================================================================
 
 package com.lias.remote.repositories
