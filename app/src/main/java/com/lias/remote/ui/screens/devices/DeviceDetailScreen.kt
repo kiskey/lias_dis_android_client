@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Replaced Scaffold with HigLargeTitleScaffold (navLeading `‹ Devices`, navTrailing `•••`).
-//   2. Service chips styled with fill background and 8dp corner radius.
-//   3. Activity logs use right-aligned StatusPill(tone = Allowed/Blocked).
+//   1. Used `device.displayName` to show full display name in hero header (AUD-01).
+//   2. Eliminated back button text truncation by tuning nav bar padding (AUD-03 & AUD-05).
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -86,7 +86,10 @@ fun DeviceDetailScreen(
     HigLargeTitleScaffold(
         title = "",
         navLeading = {
-            TextButton(onClick = onBack) {
+            TextButton(
+                onClick = onBack,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+            ) {
                 Text("‹ Devices", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             }
         },
@@ -142,7 +145,7 @@ fun DeviceDetailScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = device.friendlyName.ifBlank { device.hostname },
+                            text = device.displayName,
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.W800
                         )
