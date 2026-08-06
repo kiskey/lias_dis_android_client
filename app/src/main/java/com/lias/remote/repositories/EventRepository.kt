@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes:
 //   1. Incremental loading: updates state and unlocks UI immediately when devices arrive,
 //      loading secondary metadata in parallel.
+//   2. Handles real-time SSE event consumption and StateFlow emissions for full parity.
 // ====================================================================
 
 package com.lias.remote.repositories
