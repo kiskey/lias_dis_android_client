@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes: 
-//   1. Fully verified step-by-step policy wizard with safe schedule resolutions.
+//   1. Added Shadow Policy Warning parity on Step 1 when another policy targets the same group/device.
+//   2. Wrapped ModalBottomSheet body in smooth vertical scroll container.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -63,6 +66,7 @@ fun PolicyWizardSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val currentState by viewModel.state.collectAsState()
     
     var step by remember { mutableStateOf(1) }
     var name by remember { mutableStateOf(initialPolicy?.name ?: "") }
@@ -86,7 +90,16 @@ fun PolicyWizardSheet(
 
     LaunchedEffect(type, targetID, name) {
         if (type != "global" && targetID.isNotBlank()) {
-            shadowWarning = null 
+            val existing = currentState.policies.find { 
+                it.id != initialPolicy?.id && it.type == type && it.targetID == targetID 
+            }
+            if (existing != null) {
+                shadowWarning = "⚠️ Shadow Policy Warning: Policy '${existing.name}' already targets this $type. The higher priority policy will take precedence."
+            } else {
+                shadowWarning = null
+            }
+        } else {
+            shadowWarning = null
         }
     }
 
@@ -98,7 +111,8 @@ fun PolicyWizardSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
@@ -153,7 +167,7 @@ fun PolicyWizardSheet(
                     }
                     
                     shadowWarning?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        Text(it, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Button(
@@ -188,7 +202,8 @@ fun PolicyWizardSheet(
                                 onSave(Policy(
                                     id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}",
                                     name = name, type = type, targetID = targetID, 
-                                    action = action, priority = priority.toIntOrNull() ?: 50
+                                    action = action, priority = priority.toIntOrNull() ?: 50,
+                                    enabled = initialPolicy?.enabled ?: true
                                 ))
                             } else {
                                 step = 3
@@ -251,7 +266,8 @@ fun PolicyWizardSheet(
                                                     id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}",
                                                     name = name, type = type, targetID = targetID, 
                                                     action = action, priority = priority.toIntOrNull() ?: 50,
-                                                    scheduleIDs = selectedSchedules.toList()
+                                                    scheduleIDs = selectedSchedules.toList(),
+                                                    enabled = initialPolicy?.enabled ?: true
                                                 ))
                                             } else {
                                                 serverConflictWarning = "⚠️ Server detected ${serverResult.data.size} schedule conflict(s). Please adjust attached schedules."
