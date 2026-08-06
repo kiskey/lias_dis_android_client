@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 2.0.0
-// Purpose: Apple HIG 3-way toggle control with animated sliding indicator.
+// Version: 2.0.1
+// Audit Fixes:
+//   1. Replaced `.width(1f / options.size)` with `.fillMaxWidth(1f / options.size)`
+//      to fix Compose Float fraction vs Dp compiler type mismatch error.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,7 +59,7 @@ fun SegmentedControl(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(1f / options.size)
+                .fillMaxWidth(1f / options.size)
                 .padding(2.dp)
                 .background(
                     color = MaterialTheme.colorScheme.surface,
