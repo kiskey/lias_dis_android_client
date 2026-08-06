@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Migrated scaffold to HigLargeTitleScaffold with title "Rules".
-//   2. Consolidated Import/Export Policy actions into nav-bar "•••" overflow menu.
-//   3. Divided policies into three continuous grouped list cards (Global, Tag Rules, Device Rules).
-//   4. Folded "no schedule attached" warning text into row subtitle.
+//   1. Integrated trailing clock action button on blocked Tag Rules rows (§4.4).
+//   2. Surfaced `"Allowed · {X}m left"` status pill during active tag extensions (§4.4).
+//   3. Attached MinutePickerSheet for tag extensions.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -14,14 +13,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
@@ -48,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.models.Tag
+import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
@@ -57,11 +61,13 @@ import com.lias.remote.ui.components.HigContextMenu
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.MinutePickerSheet
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
 import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.SystemGreenDark
 
 @Composable
 fun RulesScreen(viewModel: LiasViewModel) {
@@ -72,6 +78,9 @@ fun RulesScreen(viewModel: LiasViewModel) {
     var editingPolicy by remember { mutableStateOf<Policy?>(null) }
     var policyToDelete by remember { mutableStateOf<Policy?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
+
+    // Extend Tag Access Sheet
+    var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -154,7 +163,11 @@ fun RulesScreen(viewModel: LiasViewModel) {
                                         viewModel = viewModel,
                                         showDivider = index < globalPolicies.size - 1,
                                         onEdit = { editingPolicy = policy; showWizard = true },
-                                        onDelete = { policyToDelete = policy }
+                                        onDelete = { policyToDelete = policy },
+                                        onExtendTag = { tagId ->
+                                            val t = state.tags.find { it.id == tagId }
+                                            if (t != null) activeTagForExtend = t
+                                        }
                                     )
                                 }
                             }
@@ -174,7 +187,11 @@ fun RulesScreen(viewModel: LiasViewModel) {
                                         viewModel = viewModel,
                                         showDivider = index < tagPolicies.size - 1,
                                         onEdit = { editingPolicy = policy; showWizard = true },
-                                        onDelete = { policyToDelete = policy }
+                                        onDelete = { policyToDelete = policy },
+                                        onExtendTag = { tagId ->
+                                            val t = state.tags.find { it.id == tagId }
+                                            if (t != null) activeTagForExtend = t
+                                        }
                                     )
                                 }
                             }
@@ -194,7 +211,8 @@ fun RulesScreen(viewModel: LiasViewModel) {
                                         viewModel = viewModel,
                                         showDivider = index < devicePolicies.size - 1,
                                         onEdit = { editingPolicy = policy; showWizard = true },
-                                        onDelete = { policyToDelete = policy }
+                                        onDelete = { policyToDelete = policy },
+                                        onExtendTag = { }
                                     )
                                 }
                             }
@@ -217,6 +235,26 @@ fun RulesScreen(viewModel: LiasViewModel) {
                 viewModel.savePolicy(policy)
                 showWizard = false
             }
+        )
+    }
+
+    activeTagForExtend?.let { tag ->
+        val effectiveStatus = viewModel.effectiveStatusForTag(tag.id)
+        MinutePickerSheet(
+            targetLabel = tag.name,
+            targetSubtitle = "Tag Group",
+            currentExtension = effectiveStatus.activeExtension,
+            onDismiss = { activeTagForExtend = null },
+            onConfirm = { minutes ->
+                viewModel.extendTagAccess(tag.id, minutes)
+                activeTagForExtend = null
+            },
+            onCancelExtension = if (effectiveStatus.activeExtension != null) {
+                {
+                    viewModel.cancelTagExtension(tag.id)
+                    activeTagForExtend = null
+                }
+            } else null
         )
     }
 
@@ -248,12 +286,17 @@ private fun PolicyRow(
     viewModel: LiasViewModel,
     showDivider: Boolean,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExtendTag: (tagId: String) -> Unit
 ) {
     val isInfra = policy.targetID == "infrastructure"
     val isGlobal = policy.id == "global_default"
     val isPaused = policy.id.startsWith("pol_pause_")
     val canToggle = !isGlobal && !isPaused && !isInfra
+
+    val tagStatus = if (policy.type == "tag") viewModel.effectiveStatusForTag(policy.targetID) else null
+    val canExtendTag = ExtendHelper.isExtendAvailable(tagStatus)
+    val activeTagExtension = tagStatus?.activeExtension
 
     val attachedSchedules = policy.resolveScheduleIDs().mapNotNull { id -> schedules.find { it.id == id } }
     val noScheduleWarning = policy.action == "schedule" && attachedSchedules.isEmpty()
@@ -301,23 +344,44 @@ private fun PolicyRow(
                 secondaryText = subtitle,
                 showDivider = showDivider,
                 trailingContent = {
-                    if (canToggle) {
-                        Switch(
-                            checked = policy.enabled,
-                            onCheckedChange = { enabled ->
-                                viewModel.savePolicy(policy.copy(enabled = enabled))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (canExtendTag && policy.type == "tag") {
+                            IconButton(
+                                onClick = { onExtendTag(policy.targetID) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.HourglassTop,
+                                    contentDescription = "Extend Tag Access",
+                                    tint = SystemGreenDark
+                                )
                             }
-                        )
-                    } else {
-                        val pillTone = when (policy.action) {
-                            "block" -> PillTone.Blocked
-                            "allow" -> PillTone.Allowed
-                            else -> PillTone.Scheduled
                         }
-                        StatusPill(
-                            text = policy.action.uppercase(),
-                            tone = pillTone
-                        )
+
+                        if (activeTagExtension != null) {
+                            val left = ExtendHelper.minutesUntil(activeTagExtension.expiresAt)
+                            StatusPill(
+                                text = "Allowed · ${left}m left",
+                                tone = PillTone.Allowed
+                            )
+                        } else if (canToggle) {
+                            Switch(
+                                checked = policy.enabled,
+                                onCheckedChange = { enabled ->
+                                    viewModel.savePolicy(policy.copy(enabled = enabled))
+                                }
+                            )
+                        } else {
+                            val pillTone = when (policy.action) {
+                                "block" -> PillTone.Blocked
+                                "allow" -> PillTone.Allowed
+                                else -> PillTone.Scheduled
+                            }
+                            StatusPill(
+                                text = policy.action.uppercase(),
+                                tone = pillTone
+                            )
+                        }
                     }
                 },
                 onClick = { if (!isInfra) onEdit() }
