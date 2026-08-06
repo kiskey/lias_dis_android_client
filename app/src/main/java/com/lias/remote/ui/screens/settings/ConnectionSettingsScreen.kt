@@ -1,7 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
-// Version: 2.0.0
-// Purpose: Pushed screen for editing Server URL, Auth Token, and testing connection.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Migrated inputs to HigField and test trigger to HigButton.
+//   2. Added thin navigation bar header (`‹ Settings` back and `Save`).
+//   3. Rendered connection status feedback banner.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -16,19 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,8 +35,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
+import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigLargeTitleScaffold
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
@@ -52,64 +49,60 @@ fun ConnectionSettingsScreen(
     var tempUrl by remember { mutableStateOf(state.serverUrl) }
     var tempToken by remember { mutableStateOf(state.authToken) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Connection") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = {
-                        viewModel.updateServerUrl(tempUrl)
-                        viewModel.updateAuthToken(tempToken)
-                        viewModel.saveSettings()
-                        onBack()
-                    }) {
-                        Text("Save", fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
+    HigLargeTitleScaffold(
+        title = "",
+        navLeading = {
+            TextButton(onClick = onBack) {
+                Text("‹ Settings", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            }
+        },
+        navTrailing = {
+            TextButton(onClick = {
+                viewModel.updateServerUrl(tempUrl)
+                viewModel.updateAuthToken(tempToken)
+                viewModel.saveSettings()
+                onBack()
+            }) {
+                Text("Save", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
         }
-    ) { padding ->
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedTextField(
+            Text(
+                text = "Connection Settings",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.W800
+            )
+
+            HigField(
                 value = tempUrl,
                 onValueChange = { tempUrl = it },
-                label = { Text("Server URL") },
-                placeholder = { Text("http://192.168.1.1:8081") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label = "Server URL",
+                placeholder = "http://192.168.1.1:8081"
             )
 
-            OutlinedTextField(
+            HigField(
                 value = tempToken,
                 onValueChange = { tempToken = it },
-                label = { Text("Auth Token (Optional)") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label = "Auth Token (Optional)",
+                visualTransformation = PasswordVisualTransformation()
             )
 
-            Button(
+            HigButton(
+                text = "Test Connection",
                 onClick = {
                     viewModel.updateServerUrl(tempUrl)
                     viewModel.updateAuthToken(tempToken)
                     viewModel.testConnection()
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Test Connection")
-            }
+                style = HigButtonStyle.Secondary
+            )
 
             if (state.isTesting) {
                 Column(
@@ -124,7 +117,7 @@ fun ConnectionSettingsScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = result,
-                    color = if (result.startsWith("Connection successful") || result.startsWith("Success")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    color = if (result.startsWith("Connection successful") || result.startsWith("Settings saved")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
