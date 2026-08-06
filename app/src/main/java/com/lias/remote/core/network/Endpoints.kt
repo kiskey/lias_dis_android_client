@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/Endpoints.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Audit Fixes:
-//   1. Added missing REST endpoint routes for Pause/Resume, Rename,
-//      Flow Logs, Policy Export/Import, Users, Vacation Mode, and Stats.
+//   1. Added REST endpoints for Extend Access and Effective Status (§2.2).
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -16,9 +15,13 @@ object Endpoints {
     fun deviceRename(pdid: String) = "/api/v1/devices/$pdid/rename"
     fun deviceUser(pdid: String) = "/api/v1/devices/$pdid/user"
     fun deviceLogs(pdid: String) = "/api/v1/devices/$pdid/logs"
+    fun deviceExtend(pdid: String) = "/api/v1/devices/$pdid/extend"
+    fun deviceEffectiveStatus(pdid: String) = "/api/v1/devices/$pdid/effective-status"
     
     const val TAGS = "/api/v1/tags"
     fun tag(id: String) = "/api/v1/tags/$id"
+    fun tagExtend(tagId: String) = "/api/v1/tags/$tagId/extend"
+    fun tagEffectiveStatus(tagId: String) = "/api/v1/tags/$tagId/effective-status"
     
     const val POLICIES = "/api/v1/policies"
     const val POLICIES_VALIDATE = "/api/v1/policies/validate"
