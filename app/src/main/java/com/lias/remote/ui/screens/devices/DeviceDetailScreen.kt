@@ -1,14 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Used `device.displayName` to show full display name in hero header (AUD-01).
-//   2. Eliminated back button text truncation by tuning nav bar padding (AUD-03 & AUD-05).
+//   1. Added Extend Access action to `•••` overflow menu (§4.2).
+//   2. Added green `"Extended · {X}m left"` countdown pill under hero status line (§4.2).
+//   3. Attached MinutePickerSheet pre-filled with remaining minutes.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -48,11 +51,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.MinutePickerSheet
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.SkeletonRow
 import com.lias.remote.ui.components.StatusPill
@@ -72,8 +77,12 @@ fun DeviceDetailScreen(
     var logs by remember { mutableStateOf<List<FlowLog>>(emptyList()) }
     var isLoadingLogs by remember { mutableStateOf(true) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var showExtendSheet by remember { mutableStateOf(false) }
 
     val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+    val effectiveStatus = viewModel.effectiveStatusFor(device.pdid)
+    val canExtend = ExtendHelper.isExtendAvailable(effectiveStatus)
+    val activeExtension = effectiveStatus.activeExtension
 
     LaunchedEffect(pdid) {
         val result = viewModel.getDeviceLogs(pdid)
@@ -103,6 +112,16 @@ fun DeviceDetailScreen(
                     onDismissRequest = { menuExpanded = false },
                     shape = RoundedCornerShape(14.dp)
                 ) {
+                    if (canExtend || activeExtension != null) {
+                        DropdownMenuItem(
+                            text = { Text("Extend Access (1–120 min)") },
+                            leadingIcon = { Icon(Icons.Default.HourglassTop, contentDescription = null, tint = SystemGreenDark) },
+                            onClick = {
+                                menuExpanded = false
+                                showExtendSheet = true
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(if (isPaused) "Resume Internet" else "Pause Internet (1 hr)") },
                         onClick = {
@@ -156,6 +175,17 @@ fun DeviceDetailScreen(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
+
+                        // Extended Access Active Pill
+                        if (activeExtension != null) {
+                            val left = ExtendHelper.minutesUntil(activeExtension.expiresAt)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            StatusPill(
+                                text = "Extended · ${left}m left",
+                                tone = PillTone.Allowed,
+                                modifier = Modifier.clickable { showExtendSheet = true }
+                            )
+                        }
                     }
                 }
             }
@@ -228,5 +258,24 @@ fun DeviceDetailScreen(
                 }
             }
         }
+    }
+
+    if (showExtendSheet) {
+        MinutePickerSheet(
+            targetLabel = device.displayName,
+            targetSubtitle = device.currentIP.ifBlank { device.pdid },
+            currentExtension = activeExtension,
+            onDismiss = { showExtendSheet = false },
+            onConfirm = { minutes ->
+                viewModel.extendDeviceAccess(device.pdid, minutes)
+                showExtendSheet = false
+            },
+            onCancelExtension = if (activeExtension != null) {
+                {
+                    viewModel.cancelDeviceExtension(device.pdid)
+                    showExtendSheet = false
+                }
+            } else null
+        )
     }
 }
