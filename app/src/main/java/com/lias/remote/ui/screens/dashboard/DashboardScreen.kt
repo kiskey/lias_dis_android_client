@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.15.0
+// Version: 1.16.0
 // Audit Fixes: 
-//   1. Passed `existingPolicies = state.policies` to `PolicyWizardSheet` for explicit
-//      type-safe compilation and zero unresolved references.
+//   1. Aligned SegmentedControl call arguments to `selected` and `onSelected`
+//      to fix Kotlin compiler argument mismatch errors.
+//   2. Preserved HIG 2.0 presentation layer, active enforcements, and pull-to-refresh.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -158,8 +159,8 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                                 ?: Policy(id = "global_default", name = "Global", type = "global", action = "schedule")
                             
                             SegmentedControl(
-                                selectedAction = globalPolicy.action,
-                                onActionSelected = { newAction ->
+                                selected = globalPolicy.action,
+                                onSelected = { newAction ->
                                     viewModel.savePolicy(globalPolicy.copy(action = newAction))
                                 },
                                 modifier = Modifier.fillMaxWidth()
@@ -491,7 +492,7 @@ private fun computeActiveEnforcements(
 private fun evaluateScheduleActiveAction(s: Schedule): String? {
     try {
         val cal = Calendar.getInstance(TimeZone.getTimeZone(s.timezone))
-        val currentDayIdx = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=Sun
+        val currentDayIdx = cal.get(Calendar.DAY_OF_WEEK) - 1
         val currentMin = currentDayIdx * 1440 + cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
 
         val segments = ScheduleProjection.projectSchedule(s)
