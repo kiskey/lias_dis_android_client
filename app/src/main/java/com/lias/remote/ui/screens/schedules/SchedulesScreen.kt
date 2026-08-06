@@ -1,11 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 2.1.0
+// Version: 2.1.1
 // Audit Fixes:
-//   1. Migrated to HigLargeTitleScaffold with title "Schedules".
-//   2. Integrated MiniWeekStrip compact 7-cell strip into schedule cards.
-//   3. Added long-press HigContextMenu with Edit, Duplicate, and Delete actions.
-//   4. Implemented client-side schedule duplication without breaking backend API contracts.
+//   1. Removed invalid nested `item {` block inside `items(...)` lambda to resolve
+//      Gradle compileDebugKotlin failure (ERR-01 & ERR-02).
+//   2. Preserved HigLargeTitleScaffold, MiniWeekStrip, and HigContextMenu duplication parity.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -136,79 +135,77 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                 item { ListSectionHeader("Configured Schedules (${state.schedules.size})") }
 
                 items(state.schedules, key = { it.id }) { schedule ->
-                    item {
-                        GroupedListCard {
-                            val contextMenuItems = listOf(
-                                ContextMenuItem(
-                                    label = "Edit",
-                                    icon = Icons.Default.Edit,
-                                    onClick = {
-                                        editingSchedule = schedule
-                                        showEditor = true
-                                    }
-                                ),
-                                ContextMenuItem(
-                                    label = "Duplicate",
-                                    icon = Icons.Default.ContentCopy,
-                                    onClick = {
-                                        val cloned = schedule.copy(
-                                            id = "sched_${System.currentTimeMillis()}",
-                                            name = "${schedule.name} Copy"
-                                        )
-                                        viewModel.saveSchedule(cloned)
-                                    }
-                                ),
-                                ContextMenuItem(
-                                    label = "Delete",
-                                    icon = Icons.Default.Delete,
-                                    isDestructive = true,
-                                    onClick = { scheduleToDelete = schedule }
-                                )
-                            )
-
-                            HigContextMenu(
-                                items = contextMenuItems,
+                    GroupedListCard {
+                        val contextMenuItems = listOf(
+                            ContextMenuItem(
+                                label = "Edit",
+                                icon = Icons.Default.Edit,
                                 onClick = {
                                     editingSchedule = schedule
                                     showEditor = true
                                 }
+                            ),
+                            ContextMenuItem(
+                                label = "Duplicate",
+                                icon = Icons.Default.ContentCopy,
+                                onClick = {
+                                    val cloned = schedule.copy(
+                                        id = "sched_${System.currentTimeMillis()}",
+                                        name = "${schedule.name} Copy"
+                                    )
+                                    viewModel.saveSchedule(cloned)
+                                }
+                            ),
+                            ContextMenuItem(
+                                label = "Delete",
+                                icon = Icons.Default.Delete,
+                                isDestructive = true,
+                                onClick = { scheduleToDelete = schedule }
+                            )
+                        )
+
+                        HigContextMenu(
+                            items = contextMenuItems,
+                            onClick = {
+                                editingSchedule = schedule
+                                showEditor = true
+                            }
+                        ) {
+                            HigSwipeRow(
+                                leadingAction = SwipeAction(
+                                    label = "Edit",
+                                    icon = Icons.Default.Edit,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    onTrigger = {
+                                        editingSchedule = schedule
+                                        showEditor = true
+                                    }
+                                ),
+                                trailingAction = SwipeAction(
+                                    label = "Delete",
+                                    icon = Icons.Default.Delete,
+                                    color = MaterialTheme.colorScheme.error,
+                                    onTrigger = { scheduleToDelete = schedule }
+                                )
                             ) {
-                                HigSwipeRow(
-                                    leadingAction = SwipeAction(
-                                        label = "Edit",
-                                        icon = Icons.Default.Edit,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        onTrigger = {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    GroupedListRow(
+                                        primaryText = schedule.name,
+                                        secondaryText = "${schedule.mode.uppercase()} · ${schedule.timezone}",
+                                        trailingContent = {
+                                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        },
+                                        onClick = {
                                             editingSchedule = schedule
                                             showEditor = true
                                         }
-                                    ),
-                                    trailingAction = SwipeAction(
-                                        label = "Delete",
-                                        icon = Icons.Default.Delete,
-                                        color = MaterialTheme.colorScheme.error,
-                                        onTrigger = { scheduleToDelete = schedule }
                                     )
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp)
-                                    ) {
-                                        GroupedListRow(
-                                            primaryText = schedule.name,
-                                            secondaryText = "${schedule.mode.uppercase()} · ${schedule.timezone}",
-                                            trailingContent = {
-                                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            },
-                                            onClick = {
-                                                editingSchedule = schedule
-                                                showEditor = true
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        MiniWeekStrip(schedules = listOf(schedule))
-                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    MiniWeekStrip(schedules = listOf(schedule))
                                 }
                             }
                         }
