@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.0.0
-// Audit Fixes: 
-//   1. Added success Snackbar emissions for savePolicy, deletePolicy, saveSchedule,
-//      deleteSchedule, createTag, updateTag, deleteTag, and assignTags to guarantee
-//      100% visual feedback parity with LIAS web dashboard `showToast` notifications.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Added Extend Access ViewModel methods and optimistic effective status helpers (§5).
 // ====================================================================
 
 package com.lias.remote.ui
@@ -12,6 +10,8 @@ package com.lias.remote.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.models.Conflict
+import com.lias.remote.core.models.EffectiveStatus
+import com.lias.remote.core.models.ExtensionInfo
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -24,12 +24,16 @@ import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTag
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
+import com.lias.remote.repositories.cancelDeviceExtension
+import com.lias.remote.repositories.cancelTagExtension
 import com.lias.remote.repositories.createTag
 import com.lias.remote.repositories.createUser
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
 import com.lias.remote.repositories.exportPolicies
+import com.lias.remote.repositories.extendDeviceAccess
+import com.lias.remote.repositories.extendTagAccess
 import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.importPolicies
 import com.lias.remote.repositories.pauseDeviceInternet
@@ -51,6 +55,87 @@ class LiasViewModel(
 
     init {
         eventRepository.start()
+    }
+
+    fun extendDeviceAccess(pdid: String, minutes: Int) {
+        viewModelScope.launch {
+            val result = eventRepository.extendDeviceAccess(pdid, minutes)
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏳ Access extended by $minutes minutes"))
+            } else {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to extend access: $msg"))
+            }
+        }
+    }
+
+    fun cancelDeviceExtension(pdid: String) {
+        viewModelScope.launch {
+            val result = eventRepository.cancelDeviceExtension(pdid)
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Extension cancelled"))
+            } else {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to cancel extension: $msg"))
+            }
+        }
+    }
+
+    fun extendTagAccess(tagId: String, minutes: Int) {
+        viewModelScope.launch {
+            val result = eventRepository.extendTagAccess(tagId, minutes)
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏳ Tag access extended by $minutes minutes"))
+            } else {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to extend tag access: $msg"))
+            }
+        }
+    }
+
+    fun cancelTagExtension(tagId: String) {
+        viewModelScope.launch {
+            val result = eventRepository.cancelTagExtension(tagId)
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Tag extension cancelled"))
+            } else {
+                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to cancel tag extension: $msg"))
+            }
+        }
+    }
+
+    fun effectiveStatusFor(pdid: String): EffectiveStatus {
+        val device = state.value.devices.find { it.pdid == pdid }
+        if (device != null && device.safeTags.contains("infrastructure")) {
+            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false)
+        }
+        val extensionPol = state.value.policies.find { it.id == "pol_extend_device_$pdid" }
+        if (extensionPol != null && extensionPol.enabled) {
+            return EffectiveStatus(
+                action = "allow",
+                source = "device_policy",
+                extendAvailable = false,
+                activeExtension = ExtensionInfo(expiresAt = extensionPol.updatedAt, minutesLeft = 30)
+            )
+        }
+        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true)
+    }
+
+    fun effectiveStatusForTag(tagId: String): EffectiveStatus {
+        if (tagId == "infrastructure") {
+            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false)
+        }
+        val extensionPol = state.value.policies.find { it.id == "pol_extend_tag_$tagId" }
+        if (extensionPol != null && extensionPol.enabled) {
+            return EffectiveStatus(
+                action = "allow",
+                source = "tag_policy",
+                extendAvailable = false,
+                activeExtension = ExtensionInfo(expiresAt = extensionPol.updatedAt, minutesLeft = 30)
+            )
+        }
+        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true)
     }
 
     suspend fun validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
