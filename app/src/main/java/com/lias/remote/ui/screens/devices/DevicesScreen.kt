@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Used `device.displayName` to show full friendly/hostname/vendor display name (AUD-01).
-//   2. Eliminated text truncation in search bar and top header bar (AUD-04 & AUD-05).
+//   1. Integrated Extend Access context menu item on device rows (§4.1).
+//   2. Added trailing clock action button on tag section headers (`ListSectionHeader`) for group extensions (§4.1).
+//   3. Attached MinutePickerSheet for device and tag level extensions.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
@@ -43,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
@@ -53,6 +56,7 @@ import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSearchPill
 import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.MinutePickerSheet
 import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemGreenDark
@@ -67,6 +71,10 @@ fun DevicesScreen(
     var showTagEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
+
+    // Extend Access Sheet State
+    var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
+    var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
 
     val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) {
@@ -128,35 +136,71 @@ fun DevicesScreen(
             state.tags.forEach { tag ->
                 val devicesInTag = groupedDevices[tag.id] ?: emptyList()
                 if (devicesInTag.isNotEmpty()) {
+                    val tagStatus = viewModel.effectiveStatusForTag(tag.id)
+                    val canExtendTag = ExtendHelper.isExtendAvailable(tagStatus)
+
                     item(key = "header_${tag.id}") {
-                        ListSectionHeader("${tag.name} ${if (tag.id == "infrastructure") "🔒" else ""} · ${devicesInTag.size}")
+                        ListSectionHeader(
+                            text = "${tag.name} ${if (tag.id == "infrastructure") "🔒" else ""} · ${devicesInTag.size}",
+                            trailingAction = if (canExtendTag) {
+                                {
+                                    IconButton(
+                                        onClick = { activeTagForExtend = tag },
+                                        modifier = Modifier.size(26.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.HourglassTop,
+                                            contentDescription = "Extend Tag Access",
+                                            tint = SystemGreenDark
+                                        )
+                                    }
+                                }
+                            } else null
+                        )
                     }
                     item(key = "card_${tag.id}") {
                         GroupedListCard {
                             devicesInTag.forEachIndexed { index, device ->
                                 val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+                                val devStatus = viewModel.effectiveStatusFor(device.pdid)
+                                val canExtendDevice = ExtendHelper.isExtendAvailable(devStatus)
 
-                                val contextMenuItems = listOf(
-                                    ContextMenuItem(
-                                        label = "View Details",
-                                        icon = Icons.Default.Visibility,
-                                        onClick = { onNavigateToDeviceDetail(device.pdid) }
-                                    ),
-                                    ContextMenuItem(
-                                        label = "Rename",
-                                        icon = Icons.Default.Edit,
-                                        onClick = { deviceToRename = device }
-                                    ),
-                                    ContextMenuItem(
-                                        label = if (isPaused) "Resume Internet" else "Pause Internet (1 hr)",
-                                        icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                        isDestructive = !isPaused,
-                                        onClick = {
-                                            if (isPaused) viewModel.unpauseInternet(device.pdid)
-                                            else viewModel.pauseInternet(device.pdid)
-                                        }
+                                val contextMenuItems = buildList {
+                                    add(
+                                        ContextMenuItem(
+                                            label = "View Details",
+                                            icon = Icons.Default.Visibility,
+                                            onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                        )
                                     )
-                                )
+                                    if (canExtendDevice) {
+                                        add(
+                                            ContextMenuItem(
+                                                label = "Extend Access (1–120 min)",
+                                                icon = Icons.Default.HourglassTop,
+                                                onClick = { activeDeviceForExtend = device }
+                                            )
+                                        )
+                                    }
+                                    add(
+                                        ContextMenuItem(
+                                            label = "Rename",
+                                            icon = Icons.Default.Edit,
+                                            onClick = { deviceToRename = device }
+                                        )
+                                    )
+                                    add(
+                                        ContextMenuItem(
+                                            label = if (isPaused) "Resume Internet" else "Pause Internet (1 hr)",
+                                            icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                            isDestructive = !isPaused,
+                                            onClick = {
+                                                if (isPaused) viewModel.unpauseInternet(device.pdid)
+                                                else viewModel.pauseInternet(device.pdid)
+                                            }
+                                        )
+                                    )
+                                }
 
                                 HigContextMenu(
                                     items = contextMenuItems,
@@ -220,6 +264,49 @@ fun DevicesScreen(
                 else viewModel.updateTag(tag)
                 showTagEditor = false
             }
+        )
+    }
+
+    // Extend Device Access Sheet
+    activeDeviceForExtend?.let { device ->
+        val effectiveStatus = viewModel.effectiveStatusFor(device.pdid)
+        MinutePickerSheet(
+            targetLabel = device.displayName,
+            targetSubtitle = device.currentIP.ifBlank { device.pdid },
+            currentExtension = effectiveStatus.activeExtension,
+            onDismiss = { activeDeviceForExtend = null },
+            onConfirm = { minutes ->
+                viewModel.extendDeviceAccess(device.pdid, minutes)
+                activeDeviceForExtend = null
+            },
+            onCancelExtension = if (effectiveStatus.activeExtension != null) {
+                {
+                    viewModel.cancelDeviceExtension(device.pdid)
+                    activeDeviceForExtend = null
+                }
+            } else null
+        )
+    }
+
+    // Extend Tag Group Access Sheet
+    activeTagForExtend?.let { tag ->
+        val tagDevices = groupedDevices[tag.id] ?: emptyList()
+        val effectiveStatus = viewModel.effectiveStatusForTag(tag.id)
+        MinutePickerSheet(
+            targetLabel = tag.name,
+            targetSubtitle = "${tagDevices.size} devices",
+            currentExtension = effectiveStatus.activeExtension,
+            onDismiss = { activeTagForExtend = null },
+            onConfirm = { minutes ->
+                viewModel.extendTagAccess(tag.id, minutes)
+                activeTagForExtend = null
+            },
+            onCancelExtension = if (effectiveStatus.activeExtension != null) {
+                {
+                    viewModel.cancelTagExtension(tag.id)
+                    activeTagForExtend = null
+                }
+            } else null
         )
     }
 
