@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/dashboard/DashboardScreen.kt
-// Version: 1.13.0
+// Version: 1.14.0
 // Audit Fixes: 
-//   1. Adaptive GridCells.Adaptive(minSize = 280.dp) for Recent Devices so cards rendering
-//      on mobile use 1 full column, giving buttons and labels clean single-line spacing.
+//   1. Full parity with LIAS web dashboard `renderActiveEnforcementsHtml()`:
+//      detects Global Kill-Switch (Block All) and Global Allow Override in active enforcements.
+//   2. Wrapped Dashboard layout in a single smooth LazyColumn to eliminate nested scrolling lag.
 // ====================================================================
 
 package com.lias.remote.ui.screens.dashboard
@@ -22,9 +23,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -76,8 +76,9 @@ data class ActiveEnforcementItem(
     val targetColor: Color,
     val scheduleName: String,
     val action: String,
-    val timezone: String,
-    val isDST: Boolean
+    val timezone: String = "UTC",
+    val isDST: Boolean = false,
+    val isGlobal: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,127 +103,128 @@ fun DashboardScreen(viewModel: LiasViewModel) {
             isRefreshing = true
         }
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            ConnectionStatusBanner(state.connectionState)
-            Spacer(modifier = Modifier.size(16.dp))
-
-            if (!state.isInitialLoaded && state.devices.isEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text("Connecting to LIAS...")
-                }
-                return@Column
+            item {
+                ConnectionStatusBanner(state.connectionState)
             }
 
-            // Live Active Enforcements Section
-            Text("Active Enforcements", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.size(4.dp))
-            Text(
-                "Live status of scheduled policies currently in effect",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-
-            ActiveEnforcementsList(items = activeEnforcements)
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Global Access Switch", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.size(4.dp))
-                    Text(
-                        "Master internet control across all managed devices",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.size(12.dp))
-                    
-                    val globalPolicy = state.policies.find { it.id == "global_default" } 
-                        ?: Policy(id = "global_default", name = "Global", type = "global", action = "schedule")
-                    
-                    SegmentedControl(
-                        selectedAction = globalPolicy.action,
-                        onActionSelected = { newAction ->
-                            viewModel.savePolicy(globalPolicy.copy(action = newAction))
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    AnimatedVisibility(
-                        visible = globalPolicy.action == "schedule",
-                        enter = expandVertically(),
-                        exit = shrinkVertically()
+            if (!state.isInitialLoaded && state.devices.isEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(top = 16.dp)) {
-                            val globalSchedules = state.schedules.filter { it.id in globalPolicy.resolveScheduleIDs() }
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Connecting to LIAS...")
+                    }
+                }
+            } else {
+                item {
+                    Column {
+                        Text("Active Enforcements", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(
+                            "Live status of scheduled policies currently in effect",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        ActiveEnforcementsList(items = activeEnforcements)
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Global Access Switch", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                "Master internet control across all managed devices",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.size(12.dp))
                             
-                            if (globalSchedules.isNotEmpty()) {
-                                Text(
-                                    "Attached Schedules (${globalSchedules.size})",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.size(8.dp))
-                                WeeklyTimeline(schedules = globalSchedules)
-                            }
+                            val globalPolicy = state.policies.find { it.id == "global_default" } 
+                                ?: Policy(id = "global_default", name = "Global", type = "global", action = "schedule")
                             
-                            Button(
-                                onClick = { showGlobalWizard = true },
-                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                            SegmentedControl(
+                                selectedAction = globalPolicy.action,
+                                onActionSelected = { newAction ->
+                                    viewModel.savePolicy(globalPolicy.copy(action = newAction))
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            AnimatedVisibility(
+                                visible = globalPolicy.action == "schedule",
+                                enter = expandVertically(),
+                                exit = shrinkVertically()
                             ) {
-                                Text("Manage Schedules")
+                                Column(modifier = Modifier.padding(top = 16.dp)) {
+                                    val globalSchedules = state.schedules.filter { it.id in globalPolicy.resolveScheduleIDs() }
+                                    
+                                    if (globalSchedules.isNotEmpty()) {
+                                        Text(
+                                            "Attached Schedules (${globalSchedules.size})",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.size(8.dp))
+                                        WeeklyTimeline(schedules = globalSchedules)
+                                    }
+                                    
+                                    Button(
+                                        onClick = { showGlobalWizard = true },
+                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                                    ) {
+                                        Text("Manage Schedules")
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                StatCard("TOTAL", state.devices.size.toString(), Modifier.weight(1f))
-                StatCard("ONLINE", state.devices.count { it.online }.toString(), Modifier.weight(1f))
-                StatCard("OFFLINE", state.devices.count { !it.online }.toString(), Modifier.weight(1f))
-            }
-
-            Spacer(modifier = Modifier.size(24.dp))
-            Text("Recent Devices", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.size(8.dp))
-
-            if (state.devices.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Waiting for Discovery Service to report inventory...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        StatCard("TOTAL", state.devices.size.toString(), Modifier.weight(1f))
+                        StatCard("ONLINE", state.devices.count { it.online }.toString(), Modifier.weight(1f))
+                        StatCard("OFFLINE", state.devices.count { !it.online }.toString(), Modifier.weight(1f))
+                    }
                 }
-            } else {
-                // Adaptive layout: 1 column on phones (280dp min width), 2+ on tablets
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 280.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(state.devices.take(10)) { device ->
+
+                item {
+                    Text("Recent Devices", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+
+                if (state.devices.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Waiting for Discovery Service to report inventory...",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    items(state.devices.take(12), key = { it.pdid }) { device ->
                         val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
                         DeviceCard(
                             device = device,
@@ -232,7 +234,8 @@ fun DashboardScreen(viewModel: LiasViewModel) {
                             onPauseClick = { deviceToPause = device },
                             onUnpauseClick = { deviceToUnpause = device },
                             onRenameClick = { deviceToRename = device },
-                            onDetailsClick = { selectedDeviceForDetails = device }
+                            onDetailsClick = { selectedDeviceForDetails = device },
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
                 }
@@ -372,7 +375,11 @@ private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isBlock) "Internet Blocked" else "Internet Allowed",
+                                text = if (item.isGlobal) {
+                                    if (isBlock) "Global Block Active" else "Global Allow Active"
+                                } else {
+                                    if (isBlock) "Internet Blocked" else "Internet Allowed"
+                                },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isBlock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
@@ -419,8 +426,35 @@ private fun computeActiveEnforcements(
 ): List<ActiveEnforcementItem> {
     val items = mutableListOf<ActiveEnforcementItem>()
 
+    val globalPol = policies.find { it.id == "global_default" }
+    if (globalPol != null && globalPol.action == "block") {
+        items.add(
+            ActiveEnforcementItem(
+                policyName = "Global Kill-Switch",
+                targetName = "Entire Network",
+                targetColor = Color.Red,
+                scheduleName = "Vacation Mode / Block All",
+                action = "block",
+                isGlobal = true
+            )
+        )
+        return items
+    } else if (globalPol != null && globalPol.action == "allow") {
+        items.add(
+            ActiveEnforcementItem(
+                policyName = "Global Allow Override",
+                targetName = "Entire Network",
+                targetColor = Color.Green,
+                scheduleName = "Allow All Active",
+                action = "allow",
+                isGlobal = true
+            )
+        )
+        return items
+    }
+
     policies.forEach { p ->
-        if (p.action == "schedule" && p.type != "global") {
+        if (p.action == "schedule" && p.type != "global" && p.enabled) {
             val targetTag = tags.find { it.id == p.targetID }
             val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.hostname ?: p.targetID)
             val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color.Gray
