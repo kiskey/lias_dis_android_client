@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.7.0
-// Audit Fixes: 
-//   1. Full Rule Mode parity with Web Dashboard: Continuous Day Range, Specific Days, Calendar Dates.
-//   2. Automatic mode inference when viewing saved schedules so stored rules display accurately.
-//   3. Smoothly scrollable ModalBottomSheet body.
+// Version: 2.0.0
+// Purpose: HIG Modal bottom sheet for Schedule creation/editing with
+//          iOS navigation row (Cancel / Title / Save) and multi-mode rules.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -15,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -55,6 +54,7 @@ import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleProjection
+import com.lias.remote.ui.components.SegmentedControl
 
 enum class RuleDayMode { RANGE, SPECIFIC, CALENDAR }
 
@@ -89,9 +89,7 @@ fun ScheduleEditorSheet(
         "America/New_York" to "(UTC-05:00) Eastern Time",
         "UTC" to "(UTC+00:00) Coordinated Universal Time",
         "Europe/London" to "(UTC+00:00) London",
-        "Europe/Paris" to "(UTC+01:00) Paris",
-        "Asia/Kolkata" to "(UTC+05:30) India Standard Time",
-        "Asia/Tokyo" to "(UTC+09:00) Tokyo"
+        "Asia/Kolkata" to "(UTC+05:30) India Standard Time"
     )
 
     val conflicts = remember(rules.toList()) {
@@ -103,7 +101,7 @@ fun ScheduleEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
@@ -112,7 +110,35 @@ fun ScheduleEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Schedule Editor", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            // HIG Navigation Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = if (initialSchedule == null) "New Schedule" else initialSchedule.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(
+                    onClick = {
+                        onSave(Schedule(
+                            id = initialSchedule?.id ?: "sched_${System.currentTimeMillis()}",
+                            name = name,
+                            mode = mode,
+                            timezone = timezone,
+                            rules = rules.toList()
+                        ))
+                    },
+                    enabled = name.isNotBlank() && conflicts.isEmpty()
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold, color = if (name.isNotBlank() && conflicts.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             
             OutlinedTextField(
                 value = name,
@@ -122,21 +148,14 @@ fun ScheduleEditorSheet(
                 singleLine = true
             )
             
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = mode == "downtime",
-                    onClick = { mode = "downtime" },
-                    label = { Text("Downtime (Block rules)") }
-                )
-                FilterChip(
-                    selected = mode == "whitelist",
-                    onClick = { mode = "whitelist" },
-                    label = { Text("Whitelist (Allow rules)") }
-                )
-            }
+            Text("Mode", style = MaterialTheme.typography.labelLarge)
+            SegmentedControl(
+                selected = if (mode == "downtime") "Block" else "Allow",
+                onSelected = { selectedLabel ->
+                    mode = if (selectedLabel.equals("Block", ignoreCase = true)) "downtime" else "whitelist"
+                },
+                options = listOf("Block", "Allow")
+            )
 
             ExposedDropdownMenuBox(
                 expanded = timezoneExpanded,
@@ -191,13 +210,9 @@ fun ScheduleEditorSheet(
                 val safeDays = rule.safeDays
                 var dayMode by remember {
                     mutableStateOf(
-                        if (!rule.startDate.isNullOrBlank() && !rule.endDate.isNullOrBlank()) {
-                            RuleDayMode.CALENDAR
-                        } else if (safeDays.size > 2) {
-                            RuleDayMode.RANGE
-                        } else {
-                            RuleDayMode.SPECIFIC
-                        }
+                        if (!rule.startDate.isNullOrBlank() && !rule.endDate.isNullOrBlank()) RuleDayMode.CALENDAR
+                        else if (safeDays.size > 2) RuleDayMode.RANGE
+                        else RuleDayMode.SPECIFIC
                     )
                 }
 
@@ -216,8 +231,7 @@ fun ScheduleEditorSheet(
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             FilterChip(
                                 selected = dayMode == RuleDayMode.RANGE,
@@ -433,22 +447,6 @@ fun ScheduleEditorSheet(
                         }
                     }
                 }
-            }
-
-            Button(
-                onClick = {
-                    onSave(Schedule(
-                        id = initialSchedule?.id ?: "sched_${System.currentTimeMillis()}",
-                        name = name,
-                        mode = mode,
-                        timezone = timezone,
-                        rules = rules.toList()
-                    ))
-                },
-                enabled = name.isNotBlank() && conflicts.isEmpty(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save Schedule")
             }
         }
     }
