@@ -1,13 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes:
-//   1. Added state rollback on API errors for optimistic toggles & actions (AUD-07).
+//   1. Added Extend Access repository suspend functions (§2.4).
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Conflict
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
@@ -23,6 +24,46 @@ import com.lias.remote.core.network.RenameDeviceRequest
 import com.lias.remote.core.network.UserDeviceRequest
 import com.lias.remote.core.network.VacationRequest
 import com.lias.remote.core.network.VacationResponse
+
+suspend fun EventRepository.extendDeviceAccess(pdid: String, minutes: Int): ApiResult<Unit> {
+    val result = api.extendDeviceAccess(pdid, minutes)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.cancelDeviceExtension(pdid: String): ApiResult<Unit> {
+    val result = api.cancelDeviceExtension(pdid)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.extendTagAccess(tagId: String, minutes: Int): ApiResult<Unit> {
+    val result = api.extendTagAccess(tagId, minutes)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.cancelTagExtension(tagId: String): ApiResult<Unit> {
+    val result = api.cancelTagExtension(tagId)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.getDeviceEffectiveStatus(pdid: String): ApiResult<EffectiveStatus> {
+    return api.getDeviceEffectiveStatus(pdid)
+}
+
+suspend fun EventRepository.getTagEffectiveStatus(tagId: String): ApiResult<EffectiveStatus> {
+    return api.getTagEffectiveStatus(tagId)
+}
 
 suspend fun EventRepository.assignDeviceTags(pdid: String, tagIds: List<String>): ApiResult<Unit> {
     val previousTags = _state.value.devices.find { it.pdid == pdid }?.tags
