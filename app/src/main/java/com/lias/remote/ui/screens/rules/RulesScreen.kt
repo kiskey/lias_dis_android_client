@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt
-// Version: 2.0.1
+// Version: 2.1.0
 // Audit Fixes:
-//   1. Added `import androidx.compose.foundation.lazy.items` to resolve model parameter list overloading.
+//   1. Migrated scaffold to HigLargeTitleScaffold with title "Rules".
+//   2. Consolidated Import/Export Policy actions into nav-bar "•••" overflow menu.
+//   3. Divided policies into three continuous grouped list cards (Global, Tag Rules, Device Rules).
+//   4. Folded "no schedule attached" warning text into row subtitle.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -13,23 +16,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,23 +42,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
+import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigContextMenu
+import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
-import com.lias.remote.ui.components.SwipeActionRow
+import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
+import com.lias.remote.ui.theme.HigSpec
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RulesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    
+
     var showWizard by remember { mutableStateOf(false) }
     var editingPolicy by remember { mutableStateOf<Policy?>(null) }
     var policyToDelete by remember { mutableStateOf<Policy?>(null) }
@@ -71,37 +84,39 @@ fun RulesScreen(viewModel: LiasViewModel) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Rules", style = MaterialTheme.typography.headlineLarge) },
-                actions = {
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Import Policies") },
-                                onClick = {
-                                    menuExpanded = false
-                                    importLauncher.launch("application/json")
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export Policies") },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.exportPolicies {}
-                                }
-                            )
-                        }
-                    }
+    HigLargeTitleScaffold(
+        title = "Rules",
+        navTrailing = {
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More Actions", tint = MaterialTheme.colorScheme.primary)
                 }
-            )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Import Policies") },
+                        leadingIcon = { Icon(Icons.Default.Upload, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            importLauncher.launch("application/json")
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Export Policies") },
+                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            viewModel.exportPolicies {}
+                        }
+                    )
+                }
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -109,68 +124,80 @@ fun RulesScreen(viewModel: LiasViewModel) {
                     editingPolicy = null
                     showWizard = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(HigSpec.FabSize)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Policy")
+                Icon(Icons.Filled.Add, contentDescription = "Add Policy", tint = Color.White)
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             if (state.policies.isEmpty() && state.isInitialLoaded) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "No policies yet. Tap + to create one.",
+                        text = "No policies configured. Tap + to create one.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
                 GroupedList {
-                    // Global Rules
+                    // Section 1: Global Policies
                     val globalPolicies = state.policies.filter { it.type == "global" }
                     if (globalPolicies.isNotEmpty()) {
-                        item { ListSectionHeader("Global") }
-                        items(globalPolicies, key = { it.id }) { policy ->
-                            PolicyRow(
-                                policy = policy,
-                                schedules = state.schedules,
-                                viewModel = viewModel,
-                                onEdit = { editingPolicy = policy; showWizard = true },
-                                onDelete = { policyToDelete = policy }
-                            )
+                        item { ListSectionHeader("Global Rules") }
+                        item {
+                            GroupedListCard {
+                                globalPolicies.forEachIndexed { index, policy ->
+                                    PolicyRow(
+                                        policy = policy,
+                                        schedules = state.schedules,
+                                        viewModel = viewModel,
+                                        showDivider = index < globalPolicies.size - 1,
+                                        onEdit = { editingPolicy = policy; showWizard = true },
+                                        onDelete = { policyToDelete = policy }
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // Tag Rules
+                    // Section 2: Tag Rules
                     val tagPolicies = state.policies.filter { it.type == "tag" }
                     if (tagPolicies.isNotEmpty()) {
                         item { ListSectionHeader("Tag Rules") }
-                        items(tagPolicies, key = { it.id }) { policy ->
-                            PolicyRow(
-                                policy = policy,
-                                schedules = state.schedules,
-                                viewModel = viewModel,
-                                onEdit = { editingPolicy = policy; showWizard = true },
-                                onDelete = { policyToDelete = policy }
-                            )
+                        item {
+                            GroupedListCard {
+                                tagPolicies.forEachIndexed { index, policy ->
+                                    PolicyRow(
+                                        policy = policy,
+                                        schedules = state.schedules,
+                                        viewModel = viewModel,
+                                        showDivider = index < tagPolicies.size - 1,
+                                        onEdit = { editingPolicy = policy; showWizard = true },
+                                        onDelete = { policyToDelete = policy }
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // Device Rules
+                    // Section 3: Device Rules
                     val devicePolicies = state.policies.filter { it.type == "device" }
                     if (devicePolicies.isNotEmpty()) {
                         item { ListSectionHeader("Device Rules") }
-                        items(devicePolicies, key = { it.id }) { policy ->
-                            PolicyRow(
-                                policy = policy,
-                                schedules = state.schedules,
-                                viewModel = viewModel,
-                                onEdit = { editingPolicy = policy; showWizard = true },
-                                onDelete = { policyToDelete = policy }
-                            )
+                        item {
+                            GroupedListCard {
+                                devicePolicies.forEachIndexed { index, policy ->
+                                    PolicyRow(
+                                        policy = policy,
+                                        schedules = state.schedules,
+                                        viewModel = viewModel,
+                                        showDivider = index < devicePolicies.size - 1,
+                                        onEdit = { editingPolicy = policy; showWizard = true },
+                                        onDelete = { policyToDelete = policy }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -205,7 +232,7 @@ fun RulesScreen(viewModel: LiasViewModel) {
                         policyToDelete = null
                     },
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+                ) { Text("Delete", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { policyToDelete = null }) { Text("Cancel") }
@@ -219,6 +246,7 @@ private fun PolicyRow(
     policy: Policy,
     schedules: List<Schedule>,
     viewModel: LiasViewModel,
+    showDivider: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -227,31 +255,73 @@ private fun PolicyRow(
     val isPaused = policy.id.startsWith("pol_pause_")
     val canToggle = !isGlobal && !isPaused && !isInfra
 
-    SwipeActionRow(
-        onSwipeLeft = { if (!isGlobal && !isPaused) onDelete() },
-        onSwipeRight = { if (!isInfra) onEdit() }
-    ) {
-        GroupedListRow(
-            primaryText = policy.name + if (!policy.enabled) " (Disabled)" else "",
-            secondaryText = "Target: ${policy.targetID.ifBlank { "Global" }} · Priority: ${policy.priority}",
-            trailingContent = {
-                if (canToggle) {
-                    Switch(
-                        checked = policy.enabled,
-                        onCheckedChange = { enabled ->
-                            viewModel.savePolicy(policy.copy(enabled = enabled))
-                        }
-                    )
-                } else {
-                    val isBlock = policy.action == "block"
-                    StatusPill(
-                        text = policy.action.uppercase(),
-                        color = if (isBlock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        backgroundColor = if (isBlock) MaterialTheme.colorScheme.error.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                    )
-                }
-            },
-            onClick = { if (!isInfra) onEdit() }
+    val attachedSchedules = policy.resolveScheduleIDs().mapNotNull { id -> schedules.find { it.id == id } }
+    val noScheduleWarning = policy.action == "schedule" && attachedSchedules.isEmpty()
+
+    val subtitle = if (noScheduleWarning) {
+        "Target: ${policy.targetID.ifBlank { "Global" }} · ⚠️ No schedule attached (defaults to Allow All)"
+    } else {
+        "Target: ${policy.targetID.ifBlank { "Global" }} · Priority: ${policy.priority}"
+    }
+
+    val contextMenuItems = listOf(
+        ContextMenuItem(
+            label = "Edit Rule",
+            icon = Icons.Default.Edit,
+            onClick = onEdit
+        ),
+        ContextMenuItem(
+            label = "Delete Rule",
+            icon = Icons.Default.Delete,
+            isDestructive = true,
+            onClick = onDelete
         )
+    )
+
+    HigContextMenu(
+        items = contextMenuItems,
+        onClick = { if (!isInfra) onEdit() }
+    ) {
+        HigSwipeRow(
+            leadingAction = SwipeAction(
+                label = "Edit",
+                icon = Icons.Default.Edit,
+                color = MaterialTheme.colorScheme.primary,
+                onTrigger = onEdit
+            ),
+            trailingAction = SwipeAction(
+                label = "Delete",
+                icon = Icons.Default.Delete,
+                color = MaterialTheme.colorScheme.error,
+                onTrigger = onDelete
+            )
+        ) {
+            GroupedListRow(
+                primaryText = policy.name + if (!policy.enabled) " (Disabled)" else if (isInfra) " 🔒" else "",
+                secondaryText = subtitle,
+                showDivider = showDivider,
+                trailingContent = {
+                    if (canToggle) {
+                        Switch(
+                            checked = policy.enabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.savePolicy(policy.copy(enabled = enabled))
+                            }
+                        )
+                    } else {
+                        val pillTone = when (policy.action) {
+                            "block" -> PillTone.Blocked
+                            "allow" -> PillTone.Allowed
+                            else -> PillTone.Scheduled
+                        }
+                        StatusPill(
+                            text = policy.action.uppercase(),
+                            tone = pillTone
+                        )
+                    }
+                },
+                onClick = { if (!isInfra) onEdit() }
+            )
+        }
     }
 }
