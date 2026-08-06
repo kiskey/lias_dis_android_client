@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Fixed multi-tag selection bug: selecting a specific tag automatically
-//      strips the fallback 'generic' tag. Unchecking all tags restores 'generic'.
-//   2. Clean, spacious Apple HIG action row ensuring text and buttons never wrap awkwardly.
+//   1. Multi-tag selection: Selecting a specific tag strips fallback 'generic' tag.
+//      Unchecking all tags restores 'generic'.
+//   2. Clean Apple HIG action row with single-line layout and responsive button layout.
 // ====================================================================
 
 package com.lias.remote.ui.components
