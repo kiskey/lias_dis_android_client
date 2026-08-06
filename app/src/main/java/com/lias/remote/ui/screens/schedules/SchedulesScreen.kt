@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 1.6.0
-// Audit Fixes: 
-//   1. Added Copy Schedule action button to match LIAS Web Dashboard parity.
-//   2. Ensured smooth HIG scrollability across schedule cards list.
+// Version: 2.0.0
+// Purpose: HIG Schedules screen with mini weekly timelines, swipe actions,
+//          and copy/duplicate support.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -12,26 +11,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,17 +40,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.GroupedList
+import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.SwipeActionRow
 import com.lias.remote.ui.components.WeeklyTimeline
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulesScreen(viewModel: LiasViewModel) {
     val state by viewModel.state.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
-    
     var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Schedules", style = MaterialTheme.typography.headlineLarge) }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -63,7 +68,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                 },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Schedule")
+                Icon(Icons.Default.Add, contentDescription = "New Schedule")
             }
         }
     ) { padding ->
@@ -73,59 +78,46 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                 .padding(padding)
         ) {
             if (state.schedules.isEmpty()) {
-                Text(
-                    text = "No schedules yet. Tap + to create one.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Text(
+                        text = "No schedules yet. Tap + to create one.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                GroupedList {
+                    item { ListSectionHeader("Configured Schedules (${state.schedules.size})") }
+
                     items(state.schedules, key = { it.id }) { schedule ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        SwipeActionRow(
+                            onSwipeRight = {
+                                editingSchedule = schedule
+                                showEditor = true
+                            },
+                            onSwipeLeft = {
+                                scheduleToDelete = schedule
+                            }
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            schedule.name,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "Mode: ${schedule.mode} | TZ: ${schedule.timezone}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    IconButton(onClick = {
-                                        editingSchedule = schedule.copy(
-                                            id = "sched_${System.currentTimeMillis()}",
-                                            name = "Copy of ${schedule.name}"
-                                        )
-                                        showEditor = true
-                                    }) {
-                                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
-                                    }
-                                    IconButton(onClick = {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                            ) {
+                                GroupedListRow(
+                                    primaryText = schedule.name,
+                                    secondaryText = "${schedule.mode.uppercase()} · ${schedule.timezone}",
+                                    trailingContent = {
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    },
+                                    onClick = {
                                         editingSchedule = schedule
                                         showEditor = true
-                                    }) {
-                                        Icon(Icons.Filled.Edit, contentDescription = "Edit")
                                     }
-                                    IconButton(onClick = {
-                                        scheduleToDelete = schedule
-                                    }) {
-                                        Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                                
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 WeeklyTimeline(schedules = listOf(schedule))
                             }
                         }
