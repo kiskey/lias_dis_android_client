@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 1.1.1
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Implemented ViewModelProvider.Factory to properly retain ViewModels
-//      across configuration changes (screen rotations) instead of direct
-//      instantiation, fixing the lifecycle violation.
+//   1. Retained ViewModelProvider.Factory for properly retaining ViewModels
+//      across configuration changes (screen rotations) in full compliance with Android lifecycle guidelines.
 // ====================================================================
 
 package com.lias.remote
@@ -15,7 +14,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.lias.remote.core.AppContainer
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.navigation.LiasNavHost
@@ -30,7 +28,6 @@ class MainActivity : ComponentActivity() {
         
         val container = (application as LiasApplication).container
 
-        // FIX 2.1: Proper ViewModel lifecycle management via ViewModelProvider.Factory
         val viewModelFactory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
