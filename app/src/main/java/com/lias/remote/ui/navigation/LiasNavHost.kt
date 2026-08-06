@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Added exhaustive 'is UiEvent.ShowSecurityAlert' branch to LaunchedEffect(uiEvents)
-//      when expression to fix Kotlin compiler FAILED error.
+//   1. Handled exhaustive UiEvent branches (ShowSnackbar, ShowSnackbarError, ShowSecurityAlert).
 // ====================================================================
 
 package com.lias.remote.ui.navigation
