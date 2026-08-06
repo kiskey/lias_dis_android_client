@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes: 
-//   1. Added ViewModel wrapper methods for policy & schedule copying, policy enabling/disabling,
-//      pauseDeviceInternet, unpauseDeviceInternet, renameDevice, getDeviceLogs,
-//      assignDeviceTags, exportPolicies, importPolicies, createUser, and assignDeviceUser.
+//   1. Added success Snackbar emissions for savePolicy, deletePolicy, saveSchedule,
+//      deleteSchedule, createTag, updateTag, deleteTag, and assignTags to guarantee
+//      100% visual feedback parity with LIAS web dashboard `showToast` notifications.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -60,7 +60,9 @@ class LiasViewModel(
     fun assignTags(pdid: String, tagIds: List<String>) {
         viewModelScope.launch {
             val result = eventRepository.assignDeviceTags(pdid, tagIds)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Tags updated successfully"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to assign tags: $msg"))
             }
@@ -68,13 +70,7 @@ class LiasViewModel(
     }
 
     fun assignTag(pdid: String, tagId: String) {
-        viewModelScope.launch {
-            val result = eventRepository.assignDeviceTag(pdid, tagId)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
-                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to assign tag: $msg"))
-            }
-        }
+        assignTags(pdid, listOf(tagId))
     }
 
     fun pauseInternet(pdid: String) {
@@ -170,7 +166,9 @@ class LiasViewModel(
     fun createTag(tag: Tag) {
         viewModelScope.launch {
             val result = eventRepository.createTag(tag)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Tag created successfully"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to create tag: $msg"))
             }
@@ -180,7 +178,9 @@ class LiasViewModel(
     fun updateTag(tag: Tag) {
         viewModelScope.launch {
             val result = eventRepository.updateTag(tag)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Tag updated successfully"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to update tag: $msg"))
             }
@@ -190,7 +190,9 @@ class LiasViewModel(
     fun deleteTag(tagId: String) {
         viewModelScope.launch {
             val result = eventRepository.deleteTag(tagId)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Tag deleted"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete tag: $msg"))
             }
@@ -200,7 +202,9 @@ class LiasViewModel(
     fun savePolicy(policy: Policy) {
         viewModelScope.launch {
             val result = eventRepository.savePolicy(policy)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Policy saved successfully"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to save policy: $msg"))
             }
@@ -210,7 +214,9 @@ class LiasViewModel(
     fun deletePolicy(policyId: String) {
         viewModelScope.launch {
             val result = eventRepository.deletePolicy(policyId)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Policy deleted"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete policy: $msg"))
             }
@@ -220,7 +226,9 @@ class LiasViewModel(
     fun saveSchedule(schedule: Schedule) {
         viewModelScope.launch {
             val result = eventRepository.saveSchedule(schedule)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Schedule saved successfully"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to save schedule: $msg"))
             }
@@ -230,7 +238,9 @@ class LiasViewModel(
     fun deleteSchedule(scheduleId: String) {
         viewModelScope.launch {
             val result = eventRepository.deleteSchedule(scheduleId)
-            if (result is ApiResult.HttpError || result is ApiResult.NetworkError) {
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Schedule deleted"))
+            } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to delete schedule: $msg"))
             }
