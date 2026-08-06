@@ -1,7 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/StatusPill.kt
-// Version: 2.0.0
-// Purpose: HIG capsule status badge for Allow, Block, and Schedule states.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Added PillTone enum (`Allowed`, `Blocked`, `Scheduled`, `Info`).
+//   2. Derived semantic foreground/background colors automatically via theme.
+//   3. Retained raw color/backgroundColor overload for full backward compatibility.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -19,6 +22,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.ui.theme.LiasThemeColors
+import com.lias.remote.ui.theme.SystemBlueDark
+import com.lias.remote.ui.theme.SystemGreenDark
+import com.lias.remote.ui.theme.SystemOrangeDark
+import com.lias.remote.ui.theme.SystemRedDark
+
+enum class PillTone {
+    Allowed,
+    Blocked,
+    Scheduled,
+    Info
+}
+
+@Composable
+fun StatusPill(
+    text: String,
+    tone: PillTone,
+    modifier: Modifier = Modifier
+) {
+    val (fgColor, bgColor) = when (tone) {
+        PillTone.Allowed -> MaterialTheme.colorScheme.primary to LiasThemeColors.pillGreenBg
+        PillTone.Blocked -> MaterialTheme.colorScheme.error to LiasThemeColors.pillRedBg
+        PillTone.Scheduled -> SystemOrangeDark to LiasThemeColors.pillOrangeBg
+        PillTone.Info -> SystemBlueDark to LiasThemeColors.pillBlueBg
+    }
+
+    StatusPill(
+        text = text,
+        color = fgColor,
+        backgroundColor = bgColor,
+        modifier = modifier
+    )
+}
 
 @Composable
 fun StatusPill(
