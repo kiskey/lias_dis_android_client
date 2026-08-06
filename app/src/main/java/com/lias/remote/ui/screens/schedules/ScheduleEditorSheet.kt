@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes: 
-//   1. Updated all `rule.days` and `initialSchedule.rules` calls to use `safeDays`
-//      and `safeRules`, completely resolving Kotlin nullable receiver errors.
+//   1. Full Rule Mode parity with Web Dashboard: Continuous Day Range, Specific Days, Calendar Dates.
+//   2. Automatic mode inference when viewing saved schedules so stored rules display accurately.
+//   3. Smoothly scrollable ModalBottomSheet body.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -16,7 +17,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -53,6 +56,8 @@ import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleProjection
 
+enum class RuleDayMode { RANGE, SPECIFIC, CALENDAR }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleEditorSheet(
@@ -69,8 +74,11 @@ fun ScheduleEditorSheet(
     
     val rules = remember {
         mutableStateListOf<ScheduleRule>().apply {
-            if (initialSchedule != null) addAll(initialSchedule.safeRules)
-            else add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block"))
+            if (initialSchedule != null && initialSchedule.safeRules.isNotEmpty()) {
+                addAll(initialSchedule.safeRules)
+            } else {
+                add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block"))
+            }
         }
     }
 
@@ -80,7 +88,10 @@ fun ScheduleEditorSheet(
         "America/Chicago" to "(UTC-06:00) Central Time",
         "America/New_York" to "(UTC-05:00) Eastern Time",
         "UTC" to "(UTC+00:00) Coordinated Universal Time",
-        "Asia/Kolkata" to "(UTC+05:30) India Standard Time"
+        "Europe/London" to "(UTC+00:00) London",
+        "Europe/Paris" to "(UTC+01:00) Paris",
+        "Asia/Kolkata" to "(UTC+05:30) India Standard Time",
+        "Asia/Tokyo" to "(UTC+09:00) Tokyo"
     )
 
     val conflicts = remember(rules.toList()) {
@@ -97,7 +108,8 @@ fun ScheduleEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Schedule Editor", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -163,7 +175,7 @@ fun ScheduleEditorSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Rules", style = MaterialTheme.typography.titleMedium)
+                Text("Rules (${rules.size})", style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = { 
                     rules.add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block")) 
                 }) {
@@ -176,6 +188,19 @@ fun ScheduleEditorSheet(
             }
             
             rules.forEachIndexed { index, rule ->
+                val safeDays = rule.safeDays
+                var dayMode by remember {
+                    mutableStateOf(
+                        if (!rule.startDate.isNullOrBlank() && !rule.endDate.isNullOrBlank()) {
+                            RuleDayMode.CALENDAR
+                        } else if (safeDays.size > 2) {
+                            RuleDayMode.RANGE
+                        } else {
+                            RuleDayMode.SPECIFIC
+                        }
+                    )
+                }
+
                 Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(
@@ -189,49 +214,106 @@ fun ScheduleEditorSheet(
                             }
                         }
                         
-                        val safeDays = rule.safeDays
-                        var isRange by remember { mutableStateOf(safeDays.size > 2 && safeDays.contains("mon") && safeDays.contains("fri")) }
-                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            FilterChip(selected = !isRange, onClick = { isRange = false }, label = { Text("Specific Days") })
-                            FilterChip(selected = isRange, onClick = { isRange = true }, label = { Text("Day Range") })
+                            FilterChip(
+                                selected = dayMode == RuleDayMode.RANGE,
+                                onClick = { dayMode = RuleDayMode.RANGE },
+                                label = { Text("Day Range") }
+                            )
+                            FilterChip(
+                                selected = dayMode == RuleDayMode.SPECIFIC,
+                                onClick = { dayMode = RuleDayMode.SPECIFIC },
+                                label = { Text("Specific Days") }
+                            )
+                            FilterChip(
+                                selected = dayMode == RuleDayMode.CALENDAR,
+                                onClick = { dayMode = RuleDayMode.CALENDAR },
+                                label = { Text("Calendar Dates") }
+                            )
                         }
                         
                         Spacer(modifier = Modifier.size(8.dp))
                         
-                        if (isRange) {
-                            val days = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-                            val startIdx = days.indexOf(safeDays.firstOrNull())
-                            val endIdx = days.indexOf(safeDays.lastOrNull())
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("From:")
-                                FilterChip(selected = true, onClick = {}, label = { Text(days.getOrNull(startIdx)?.uppercase() ?: "MON") })
-                                Text("To:")
-                                FilterChip(selected = true, onClick = {}, label = { Text(days.getOrNull(endIdx)?.uppercase() ?: "FRI") })
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
+                        when (dayMode) {
+                            RuleDayMode.RANGE -> {
+                                var fromDay by remember { mutableStateOf(safeDays.firstOrNull() ?: "mon") }
+                                var toDay by remember { mutableStateOf(safeDays.lastOrNull() ?: "fri") }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("From:", style = MaterialTheme.typography.labelMedium)
                                     FilterChip(
-                                        selected = day in safeDays,
+                                        selected = true,
                                         onClick = {
-                                            val newDays = safeDays.toMutableList()
-                                            if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
-                                            rules[index] = rule.copy(days = newDays)
+                                            val days = ScheduleProjection.daysOrder
+                                            val nextIdx = (days.indexOf(fromDay) + 1) % days.size
+                                            fromDay = days[nextIdx]
+                                            rules[index] = rule.copy(days = ScheduleProjection.expandDayRange(fromDay, toDay))
                                         },
-                                        label = { Text(day.take(3).uppercase()) }
+                                        label = { Text(fromDay.uppercase()) }
+                                    )
+                                    Text("To:", style = MaterialTheme.typography.labelMedium)
+                                    FilterChip(
+                                        selected = true,
+                                        onClick = {
+                                            val days = ScheduleProjection.daysOrder
+                                            val nextIdx = (days.indexOf(toDay) + 1) % days.size
+                                            toDay = days[nextIdx]
+                                            rules[index] = rule.copy(days = ScheduleProjection.expandDayRange(fromDay, toDay))
+                                        },
+                                        label = { Text(toDay.uppercase()) }
+                                    )
+                                }
+                            }
+                            RuleDayMode.SPECIFIC -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
+                                        FilterChip(
+                                            selected = day in safeDays,
+                                            onClick = {
+                                                val newDays = safeDays.toMutableList()
+                                                if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
+                                                rules[index] = rule.copy(days = newDays, startDate = null, endDate = null)
+                                            },
+                                            label = { Text(day.take(3).uppercase()) }
+                                        )
+                                    }
+                                }
+                            }
+                            RuleDayMode.CALENDAR -> {
+                                var startDate by remember { mutableStateOf(rule.startDate ?: "") }
+                                var endDate by remember { mutableStateOf(rule.endDate ?: "") }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = startDate,
+                                        onValueChange = { 
+                                            startDate = it
+                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                        },
+                                        label = { Text("Start Date (YYYY-MM-DD)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    OutlinedTextField(
+                                        value = endDate,
+                                        onValueChange = { 
+                                            endDate = it
+                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                        },
+                                        label = { Text("End Date (YYYY-MM-DD)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
                                     )
                                 }
                             }
