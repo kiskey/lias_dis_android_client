@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Wrapped `buildRequest` strictly inside try-catch blocks to prevent uncaught
-//      URL parsing crashes on invalid input (CRASH-02).
-//   2. Added REST client endpoints for Extend Access and Effective Status features.
+//   1. Coalesced nullable `ConflictResponse.message` receiver to non-null String
+//      before calling `.ifBlank` to fix Kotlin compiler error on line 100 (BUG-01).
+//   2. Retained try-catch request protection and Extend Access client endpoints.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -94,10 +94,13 @@ class LiasApiClient(
                 }
             }
             else -> {
-                val errorMsg = try { 
+                val decodedMsg = try { 
                     json.decodeFromString(ConflictResponse.serializer(), bodyString).message 
-                } catch (e: Exception) { bodyString }
-                ApiResult.HttpError(response.code, errorMsg.ifBlank { "HTTP ${response.code}" })
+                } catch (e: Exception) { null }
+                
+                // BUG-01 Fix: Null-coalesced non-null String receiver before calling .ifBlank
+                val errorMsg = (decodedMsg ?: bodyString).ifBlank { "HTTP ${response.code}" }
+                ApiResult.HttpError(response.code, errorMsg)
             }
         }
     }
