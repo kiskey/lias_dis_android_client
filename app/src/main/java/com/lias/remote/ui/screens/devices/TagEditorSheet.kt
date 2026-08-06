@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 2.0.0
-// Purpose: HIG Modal bottom sheet for Tag creation/editing with
-//          iOS navigation row (Cancel / Title / Save) and color halo swatches.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. ModalBottomSheet with 22dp top corner radius (HigSpec.SheetCorner).
+//   2. iOS Nav Row (Cancel / Title / Save).
+//   3. Migrated Tag Name input to HigField.
+//   4. Selected color swatch gets double border halo ring effect.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -26,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -42,6 +44,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Tag
+import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.theme.HigSpec
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,19 +55,19 @@ fun TagEditorSheet(
     onSave: (Tag) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    
+
     var name by remember { mutableStateOf(initialTag?.name ?: "") }
     var selectedColor by remember { mutableStateOf(initialTag?.color ?: "#0A84FF") }
 
     val presetColors = listOf(
-        "#0A84FF", "#5856D6", "#FF9500", "#FF2D55", 
+        "#0A84FF", "#5856D6", "#FF9500", "#FF2D55",
         "#00C7BE", "#30D158", "#FFCC00", "#A28B55"
     )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner)
     ) {
         Column(
             modifier = Modifier
@@ -72,14 +76,14 @@ fun TagEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // HIG Navigation Row
+            // HIG Navigation Row: Cancel / Title / Save
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                    Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 }
                 Text(
                     text = if (initialTag == null) "New Tag" else "Edit Tag",
@@ -99,20 +103,26 @@ fun TagEditorSheet(
                     },
                     enabled = name.isNotBlank()
                 ) {
-                    Text("Save", fontWeight = FontWeight.Bold, color = if (name.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "Save",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (name.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-            
-            OutlinedTextField(
+
+            HigField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Tag Name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label = "Tag Name",
+                placeholder = "e.g. Nursery"
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Badge Color", style = MaterialTheme.typography.labelLarge)
+            Text("BADGE COLOR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            // Swatch Row with Halo Ring on Selected Swatch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -120,15 +130,18 @@ fun TagEditorSheet(
                 presetColors.forEach { colorHex ->
                     val isSelected = selectedColor.equals(colorHex, ignoreCase = true)
                     val color = Color(android.graphics.Color.parseColor(colorHex))
+
                     Box(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .border(
-                                width = if (isSelected) 2.dp else 0.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                shape = CircleShape
+                            .then(
+                                if (isSelected) {
+                                    Modifier
+                                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                                        .border(4.dp, color, CircleShape)
+                                } else Modifier
                             )
                             .clickable { selectedColor = colorHex }
                     )
