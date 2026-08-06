@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/test/java/com/lias/remote/core/util/ScheduleProjectionTest.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Fully verified unit tests covering overnight wrap-around week-minute boundary 
-//      calculations (10080 minute boundary) to guarantee Canvas drawing parity.
+//   1. Added unit tests for expandDayRange and verified overnight boundary calculations.
 // ====================================================================
 
 package com.lias.remote.core.util
@@ -15,6 +14,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScheduleProjectionTest {
+
+    @Test
+    fun `test expand day range`() {
+        val expanded = ScheduleProjection.expandDayRange("mon", "fri")
+        assertEquals(listOf("mon", "tue", "wed", "thu", "fri"), expanded)
+
+        val weekendWrap = ScheduleProjection.expandDayRange("fri", "mon")
+        assertEquals(listOf("fri", "sat", "sun", "mon"), weekendWrap)
+    }
 
     @Test
     fun `test worked example conflict`() {
