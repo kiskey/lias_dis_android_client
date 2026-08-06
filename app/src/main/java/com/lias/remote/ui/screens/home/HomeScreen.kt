@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 2.0.1
+// Version: 2.1.0
 // Audit Fixes:
-//   1. Added missing imports `expandVertically`, `shrinkVertically`, and `androidx.compose.foundation.lazy.items`.
+//   1. Scaffolded via HigLargeTitleScaffold with title "Home".
+//   2. Integrated MiniWeekStrip into All Access hero card.
+//   3. Rendered device online status dots in SystemGreenDark (never blue).
+//   4. Folded active enforcements contextually into grouped list block.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -22,17 +25,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -57,12 +57,17 @@ import com.lias.remote.core.models.Tag
 import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
+import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.MiniWeekStrip
+import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.SegmentedControl
+import com.lias.remote.ui.components.SkeletonGroupedList
 import com.lias.remote.ui.components.StatusPill
-import com.lias.remote.ui.components.WeeklyTimeline
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
+import com.lias.remote.ui.theme.SystemGreenDark
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -91,68 +96,75 @@ fun HomeScreen(
         computeActiveEnforcements(state.policies, state.schedules, state.tags, state.devices)
     }
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = { isRefreshing = true }
+    HigLargeTitleScaffold(
+        title = "Home"
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true }
         ) {
-            item { ConnectionStatusBanner(state.connectionState) }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { ConnectionStatusBanner(state.connectionState) }
 
-            if (!state.isInitialLoaded && state.devices.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                if (!state.isInitialLoaded && state.devices.isEmpty()) {
+                    item { SkeletonGroupedList(count = 4) }
+                } else {
+                    // All Access Hero Switch
+                    item {
+                        GlobalSwitchHero(
+                            globalPolicy = state.policies.find { it.id == "global_default" },
+                            schedules = state.schedules,
+                            onSavePolicy = { viewModel.savePolicy(it) },
+                            onManageSchedules = { showGlobalWizard = true }
+                        )
                     }
-                }
-            } else {
-                // All Access Hero Switch
-                item {
-                    GlobalSwitchHero(
-                        globalPolicy = state.policies.find { it.id == "global_default" },
-                        schedules = state.schedules,
-                        onSavePolicy = { viewModel.savePolicy(it) },
-                        onManageSchedules = { showGlobalWizard = true }
-                    )
-                }
 
-                // Active Enforcements Section
-                item {
-                    Column {
-                        ListSectionHeader("Active Enforcements")
-                        ActiveEnforcementsList(items = activeEnforcements)
+                    // Contextual Active Enforcements Section (shown only when enforcements active)
+                    if (activeEnforcements.isNotEmpty()) {
+                        item {
+                            Column {
+                                ListSectionHeader("Active Enforcements")
+                                ActiveEnforcementsList(items = activeEnforcements)
+                            }
+                        }
                     }
-                }
 
-                // Metrics Row
-                item { MetricsRow(devices = state.devices) }
+                    // Metrics Row
+                    item { MetricsRow(devices = state.devices) }
 
-                // Recent Devices List
-                item { ListSectionHeader("Recent Devices") }
+                    // Recent Devices Section
+                    item { ListSectionHeader("Recent Devices") }
 
-                items(state.devices.take(10), key = { it.pdid }) { device ->
-                    GroupedListRow(
-                        primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
-                        secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(
-                                        color = if (device.online) MaterialTheme.colorScheme.primary else Color.Gray,
-                                        shape = CircleShape
-                                    )
-                            )
-                        },
-                        trailingContent = {
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        onClick = { onNavigateToDeviceDetail(device.pdid) }
-                    )
+                    item {
+                        GroupedListCard {
+                            state.devices.take(8).forEachIndexed { index, device ->
+                                GroupedListRow(
+                                    primaryText = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } },
+                                    secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
+                                    leadingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(9.dp)
+                                                .background(
+                                                    color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    },
+                                    showDivider = index < state.devices.take(8).size - 1,
+                                    onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -208,7 +220,7 @@ private fun GlobalSwitchHero(
                 Column(modifier = Modifier.padding(top = 12.dp)) {
                     val attachedSchedules = schedules.filter { it.id in pol.resolveScheduleIDs() }
                     if (attachedSchedules.isNotEmpty()) {
-                        WeeklyTimeline(schedules = attachedSchedules)
+                        MiniWeekStrip(schedules = attachedSchedules)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -227,54 +239,23 @@ private fun GlobalSwitchHero(
 
 @Composable
 private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
-    if (items.isEmpty()) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text("No Active Schedules", style = MaterialTheme.typography.titleLarge)
-                    Text("All devices operating under default rules", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items.forEach { item ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val isBlock = item.action == "block"
-                        StatusPill(
-                            text = if (item.isGlobal) "Global " + item.action else item.action,
-                            color = if (isBlock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                            backgroundColor = if (isBlock) MaterialTheme.colorScheme.error.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(item.targetColor))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(item.targetName, style = MaterialTheme.typography.titleLarge)
-                            }
-                            Text(item.scheduleName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
+    GroupedListCard {
+        items.forEachIndexed { index, item ->
+            val isBlock = item.action == "block"
+            GroupedListRow(
+                primaryText = item.targetName,
+                secondaryText = item.scheduleName,
+                leadingContent = {
+                    Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(item.targetColor))
+                },
+                trailingContent = {
+                    StatusPill(
+                        text = if (item.isGlobal) "Global " + item.action else item.action,
+                        tone = if (isBlock) PillTone.Blocked else PillTone.Allowed
+                    )
+                },
+                showDivider = index < items.size - 1
+            )
         }
     }
 }
@@ -290,7 +271,7 @@ private fun MetricsRow(devices: List<Device>) {
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         MetricCard("TOTAL", total.toString(), MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
-        MetricCard("ONLINE", online.toString(), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+        MetricCard("ONLINE", online.toString(), SystemGreenDark, Modifier.weight(1f))
         MetricCard("OFFLINE", offline.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
     }
 }
