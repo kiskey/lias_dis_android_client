@@ -1,11 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 2.0.0
+// Version: 2.1.0
 // Audit Fixes: 
-//   1. Added Copy Policy action button to match LIAS Web Dashboard parity.
-//   2. Added Policy Enable / Disable toggle switch on policy card.
-//   3. Added Policy Import/Export actions and empty-schedule/infrastructure warning callouts.
-//   4. Ensured smooth HIG scrollability.
+//   1. Passed `existingPolicies = state.policies` to `PolicyWizardSheet` for explicit
+//      type-safe compilation and zero unresolved references.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -160,6 +158,7 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
             initialPolicy = editingPolicy,
             tags = state.tags,
             schedules = state.schedules,
+            existingPolicies = state.policies,
             onDismiss = { showWizard = false },
             onSave = { policy ->
                 viewModel.savePolicy(policy)
