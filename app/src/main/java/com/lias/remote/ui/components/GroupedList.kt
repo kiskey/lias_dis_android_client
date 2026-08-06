@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 2.0.0
-// Purpose: HIG Grouped Inset List primitives (GroupedList, ListSectionHeader, GroupedListRow).
+// Version: 2.0.1
+// Audit Fixes:
+//   1. Added explicit `@Composable` annotations to parameter functional types `(@Composable () -> Unit)?`
+//      to fix Compose compiler composable invocation context errors.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -59,8 +61,8 @@ fun GroupedListRow(
     primaryText: String,
     modifier: Modifier = Modifier,
     secondaryText: String? = null,
-    leadingContent: @Composable (() -> Unit)? = null,
-    trailingContent: @Composable (() -> Unit)? = null,
+    leadingContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit = {},
     colors: ListItemColors = ListItemDefaults.colors(
         containerColor = MaterialTheme.colorScheme.surface,
