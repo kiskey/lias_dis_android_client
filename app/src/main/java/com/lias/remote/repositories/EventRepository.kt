@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Eager parallel inventory fetch unlocks UI immediately on initial connect (AUD-06).
+//   1. Added effective status tracking and `effective_status_changed` SSE handler (§2.5).
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -10,6 +10,7 @@ package com.lias.remote.repositories
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -89,7 +90,6 @@ class EventRepository(
     internal suspend fun refreshAll() {
         if (api.baseUrl.isBlank()) return
         coroutineScope {
-            // Priority 1: Fetch devices and render UI immediately
             val devsResult = api.get<DeviceListResponse>(Endpoints.DEVICES)
             if (devsResult is ApiResult.Success) {
                 _state.value = _state.value.copy(
@@ -98,7 +98,6 @@ class EventRepository(
                 )
             }
 
-            // Priority 2: Concurrently fetch metadata
             val tagsDeferred = async { api.get<List<Tag>>(Endpoints.TAGS) }
             val polsDeferred = async { api.get<List<Policy>>(Endpoints.POLICIES) }
             val schedsDeferred = async { api.get<List<Schedule>>(Endpoints.SCHEDULES) }
@@ -137,6 +136,9 @@ class EventRepository(
                 EventConstants.DEVICE_OFFLINE -> {
                     refreshSingleDevice(event.deviceID)
                     _uiEvents.emit(UiEvent.ShowSnackbar("🔴 Device Offline: ${event.deviceID.takeLast(8)}"))
+                }
+                EventConstants.EFFECTIVE_STATUS_CHANGED -> {
+                    refreshAll()
                 }
                 EventConstants.HOSTNAME_CHANGED,
                 EventConstants.FINGERPRINT_UPDATED,
