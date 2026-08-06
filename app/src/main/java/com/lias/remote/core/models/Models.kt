@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.7.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Added `displayName` computed property matching Go backend `DisplayName()`
-//      and Web Dashboard display logic (friendlyName -> hostname -> canonicalHostname -> vendor+model -> MAC -> PDID).
+//   1. Added ExtensionInfo and EffectiveStatus models (§2.1).
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -41,7 +40,6 @@ data class Device(
     val safeServices: List<String> get() = services ?: emptyList()
     val safeTags: List<String> get() = tags ?: emptyList()
 
-    // AUD-01 Fix: 100% parity with Go backend models.Device.DisplayName()
     val displayName: String
         get() {
             if (friendlyName.isNotBlank()) return friendlyName
@@ -55,6 +53,20 @@ data class Device(
             return "Unknown Device"
         }
 }
+
+@Serializable
+data class ExtensionInfo(
+    @SerialName("expires_at") val expiresAt: String = "",
+    @SerialName("minutes_left") val minutesLeft: Int = 0
+)
+
+@Serializable
+data class EffectiveStatus(
+    val action: String = "allow",
+    val source: String = "global",
+    @SerialName("extend_available") val extendAvailable: Boolean = false,
+    @SerialName("active_extension") val activeExtension: ExtensionInfo? = null
+)
 
 @Serializable
 data class Tag(
