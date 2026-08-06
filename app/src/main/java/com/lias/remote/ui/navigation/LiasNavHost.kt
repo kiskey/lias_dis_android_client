@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Bound `isConnected` route condition to `savedServerUrl` (AUD-02).
-//   2. Refactored `uiEvents` consumption to direct `Flow.collect` inside `LaunchedEffect(Unit)`
-//      to guarantee 100% reception of all SSE real-time toasts and alerts (AUD-07).
+//   1. Removed duplicate `navController.navigate` call in ConnectScreen callback
+//      to resolve ConnectScreen crash on Connect tap (CRASH-01).
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -81,7 +80,6 @@ fun LiasNavHost(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // AUD-07 Fix: Direct Flow.collect guarantees 100% SSE event toast delivery
     LaunchedEffect(Unit) {
         liasViewModel.uiEvents.collect { event ->
             when (event) {
@@ -111,9 +109,7 @@ fun LiasNavHost(
         ConnectScreen(
             viewModel = settingsViewModel,
             onConnected = {
-                navController.navigate(LiasScreen.Home.route) {
-                    popUpTo(0)
-                }
+                // Compositional state switch handles navigation cleanly without race conditions
             }
         )
     } else {
