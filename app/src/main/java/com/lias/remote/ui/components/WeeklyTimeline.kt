@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/WeeklyTimeline.kt
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes: 
 //   1. Updated Canvas segment loop to use `s.safeRules` and `rule.safeDays`
-//      for complete null-safety alignment.
+//      for complete null-safety alignment and HIG schedule visualization parity.
 // ====================================================================
 
 package com.lias.remote.ui.components
