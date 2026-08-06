@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PoliciesScreen.kt
-// Version: 1.9.0
+// Version: 2.0.0
 // Audit Fixes: 
-//   1. Added Policy Import/Export actions and empty-schedule/infrastructure warning callouts.
+//   1. Added Copy Policy action button to match LIAS Web Dashboard parity.
+//   2. Added Policy Enable / Disable toggle switch on policy card.
+//   3. Added Policy Import/Export actions and empty-schedule/infrastructure warning callouts.
+//   4. Ensured smooth HIG scrollability.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -24,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
@@ -37,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -125,6 +130,16 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
                         PolicyCard(
                             policy = policy,
                             schedules = state.schedules,
+                            onToggleEnabled = { enabled ->
+                                viewModel.savePolicy(policy.copy(enabled = enabled))
+                            },
+                            onCopyClick = {
+                                editingPolicy = policy.copy(
+                                    id = "pol_${System.currentTimeMillis()}",
+                                    name = "Copy of ${policy.name}"
+                                )
+                                showWizard = true
+                            },
                             onEditClick = {
                                 editingPolicy = policy
                                 showWizard = true
@@ -178,10 +193,15 @@ fun PoliciesScreen(viewModel: LiasViewModel) {
 private fun PolicyCard(
     policy: Policy,
     schedules: List<Schedule>,
+    onToggleEnabled: (Boolean) -> Unit,
+    onCopyClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     val isInfra = policy.targetID == "infrastructure"
+    val isGlobal = policy.id == "global_default"
+    val isPaused = policy.id.startsWith("pol_pause_")
+    val canToggle = !isGlobal && !isPaused && !isInfra
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -189,14 +209,26 @@ private fun PolicyCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    policy.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = policy.name + if (!policy.enabled) " (Disabled)" else "",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (!policy.enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 if (isInfra) {
                     Icon(Icons.Filled.Lock, contentDescription = "Immune", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(20.dp))
+                }
+                if (canToggle) {
+                    Switch(
+                        checked = policy.enabled,
+                        onCheckedChange = onToggleEnabled,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+                IconButton(onClick = onCopyClick, enabled = !isGlobal && !isPaused) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Policy")
                 }
                 IconButton(onClick = onEditClick, enabled = !isInfra) {
                     Icon(Icons.Filled.Edit, contentDescription = "Edit Policy")
