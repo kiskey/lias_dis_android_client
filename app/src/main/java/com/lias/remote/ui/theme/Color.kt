@@ -1,11 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/Color.kt
-// Version: 2.0.0
-// Purpose: Apple HIG system color definitions for LIAS Remote v2.0.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Extended with Apple HIG semantic status pill background pairs (light/dark).
+//   2. Added LiasFill light and dark tokens for borderless filled fields.
+//   3. Retained all existing system colors and legacy aliases byte-for-byte.
 // ====================================================================
 
 package com.lias.remote.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Light Mode HIG System Colors
@@ -26,6 +31,12 @@ val SystemLabelLight = Color(0xFF1C1C1E)
 val SystemSecondaryLabelLight = Color(0xFF8A8A8E)
 val SystemSeparatorLight = Color(0xFFC7C7CC)
 
+// Light Mode Semantic Pill Backgrounds
+val PillGreenBgLight  = Color(0xFFE6F9EA)
+val PillRedBgLight    = Color(0xFFFFE9E7)
+val PillOrangeBgLight = Color(0xFFFFF3E0)
+val PillBlueBgLight   = Color(0xFFEAF3FF)
+
 // Dark Mode HIG System Colors
 val SystemBlueDark = Color(0xFF0A84FF)
 val SystemGreenDark = Color(0xFF30D158)
@@ -44,6 +55,16 @@ val SystemLabelDark = Color(0xFFFFFFFF)
 val SystemSecondaryLabelDark = Color(0xFF8E8E93)
 val SystemSeparatorDark = Color(0x38383A38)
 
+// Dark Mode Semantic Pill Backgrounds
+val PillGreenBgDark  = Color(0x2930D158) // SystemGreenDark 16% alpha
+val PillRedBgDark    = Color(0x29FF453A) // SystemRedDark 16% alpha
+val PillOrangeBgDark = Color(0x29FF9F0A) // SystemOrangeDark 16% alpha
+val PillBlueBgDark   = Color(0x290A84FF) // SystemBlueDark 16% alpha
+
+// Search Pill & Input Fill Tokens
+val LiasFillLight = Color(0x1F767680) // rgba(118,118,128,0.12)
+val LiasFillDark  = Color(0x3D767680) // rgba(118,118,128,0.24)
+
 // Backward Compatibility Preset Aliases
 val LiasBgPrimaryLight = SystemBackgroundLight
 val LiasBgSecondaryLight = SystemSecondaryBackgroundLight
@@ -60,3 +81,26 @@ val LiasTextPrimaryDark = SystemLabelDark
 val LiasTextSecondaryDark = SystemSecondaryLabelDark
 val LiasAccentDark = SystemBlueDark
 val LiasDangerDark = SystemRedDark
+
+// Theme Token Accessors
+object LiasThemeColors {
+    val fill: Color
+        @Composable
+        get() = if (isSystemInDarkTheme()) LiasFillDark else LiasFillLight
+
+    val pillGreenBg: Color
+        @Composable
+        get() = if (isSystemInDarkTheme()) PillGreenBgDark else PillGreenBgLight
+
+    val pillRedBg: Color
+        @Composable
+        get() = if (isSystemInDarkTheme()) PillRedBgDark else PillRedBgLight
+
+    val pillOrangeBg: Color
+        @Composable
+        get() = if (isSystemInDarkTheme()) PillOrangeBgDark else PillOrangeBgLight
+
+    val pillBlueBg: Color
+        @Composable
+        get() = if (isSystemInDarkTheme()) PillBlueBgDark else PillBlueBgLight
+}
