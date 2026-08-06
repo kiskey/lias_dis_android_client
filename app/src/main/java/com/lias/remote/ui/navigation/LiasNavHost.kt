@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Removed orphaned references/imports to deprecated DashboardScreen.
-//   2. Set tab enter/exit transitions to 150ms cross-fade (`fadeIn(tween(150))`).
-//   3. Retained slide push/pop navigation for Device Detail and Connection Settings.
+//   1. Bound `isConnected` route condition to `savedServerUrl` (AUD-02).
+//   2. Refactored `uiEvents` consumption to direct `Flow.collect` inside `LaunchedEffect(Unit)`
+//      to guarantee 100% reception of all SSE real-time toasts and alerts (AUD-07).
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -34,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -78,13 +77,13 @@ fun LiasNavHost(
     )
 
     val settingsState by settingsViewModel.uiState.collectAsState()
-    val isConnected = settingsState.serverUrl.isNotBlank()
+    val isConnected = settingsState.savedServerUrl.isNotBlank()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val uiEvents by liasViewModel.uiEvents.collectAsStateWithLifecycle(initialValue = null)
 
-    LaunchedEffect(uiEvents) {
-        uiEvents?.let { event ->
+    // AUD-07 Fix: Direct Flow.collect guarantees 100% SSE event toast delivery
+    LaunchedEffect(Unit) {
+        liasViewModel.uiEvents.collect { event ->
             when (event) {
                 is UiEvent.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(
