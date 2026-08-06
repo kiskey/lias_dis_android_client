@@ -1,20 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Enforced 14dp grouped container border-radius (`HigSpec.GroupedListCorner`).
-//   2. Replaced individual row clipping with continuous inset group section surfaces.
-//   3. Inserted 0.5dp separators between section items with flush outer corners.
-//   4. Guaranteed minimum row height of 44dp (`HigSpec.RowMinHeight`).
+//   1. Added `trailingAction` slot to ListSectionHeader for section clock buttons (§4.1).
 // ====================================================================
 
 package com.lias.remote.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
@@ -54,14 +52,23 @@ fun GroupedList(
 @Composable
 fun ListSectionHeader(
     text: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    trailingAction: (@Composable () -> Unit)? = null
 ) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(HigSpec.SectionLabelPadding)
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(HigSpec.SectionLabelPadding),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        trailingAction?.invoke()
+    }
 }
 
 @Composable
