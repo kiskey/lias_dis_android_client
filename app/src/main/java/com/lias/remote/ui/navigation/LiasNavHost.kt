@@ -1,13 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 2.0.0
-// Purpose: HIG NavHost container managing first-launch ConnectScreen vs.
-//          5-tab NavigationBar (Home, Devices, Schedules, Rules, Settings),
-//          pushed routes, and toast emissions.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Removed orphaned references/imports to deprecated DashboardScreen.
+//   2. Set tab enter/exit transitions to 150ms cross-fade (`fadeIn(tween(150))`).
+//   3. Retained slide push/pop navigation for Device Detail and Connection Settings.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
@@ -120,7 +124,7 @@ fun LiasNavHost(
                 NavigationBar {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
-                    
+
                     items.forEach { screen ->
                         NavigationBarItem(
                             icon = { Icon(screen.icon, contentDescription = screen.label) },
@@ -143,7 +147,9 @@ fun LiasNavHost(
             NavHost(
                 navController = navController,
                 startDestination = LiasScreen.Home.route,
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier.padding(innerPadding),
+                enterTransition = { fadeIn(animationSpec = tween(150)) },
+                exitTransition = { fadeOut(animationSpec = tween(150)) }
             ) {
                 composable(LiasScreen.Home.route) {
                     HomeScreen(
