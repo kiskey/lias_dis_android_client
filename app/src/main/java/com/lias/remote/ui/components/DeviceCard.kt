@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 1.7.0
-// Audit Fixes: 
-//   1. Multi-tag selection: Selecting a specific tag strips fallback 'generic' tag.
-//      Unchecking all tags restores 'generic'.
-//   2. Clean Apple HIG action row with single-line layout and responsive button layout.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Updated online status dot color to SystemGreenDark (never blue).
+//   2. Migrated quick action buttons to HigButton primitives.
+//   3. Styled discovered service tags with LiasThemeColors.fill.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -26,9 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -44,11 +41,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
+import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.LiasThemeColors
+import com.lias.remote.ui.theme.SystemGreenDark
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -67,20 +66,20 @@ fun DeviceCard(
     val assignedTags = device.safeTags.ifEmpty { listOf("generic") }
     val isInfra = assignedTags.contains("infrastructure")
 
-    val displayName = device.friendlyName.ifBlank { 
-        device.hostname.ifBlank { 
-            (device.vendor + " " + device.model).trim().ifBlank { 
-                device.currentMAC.ifBlank { 
-                    device.pdid 
-                } 
-            } 
-        } 
+    val displayName = device.friendlyName.ifBlank {
+        device.hostname.ifBlank {
+            (device.vendor + " " + device.model).trim().ifBlank {
+                device.currentMAC.ifBlank {
+                    device.pdid
+                }
+            }
+        }
     }
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = MaterialTheme.shapes.medium
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(HigSpec.CardCorner)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -93,57 +92,52 @@ fun DeviceCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
+                        .size(HigSpec.StatusDotSize)
                         .background(
-                            color = if (device.online) MaterialTheme.colorScheme.primary else Color.Gray,
+                            color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             shape = CircleShape
                         )
                 )
             }
-            Spacer(modifier = Modifier.size(8.dp))
+            Spacer(modifier = Modifier.size(6.dp))
             Text(
-                text = "MAC: ${device.currentMAC.ifBlank { "N/A" }}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "IP: ${device.currentIP.ifBlank { "N/A" }}",
-                style = MaterialTheme.typography.bodySmall,
+                text = "MAC: ${device.currentMAC.ifBlank { "N/A" }} · IP: ${device.currentIP.ifBlank { "N/A" }}",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = "Type: ${device.deviceType.ifBlank { "Unclassified" }}",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             if (device.safeServices.isNotEmpty()) {
                 Spacer(modifier = Modifier.size(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     device.safeServices.take(3).forEach { service ->
                         Box(
                             modifier = Modifier
-                                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .background(LiasThemeColors.fill, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = service,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.size(12.dp))
 
-            // Multi-tag Assignment Drawer
+            // Tag Selection Drawer
             TextButton(
                 onClick = { tagsExpanded = !tagsExpanded },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Assign Tags (${assignedTags.size})", style = MaterialTheme.typography.labelMedium)
+                Text("Assign Tags (${assignedTags.size})", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
 
             if (tagsExpanded) {
@@ -155,7 +149,7 @@ fun DeviceCard(
                         val isChecked = assignedTags.contains(tag.id)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(4.dp)
+                            modifier = Modifier.padding(2.dp)
                         ) {
                             Checkbox(
                                 checked = isChecked,
@@ -183,34 +177,19 @@ fun DeviceCard(
 
             Spacer(modifier = Modifier.size(8.dp))
 
-            // Quick Action Buttons Row
+            // Actions Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isInfra) {
-                    if (isPaused) {
-                        TextButton(
-                            onClick = onUnpauseClick,
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Resume")
-                        }
-                    } else {
-                        TextButton(
-                            onClick = onPauseClick,
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Filled.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Pause")
-                        }
-                    }
+                    HigButton(
+                        text = if (isPaused) "Resume" else "Pause",
+                        onClick = if (isPaused) onUnpauseClick else onPauseClick,
+                        style = if (isPaused) HigButtonStyle.Secondary else HigButtonStyle.Danger,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 IconButton(onClick = onRenameClick, modifier = Modifier.size(36.dp)) {
