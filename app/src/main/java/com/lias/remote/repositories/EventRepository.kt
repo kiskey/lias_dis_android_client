@@ -1,10 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 2.0.0
+// Version: 2.1.0
 // Audit Fixes:
-//   1. Incremental loading: updates state and unlocks UI immediately when devices arrive,
-//      loading secondary metadata in parallel.
-//   2. Handles real-time SSE event consumption and StateFlow emissions for full parity.
+//   1. Eager parallel inventory fetch unlocks UI immediately on initial connect (AUD-06).
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -48,7 +46,7 @@ class EventRepository(
     internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    internal val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
+    internal val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 64)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     private val json = Json { ignoreUnknownKeys = true }
