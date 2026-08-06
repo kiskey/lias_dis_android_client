@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 2.0.0
-// Purpose: HIG Settings screen matching iOS Settings.app with grouped rows,
-//          pushed Connection screen navigation, Vacation Mode, and Danger Zone.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Migrated scaffold to HigLargeTitleScaffold.
+//   2. Normalized icon bubbles to 26dp (HigSpec.IconBubbleSize) with 7dp corner.
+//   3. Fixed Vacation Mode icon bubble color to theme-resolved SystemOrangeDark token.
+//   4. Rendered "Flush Nftables Table" primary text in red (MaterialTheme.colorScheme.error).
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -20,14 +23,11 @@ import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,10 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedList
+import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.SystemOrangeDark
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -52,78 +55,81 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showFlushDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings", style = MaterialTheme.typography.headlineLarge) }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+    HigLargeTitleScaffold(
+        title = "Settings"
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             GroupedList {
                 // Section 1 - Server
                 item { ListSectionHeader("Server") }
                 item {
-                    GroupedListRow(
-                        primaryText = "Connection",
-                        secondaryText = if (uiState.serverUrl.isNotBlank()) "${uiState.serverUrl} · Configured" else "Not configured",
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(7.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Language, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                        },
-                        trailingContent = {
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        onClick = onNavigateToConnection
-                    )
+                    GroupedListCard {
+                        GroupedListRow(
+                            primaryText = "Connection",
+                            secondaryText = if (uiState.serverUrl.isNotBlank()) "${uiState.serverUrl} · Configured" else "Not configured",
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(HigSpec.IconBubbleSize)
+                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(HigSpec.IconBubbleCorner)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Language, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            },
+                            trailingContent = {
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            },
+                            onClick = onNavigateToConnection
+                        )
+                    }
                 }
 
                 // Section 2 - Controls
                 item { ListSectionHeader("Controls") }
                 item {
-                    GroupedListRow(
-                        primaryText = "Vacation Mode",
-                        secondaryText = "Block all non-infrastructure devices",
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(Color(0xFFFF9500), RoundedCornerShape(7.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.FlightTakeoff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    GroupedListCard {
+                        GroupedListRow(
+                            primaryText = "Vacation Mode",
+                            secondaryText = "Block all non-infrastructure devices",
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(HigSpec.IconBubbleSize)
+                                        .background(SystemOrangeDark, RoundedCornerShape(HigSpec.IconBubbleCorner)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.FlightTakeoff, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = uiState.vacationMode,
+                                    onCheckedChange = { viewModel.toggleVacationMode(it) }
+                                )
                             }
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = uiState.vacationMode,
-                                onCheckedChange = { viewModel.toggleVacationMode(it) }
-                            )
-                        }
-                    )
+                        )
+                    }
                 }
 
                 // Section 3 - Danger Zone
                 item { ListSectionHeader("Danger Zone") }
                 item {
-                    GroupedListRow(
-                        primaryText = "Flush Nftables Table",
-                        secondaryText = "Rebuilds automatically on next sync",
-                        trailingContent = {
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        onClick = { showFlushDialog = true }
-                    )
+                    GroupedListCard {
+                        GroupedListRow(
+                            primaryText = "Flush Nftables Table",
+                            secondaryText = "Rebuilds automatically on next sync",
+                            trailingContent = {
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            },
+                            onClick = { showFlushDialog = true },
+                            colors = androidx.compose.material3.ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                headlineColor = MaterialTheme.colorScheme.error,
+                                supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
                 }
             }
         }
