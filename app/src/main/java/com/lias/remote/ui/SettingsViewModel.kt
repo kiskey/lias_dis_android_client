@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Added toggleVacationMode to SettingsViewModel for global kill-switch control.
-//   2. Added vacationMode property to SettingsUiState.
+//   1. Added explicit testResult text feedback for Vacation Mode toggle and
+//      nftables flush actions so the user receives immediate visual confirmation.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -88,6 +88,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             settings.saveServerUrl(_uiState.value.serverUrl)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
+            _uiState.value = _uiState.value.copy(testResult = "Settings saved successfully.")
         }
     }
 
@@ -95,7 +96,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
             if (result is ApiResult.Success) {
-                _uiState.value = _uiState.value.copy(vacationMode = result.data.vacationMode)
+                val stateText = if (result.data.vacationMode) "enabled" else "disabled"
+                _uiState.value = _uiState.value.copy(
+                    vacationMode = result.data.vacationMode,
+                    testResult = "Vacation Mode $stateText successfully."
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(testResult = "Failed to toggle Vacation Mode.")
             }
         }
     }
