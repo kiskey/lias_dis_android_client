@@ -1,14 +1,8 @@
-# ====================================================================
-# File: app/src/main/java/com/lias/remote/core/models/Models.kt
-# ====================================================================
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.9.0
-// Audit Fixes:
-//   1. Added @SerialName("expires_at") and @SerialName("reason_tag") to
-//      Policy data class to prevent JSON deserialization data loss for
-//      temporary Pause & Extend Access policies.
+// Version: 2.0.0
+// Purpose: Canonical data models for LIAS Remote Client.
+// Audit Fix: Removed invalid '#' comments causing top-level syntax errors.
 // ====================================================================
 
 package com.lias.remote.core.models
