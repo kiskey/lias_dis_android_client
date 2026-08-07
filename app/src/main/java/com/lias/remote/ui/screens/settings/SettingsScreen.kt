@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Native iOS Settings Screen with CupertinoSwitch controls.
 // Audit Fixes:
-//   1. Migrated toggle switch to CupertinoSwitch.
-//   2. Preserved HigLargeTitleScaffold and Flush Nftables confirmation dialog.
+//   1. Replaced colors parameter in GroupedListRow with isDestructive = true.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -117,15 +116,11 @@ fun SettingsScreen(
                         GroupedListRow(
                             primaryText = "Flush Nftables Table",
                             secondaryText = "Rebuilds automatically on next sync",
+                            isDestructive = true,
                             trailingContent = {
                                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             },
-                            onClick = { showFlushDialog = true },
-                            colors = androidx.compose.material3.ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                headlineColor = MaterialTheme.colorScheme.error,
-                                supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            onClick = { showFlushDialog = true }
                         )
                     }
                 }
