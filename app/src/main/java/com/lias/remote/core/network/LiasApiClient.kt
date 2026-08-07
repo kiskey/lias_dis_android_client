@@ -1,12 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 1.6.0
+// Version: 1.8.0
 // Audit Fixes:
-//   1. Added getRaw and postRaw helper methods to handle policy JSON exports and imports.
+//   1. Coalesced nullable `ConflictResponse.message` receiver to non-null String
+//      before calling `.ifBlank` to fix Kotlin compiler error on line 100 (BUG-01).
+//   2. Retained try-catch request protection and Extend Access client endpoints.
 // ====================================================================
 
 package com.lias.remote.core.network
 
+import com.lias.remote.core.models.EffectiveStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -91,10 +94,13 @@ class LiasApiClient(
                 }
             }
             else -> {
-                val errorMsg = try { 
+                val decodedMsg = try { 
                     json.decodeFromString(ConflictResponse.serializer(), bodyString).message 
-                } catch (e: Exception) { bodyString }
-                ApiResult.HttpError(response.code, errorMsg ?: "HTTP ${response.code}")
+                } catch (e: Exception) { null }
+                
+                // BUG-01 Fix: Null-coalesced non-null String receiver before calling .ifBlank
+                val errorMsg = (decodedMsg ?: bodyString).ifBlank { "HTTP ${response.code}" }
+                ApiResult.HttpError(response.code, errorMsg)
             }
         }
     }
@@ -171,5 +177,30 @@ class LiasApiClient(
         } catch (e: Exception) {
             ApiResult.NetworkError(e)
         }
+    }
+
+    // Extend Access Features (§2.3)
+    suspend fun extendDeviceAccess(pdid: String, minutes: Int): ApiResult<Unit> {
+        return post<Unit, ExtendAccessRequest>(Endpoints.deviceExtend(pdid), ExtendAccessRequest(minutes))
+    }
+
+    suspend fun cancelDeviceExtension(pdid: String): ApiResult<Unit> {
+        return delete<Unit>(Endpoints.deviceExtend(pdid))
+    }
+
+    suspend fun extendTagAccess(tagId: String, minutes: Int): ApiResult<Unit> {
+        return post<Unit, ExtendAccessRequest>(Endpoints.tagExtend(tagId), ExtendAccessRequest(minutes))
+    }
+
+    suspend fun cancelTagExtension(tagId: String): ApiResult<Unit> {
+        return delete<Unit>(Endpoints.tagExtend(tagId))
+    }
+
+    suspend fun getDeviceEffectiveStatus(pdid: String): ApiResult<EffectiveStatus> {
+        return get<EffectiveStatus>(Endpoints.deviceEffectiveStatus(pdid))
+    }
+
+    suspend fun getTagEffectiveStatus(tagId: String): ApiResult<EffectiveStatus> {
+        return get<EffectiveStatus>(Endpoints.tagEffectiveStatus(tagId))
     }
 }

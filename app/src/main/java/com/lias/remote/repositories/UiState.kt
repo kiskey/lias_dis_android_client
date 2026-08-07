@@ -1,14 +1,13 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 1.2.0
-// Audit Fixes:
-//   1. Added stats and users state properties to UiState.
-//   2. Added ShowSecurityAlert event to UiEvent.
+// Version: 1.3.0
+// Purpose: State container holding models and effective statuses.
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -23,6 +22,8 @@ data class UiState(
     val schedules: List<Schedule> = emptyList(),
     val stats: NetworkStats? = null,
     val users: List<User> = emptyList(),
+    val deviceEffectiveStatuses: Map<String, EffectiveStatus> = emptyMap(),
+    val tagEffectiveStatuses: Map<String, EffectiveStatus> = emptyMap(),
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
     val isInitialLoaded: Boolean = false,
     val errorMessage: String? = null

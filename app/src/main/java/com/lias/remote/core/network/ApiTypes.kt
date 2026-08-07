@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/ApiTypes.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes:
-//   1. Updated DeviceTagRequest to support both tag_ids (array) and tag_id (legacy string).
-//   2. Added RenameDeviceRequest, UserDeviceRequest, and VacationRequest DTOs.
+//   1. Added ExtendAccessRequest DTO for extend endpoints (§2.3).
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -55,6 +54,11 @@ data class VacationRequest(
 @Serializable
 data class VacationResponse(
     @SerialName("vacation_mode") val vacationMode: Boolean = false
+)
+
+@Serializable
+data class ExtendAccessRequest(
+    val minutes: Int
 )
 
 @Serializable

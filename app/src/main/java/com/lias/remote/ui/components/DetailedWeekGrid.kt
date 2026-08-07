@@ -1,9 +1,10 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/WeeklyTimeline.kt
-// Version: 1.5.0
-// Audit Fixes: 
-//   1. Updated Canvas segment loop to use `s.safeRules` and `rule.safeDays`
-//      for complete null-safety alignment and HIG schedule visualization parity.
+// File: app/src/main/java/com/lias/remote/ui/components/DetailedWeekGrid.kt
+// Version: 2.0.0
+// Audit Fixes:
+//   1. Renamed from WeeklyTimeline to DetailedWeekGrid for Policy Wizard step 3 preview.
+//   2. Replaced hardcoded hexes with theme-resolved HIG system colors.
+//   3. Provided backward-compatible `WeeklyTimeline` alias.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -33,16 +34,22 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.util.ScheduleProjection
+import com.lias.remote.ui.theme.SystemBlueDark
+import com.lias.remote.ui.theme.SystemGreenDark
+import com.lias.remote.ui.theme.SystemIndigoDark
+import com.lias.remote.ui.theme.SystemOrangeDark
+import com.lias.remote.ui.theme.SystemPinkDark
+import com.lias.remote.ui.theme.SystemTealDark
 
 @Composable
-fun WeeklyTimeline(
+fun DetailedWeekGrid(
     schedules: List<Schedule>,
     conflicts: List<Conflict> = emptyList(),
     modifier: Modifier = Modifier
 ) {
-    val colors = listOf(
-        Color(0xFF0071E3), Color(0xFF34C759), Color(0xFFFF9500),
-        Color(0xFFAF52DE), Color(0xFF5856D6), Color(0xFF00C7BE)
+    val palette = listOf(
+        SystemBlueDark, SystemGreenDark, SystemOrangeDark,
+        SystemIndigoDark, SystemPinkDark, SystemTealDark
     )
     val days = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
     val dayNames = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
@@ -61,7 +68,9 @@ fun WeeklyTimeline(
         days.forEachIndexed { dayIdx, dayLabel ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
             ) {
                 Text(
                     text = dayLabel,
@@ -79,7 +88,7 @@ fun WeeklyTimeline(
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val canvasHeight = size.height
                         val canvasWidth = size.width
-                        
+
                         allSegments.forEach { seg ->
                             val segDayIdx = seg.start / 1440
                             if (segDayIdx == dayIdx) {
@@ -88,14 +97,14 @@ fun WeeklyTimeline(
                                 if (endMin == 0 && seg.end > seg.start) {
                                     endMin = 1440
                                 }
-                                
+
                                 val schedIdx = schedules.indexOfFirst { it.id == seg.scheduleId }
-                                val color = colors[if (schedIdx != -1) schedIdx % colors.size else 0]
-                                
+                                val color = palette[if (schedIdx != -1) schedIdx % palette.size else 0]
+
                                 val left = (startMin / 1440f) * canvasWidth
                                 val durationMinutes = (endMin - startMin).coerceAtLeast(0)
                                 val width = (durationMinutes / 1440f) * canvasWidth
-                                
+
                                 if (width > 0f) {
                                     drawRect(
                                         color = color,
@@ -105,7 +114,7 @@ fun WeeklyTimeline(
                                 }
                             }
                         }
-                        
+
                         val dayNameStr = dayNames[dayIdx]
                         conflicts.filter { it.day.equals(dayNameStr, ignoreCase = true) }.forEach { c ->
                             val startParts = c.overlapStart.split(":")
@@ -115,11 +124,11 @@ fun WeeklyTimeline(
                             if (endMin <= startMin && endMin == 0) {
                                 endMin = 1440
                             }
-                            
+
                             val left = (startMin / 1440f) * canvasWidth
                             val durationMinutes = (endMin - startMin).coerceAtLeast(0)
                             val width = (durationMinutes / 1440f) * canvasWidth
-                            
+
                             if (width > 0f) {
                                 drawRect(
                                     color = Color.Red.copy(alpha = 0.6f),
@@ -133,4 +142,13 @@ fun WeeklyTimeline(
             }
         }
     }
+}
+
+@Composable
+fun WeeklyTimeline(
+    schedules: List<Schedule>,
+    conflicts: List<Conflict> = emptyList(),
+    modifier: Modifier = Modifier
+) {
+    DetailedWeekGrid(schedules = schedules, conflicts = conflicts, modifier = modifier)
 }

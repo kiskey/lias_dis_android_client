@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes: 
-//   1. Retained ViewModelProvider.Factory for properly retaining ViewModels
-//      across configuration changes (screen rotations) in full compliance with Android lifecycle guidelines.
+//   1. Passed `container.eventRepository` to `SettingsViewModel` factory.
 // ====================================================================
 
 package com.lias.remote
@@ -35,7 +34,7 @@ class MainActivity : ComponentActivity() {
                     return LiasViewModel(container.eventRepository) as T
                 }
                 if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
-                    return SettingsViewModel(container.settingsRepository, container.liasApiClient) as T
+                    return SettingsViewModel(container.settingsRepository, container.liasApiClient, container.eventRepository) as T
                 }
                 throw IllegalArgumentException("Unknown ViewModel class")
             }

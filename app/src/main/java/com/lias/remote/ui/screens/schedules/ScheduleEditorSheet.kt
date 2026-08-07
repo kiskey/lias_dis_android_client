@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 1.7.0
-// Audit Fixes: 
-//   1. Full Rule Mode parity with Web Dashboard: Continuous Day Range, Specific Days, Calendar Dates.
-//   2. Automatic mode inference when viewing saved schedules so stored rules display accurately.
-//   3. Smoothly scrollable ModalBottomSheet body.
+// Version: 2.2.0
+// Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -15,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -22,19 +20,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +47,11 @@ import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleProjection
+import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.SegmentedControl
+import com.lias.remote.ui.theme.HigSpec
 
 enum class RuleDayMode { RANGE, SPECIFIC, CALENDAR }
 
@@ -66,12 +63,12 @@ fun ScheduleEditorSheet(
     onSave: (Schedule) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    
+
     var name by remember { mutableStateOf(initialSchedule?.name ?: "") }
     var mode by remember { mutableStateOf(initialSchedule?.mode ?: "downtime") }
     var timezone by remember { mutableStateOf(initialSchedule?.timezone ?: "UTC") }
     var timezoneExpanded by remember { mutableStateOf(false) }
-    
+
     val rules = remember {
         mutableStateListOf<ScheduleRule>().apply {
             if (initialSchedule != null && initialSchedule.safeRules.isNotEmpty()) {
@@ -89,9 +86,7 @@ fun ScheduleEditorSheet(
         "America/New_York" to "(UTC-05:00) Eastern Time",
         "UTC" to "(UTC+00:00) Coordinated Universal Time",
         "Europe/London" to "(UTC+00:00) London",
-        "Europe/Paris" to "(UTC+01:00) Paris",
-        "Asia/Kolkata" to "(UTC+05:30) India Standard Time",
-        "Asia/Tokyo" to "(UTC+09:00) Tokyo"
+        "Asia/Kolkata" to "(UTC+05:30) India Standard Time"
     )
 
     val conflicts = remember(rules.toList()) {
@@ -103,7 +98,7 @@ fun ScheduleEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner)
     ) {
         Column(
             modifier = Modifier
@@ -112,49 +107,72 @@ fun ScheduleEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Schedule Editor", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Schedule Name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                FilterChip(
-                    selected = mode == "downtime",
-                    onClick = { mode = "downtime" },
-                    label = { Text("Downtime (Block rules)") }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = if (initialSchedule == null) "New Schedule" else initialSchedule.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
-                FilterChip(
-                    selected = mode == "whitelist",
-                    onClick = { mode = "whitelist" },
-                    label = { Text("Whitelist (Allow rules)") }
-                )
+                TextButton(
+                    onClick = {
+                        onSave(Schedule(
+                            id = initialSchedule?.id ?: "sched_${System.currentTimeMillis()}",
+                            name = name,
+                            mode = mode,
+                            timezone = timezone,
+                            rules = rules.toList()
+                        ))
+                    },
+                    enabled = name.isNotBlank() && conflicts.isEmpty()
+                ) {
+                    Text(
+                        text = "Save",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (name.isNotBlank() && conflicts.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
+
+            HigField(
+                value = name,
+                onValueChange = { name = it },
+                label = "Schedule Name",
+                placeholder = "e.g. Bedtime Downtime"
+            )
+
+            Text("MODE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SegmentedControl(
+                selected = if (mode == "downtime") "Block" else "Allow",
+                onSelected = { selectedLabel ->
+                    mode = if (selectedLabel.equals("Block", ignoreCase = true)) "downtime" else "whitelist"
+                },
+                options = listOf("Block", "Allow")
+            )
 
             ExposedDropdownMenuBox(
                 expanded = timezoneExpanded,
                 onExpandedChange = { timezoneExpanded = !timezoneExpanded }
             ) {
-                OutlinedTextField(
+                HigField(
                     value = timezones.firstOrNull { it.first == timezone }?.second ?: timezone,
                     onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Timezone") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = timezoneExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                    label = "Time Zone",
+                    enabled = false,
+                    onClick = { timezoneExpanded = true },
+                    modifier = Modifier.menuAnchor()
                 )
                 ExposedDropdownMenu(
                     expanded = timezoneExpanded,
-                    onDismissRequest = { timezoneExpanded = false }
+                    onDismissRequest = { timezoneExpanded = false },
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     timezones.forEach { (tzId, tzLabel) ->
                         TextButton(
@@ -164,7 +182,7 @@ fun ScheduleEditorSheet(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(tzLabel)
+                            Text(tzLabel, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
@@ -175,69 +193,74 @@ fun ScheduleEditorSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Rules (${rules.size})", style = MaterialTheme.typography.titleMedium)
-                TextButton(onClick = { 
-                    rules.add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block")) 
-                }) {
-                    Text("+ Add Rule")
+                Text("RULES (${rules.size})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(
+                    onClick = {
+                        rules.add(ScheduleRule(listOf("mon", "tue", "wed", "thu", "fri"), "22:00", "06:00", "block"))
+                    }
+                ) {
+                    Text("+ Add Rule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                 }
             }
 
             if (conflicts.isNotEmpty()) {
-                Text("⚠️ Conflicts detected in rules!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text("⚠️ Conflicts detected in schedule rules!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            
+
             rules.forEachIndexed { index, rule ->
                 val safeDays = rule.safeDays
                 var dayMode by remember {
                     mutableStateOf(
-                        if (!rule.startDate.isNullOrBlank() && !rule.endDate.isNullOrBlank()) {
-                            RuleDayMode.CALENDAR
-                        } else if (safeDays.size > 2) {
-                            RuleDayMode.RANGE
-                        } else {
-                            RuleDayMode.SPECIFIC
-                        }
+                        if (!rule.startDate.isNullOrBlank() && !rule.endDate.isNullOrBlank()) RuleDayMode.CALENDAR
+                        else if (safeDays.size > 2) RuleDayMode.RANGE
+                        else RuleDayMode.SPECIFIC
                     )
                 }
 
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                GroupedListCard {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Rule ${index + 1}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            IconButton(onClick = { rules.removeAt(index) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Remove Rule")
+                            Text("RULE ${index + 1}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (rules.size > 1) {
+                                IconButton(onClick = { rules.removeAt(index) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Remove Rule", tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
-                        
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            FilterChip(
-                                selected = dayMode == RuleDayMode.RANGE,
-                                onClick = { dayMode = RuleDayMode.RANGE },
-                                label = { Text("Day Range") }
+                            val options = listOf(
+                                RuleDayMode.RANGE to "Day Range",
+                                RuleDayMode.SPECIFIC to "Specific Days",
+                                RuleDayMode.CALENDAR to "Dates"
                             )
-                            FilterChip(
-                                selected = dayMode == RuleDayMode.SPECIFIC,
-                                onClick = { dayMode = RuleDayMode.SPECIFIC },
-                                label = { Text("Specific Days") }
-                            )
-                            FilterChip(
-                                selected = dayMode == RuleDayMode.CALENDAR,
-                                onClick = { dayMode = RuleDayMode.CALENDAR },
-                                label = { Text("Calendar Dates") }
-                            )
+                            options.forEach { (modeOpt, label) ->
+                                val selected = dayMode == modeOpt
+                                TextButton(
+                                    onClick = { dayMode = modeOpt },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
-                        
+
                         Spacer(modifier = Modifier.size(8.dp))
-                        
+
                         when (dayMode) {
                             RuleDayMode.RANGE -> {
                                 var fromDay by remember { mutableStateOf(safeDays.firstOrNull() ?: "mon") }
@@ -248,45 +271,52 @@ fun ScheduleEditorSheet(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("From:", style = MaterialTheme.typography.labelMedium)
-                                    FilterChip(
-                                        selected = true,
+                                    Text("From:", style = MaterialTheme.typography.bodyMedium)
+                                    TextButton(
                                         onClick = {
                                             val days = ScheduleProjection.daysOrder
                                             val nextIdx = (days.indexOf(fromDay) + 1) % days.size
                                             fromDay = days[nextIdx]
                                             rules[index] = rule.copy(days = ScheduleProjection.expandDayRange(fromDay, toDay))
-                                        },
-                                        label = { Text(fromDay.uppercase()) }
-                                    )
-                                    Text("To:", style = MaterialTheme.typography.labelMedium)
-                                    FilterChip(
-                                        selected = true,
+                                        }
+                                    ) {
+                                        Text(fromDay.uppercase(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                    Text("To:", style = MaterialTheme.typography.bodyMedium)
+                                    TextButton(
                                         onClick = {
                                             val days = ScheduleProjection.daysOrder
                                             val nextIdx = (days.indexOf(toDay) + 1) % days.size
                                             toDay = days[nextIdx]
                                             rules[index] = rule.copy(days = ScheduleProjection.expandDayRange(fromDay, toDay))
-                                        },
-                                        label = { Text(toDay.uppercase()) }
-                                    )
+                                        }
+                                    ) {
+                                        Text(toDay.uppercase(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                             RuleDayMode.SPECIFIC -> {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun").forEach { day ->
-                                        FilterChip(
-                                            selected = day in safeDays,
+                                        val isChecked = day in safeDays
+                                        TextButton(
                                             onClick = {
                                                 val newDays = safeDays.toMutableList()
                                                 if (newDays.contains(day)) newDays.remove(day) else newDays.add(day)
                                                 rules[index] = rule.copy(days = newDays, startDate = null, endDate = null)
                                             },
-                                            label = { Text(day.take(3).uppercase()) }
-                                        )
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Text(
+                                                text = day.take(1).uppercase(),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -295,58 +325,38 @@ fun ScheduleEditorSheet(
                                 var endDate by remember { mutableStateOf(rule.endDate ?: "") }
 
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
+                                    HigField(
                                         value = startDate,
-                                        onValueChange = { 
+                                        onValueChange = {
                                             startDate = it
                                             rules[index] = rule.copy(startDate = startDate, endDate = endDate)
                                         },
-                                        label = { Text("Start Date (YYYY-MM-DD)") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
+                                        label = "Start Date (YYYY-MM-DD)"
                                     )
-                                    OutlinedTextField(
+                                    HigField(
                                         value = endDate,
-                                        onValueChange = { 
+                                        onValueChange = {
                                             endDate = it
                                             rules[index] = rule.copy(startDate = startDate, endDate = endDate)
                                         },
-                                        label = { Text("End Date (YYYY-MM-DD)") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
+                                        label = "End Date (YYYY-MM-DD)"
                                     )
                                 }
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.size(12.dp))
-                        
+
                         var showStartPicker by remember { mutableStateOf(false) }
                         var showEndPicker by remember { mutableStateOf(false) }
                         var isAllDay by remember { mutableStateOf(rule.startTime == "00:00" && rule.endTime == "23:59") }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChip(
-                                selected = rule.action == "block",
-                                onClick = { rules[index] = rule.copy(action = "block") },
-                                label = { Text("Block") }
-                            )
-                            FilterChip(
-                                selected = rule.action == "allow",
-                                onClick = { rules[index] = rule.copy(action = "allow") },
-                                label = { Text("Allow") }
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("All Day")
+                            Text("All Day (00:00 - 23:59)", style = MaterialTheme.typography.bodyLarge)
                             Checkbox(
                                 checked = isAllDay,
                                 onCheckedChange = {
@@ -364,30 +374,25 @@ fun ScheduleEditorSheet(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Card(
-                                    modifier = Modifier.weight(1f).clickable { showStartPicker = true },
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text("Start", style = MaterialTheme.typography.labelSmall)
-                                        Text(rule.startTime, style = MaterialTheme.typography.titleMedium)
-                                    }
-                                }
+                                GroupedListRow(
+                                    primaryText = rule.startTime,
+                                    secondaryText = "Start Time",
+                                    onClick = { showStartPicker = true },
+                                    modifier = Modifier.weight(1f)
+                                )
                                 Text("to", style = MaterialTheme.typography.bodyMedium)
-                                Card(
-                                    modifier = Modifier.weight(1f).clickable { showEndPicker = true },
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text("End", style = MaterialTheme.typography.labelSmall)
-                                        Text(rule.endTime, style = MaterialTheme.typography.titleMedium)
-                                    }
-                                }
+                                GroupedListRow(
+                                    primaryText = rule.endTime,
+                                    secondaryText = "End Time",
+                                    onClick = { showEndPicker = true },
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
 
                             val startMin = rule.startTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
                             val endMin = rule.endTime.split(":").getOrNull(0)?.toIntOrNull()?.times(60) ?: 0
                             if (endMin <= startMin) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text("🌙 Continues past midnight", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                             }
                         }
@@ -434,22 +439,6 @@ fun ScheduleEditorSheet(
                     }
                 }
             }
-
-            Button(
-                onClick = {
-                    onSave(Schedule(
-                        id = initialSchedule?.id ?: "sched_${System.currentTimeMillis()}",
-                        name = name,
-                        mode = mode,
-                        timezone = timezone,
-                        rules = rules.toList()
-                    ))
-                },
-                enabled = name.isNotBlank() && conflicts.isEmpty(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save Schedule")
-            }
         }
     }
 }
@@ -473,7 +462,7 @@ fun TimePickerDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
-                    TextButton(onClick = onConfirm) { Text("OK") }
+                    TextButton(onClick = onConfirm) { Text("OK", fontWeight = FontWeight.Bold) }
                 }
             }
         }

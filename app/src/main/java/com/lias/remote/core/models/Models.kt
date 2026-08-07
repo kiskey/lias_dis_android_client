@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.6.0
-// Audit Fixes:
-//   1. Added startDate and endDate to ScheduleRule for holiday/calendar scheduling.
-//   2. Added FlowLog, NetworkStats, and User models for complete LIAS feature parity.
+// Version: 2.0.0
+// Purpose: Canonical data models for LIAS Remote Client.
+// Audit Fix: Removed invalid '#' comments causing top-level syntax errors.
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -40,7 +39,36 @@ data class Device(
     val safeIps: List<String> get() = ips ?: emptyList()
     val safeServices: List<String> get() = services ?: emptyList()
     val safeTags: List<String> get() = tags ?: emptyList()
+
+    val displayName: String
+        get() {
+            if (friendlyName.isNotBlank()) return friendlyName
+            if (hostname.isNotBlank()) return hostname
+            if (canonicalHostname.isNotBlank()) return canonicalHostname
+            val vm = (vendor + " " + model).trim()
+            if (vm.isNotBlank()) return vm
+            if (manufacturer.isNotBlank()) return manufacturer
+            if (currentMAC.isNotBlank()) return currentMAC
+            if (pdid.isNotBlank()) return pdid
+            return "Unknown Device"
+        }
 }
+
+@Serializable
+data class ExtensionInfo(
+    @SerialName("expires_at") val expiresAt: String = "",
+    @SerialName("minutes_left") val minutesLeft: Int = 0,
+    @SerialName("reason_tag") val reasonTag: String = ""
+)
+
+@Serializable
+data class EffectiveStatus(
+    val action: String = "allow",
+    val source: String = "global",
+    @SerialName("extend_available") val extendAvailable: Boolean = false,
+    @SerialName("pause_available") val pauseAvailable: Boolean = false,
+    @SerialName("active_extension") val activeExtension: ExtensionInfo? = null
+)
 
 @Serializable
 data class Tag(
@@ -63,7 +91,9 @@ data class Policy(
     val priority: Int = 50,
     val enabled: Boolean = true,
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("updated_at") val updatedAt: String = ""
+    @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("reason_tag") val reasonTag: String? = null
 ) {
     val safeScheduleIDs: List<String> get() = scheduleIDs ?: emptyList()
 

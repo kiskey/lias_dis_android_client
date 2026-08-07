@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 2.0.0
-// Audit Fixes:
-//   1. Incremental loading: updates state and unlocks UI immediately when devices arrive,
-//      loading secondary metadata in parallel.
-//   2. Handles real-time SSE event consumption and StateFlow emissions for full parity.
+// Version: 2.4.0
+// Purpose: Real-time SSE event collector and state repository.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -12,12 +9,14 @@ package com.lias.remote.repositories
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.core.network.DeviceListResponse
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.EventConstants
@@ -39,6 +38,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
+import java.util.concurrent.ConcurrentHashMap
 
 class EventRepository(
     internal val api: LiasApiClient,
@@ -48,11 +48,15 @@ class EventRepository(
     internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    internal val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 10)
+    internal val _uiEvents = MutableSharedFlow<UiEvent>(replay = 0, extraBufferCapacity = 64)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile
+    private var lastSseConnectedTime: Long = 0L
+    private val recentToastMap = ConcurrentHashMap<String, Long>()
 
     init {
         scope.launch {
@@ -84,6 +88,9 @@ class EventRepository(
         scope.launch {
             sse.connectionState.collect { connState ->
                 _state.value = _state.value.copy(connectionState = connState)
+                if (connState == ConnectionState.CONNECTED) {
+                    lastSseConnectedTime = System.currentTimeMillis()
+                }
             }
         }
     }
@@ -91,16 +98,14 @@ class EventRepository(
     internal suspend fun refreshAll() {
         if (api.baseUrl.isBlank()) return
         coroutineScope {
-            // Priority 1: Fetch devices and render UI immediately
             val devsResult = api.get<DeviceListResponse>(Endpoints.DEVICES)
-            if (devsResult is ApiResult.Success) {
-                _state.value = _state.value.copy(
-                    devices = devsResult.data.devices,
-                    isInitialLoaded = true
-                )
-            }
+            val currentDevs = if (devsResult is ApiResult.Success) devsResult.data.devices else _state.value.devices
 
-            // Priority 2: Concurrently fetch metadata
+            _state.value = _state.value.copy(
+                devices = currentDevs,
+                isInitialLoaded = true
+            )
+
             val tagsDeferred = async { api.get<List<Tag>>(Endpoints.TAGS) }
             val polsDeferred = async { api.get<List<Policy>>(Endpoints.POLICIES) }
             val schedsDeferred = async { api.get<List<Schedule>>(Endpoints.SCHEDULES) }
@@ -111,34 +116,77 @@ class EventRepository(
             val schedulesResult = schedsDeferred.await()
             val statsResult = statsDeferred.await()
 
+            val loadedTags = (tagsResult as? ApiResult.Success)?.data ?: _state.value.tags
+
             _state.value = _state.value.copy(
-                tags = (tagsResult as? ApiResult.Success)?.data ?: _state.value.tags,
+                tags = loadedTags,
                 policies = (policiesResult as? ApiResult.Success)?.data ?: _state.value.policies,
                 schedules = (schedulesResult as? ApiResult.Success)?.data ?: _state.value.schedules,
                 stats = (statsResult as? ApiResult.Success)?.data ?: _state.value.stats,
                 isInitialLoaded = true
             )
+
+            launch {
+                val devStatusMap = mutableMapOf<String, EffectiveStatus>()
+                currentDevs.forEach { d ->
+                    val statusRes = api.getDeviceEffectiveStatus(d.pdid)
+                    if (statusRes is ApiResult.Success) {
+                        devStatusMap[d.pdid] = statusRes.data
+                    }
+                }
+                val tagStatusMap = mutableMapOf<String, EffectiveStatus>()
+                loadedTags.forEach { t ->
+                    val statusRes = api.getTagEffectiveStatus(t.id)
+                    if (statusRes is ApiResult.Success) {
+                        tagStatusMap[t.id] = statusRes.data
+                    }
+                }
+                _state.value = _state.value.copy(
+                    deviceEffectiveStatuses = devStatusMap,
+                    tagEffectiveStatuses = tagStatusMap
+                )
+            }
         }
     }
 
     private suspend fun collectSseEvents() {
         sse.events.collect { event ->
+            val now = System.currentTimeMillis()
+            val isReplayPhase = (now - lastSseConnectedTime) < 2500L
+            val toastKey = "${event.type}:${event.deviceID}"
+            val lastToastTime = recentToastMap[toastKey] ?: 0L
+            val isDuplicateToast = (now - lastToastTime) < 3000L
+
+            val shouldShowToast = !isReplayPhase && !isDuplicateToast
+
             when (event.type) {
                 EventConstants.DEVICE_ADDED -> {
                     refreshSingleDevice(event.deviceID)
-                    _uiEvents.emit(UiEvent.ShowSnackbar("✨ New Device Discovered: ${event.deviceID.takeLast(8)}"))
+                    if (shouldShowToast) {
+                        recentToastMap[toastKey] = now
+                        _uiEvents.emit(UiEvent.ShowSnackbar("✨ New Device Discovered: ${event.deviceID.takeLast(8)}"))
+                    }
                 }
                 EventConstants.DEVICE_ONLINE -> {
                     refreshSingleDevice(event.deviceID)
-                    val confirmedBy = event.payload?.let {
-                        try { json.decodeFromJsonElement<DeviceEventPayload>(it).safeConfirmedBy } catch (e: Exception) { emptyList() }
-                    } ?: emptyList()
-                    val verifiedText = if (confirmedBy.isNotEmpty()) " ✓ ${confirmedBy.size} sources" else ""
-                    _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}$verifiedText"))
+                    if (shouldShowToast) {
+                        recentToastMap[toastKey] = now
+                        val confirmedBy = event.payload?.let {
+                            try { json.decodeFromJsonElement<DeviceEventPayload>(it).safeConfirmedBy } catch (e: Exception) { emptyList() }
+                        } ?: emptyList()
+                        val verifiedText = if (confirmedBy.isNotEmpty()) " ✓ ${confirmedBy.size} sources" else ""
+                        _uiEvents.emit(UiEvent.ShowSnackbar("🟢 Device Online: ${event.deviceID.takeLast(8)}$verifiedText"))
+                    }
                 }
                 EventConstants.DEVICE_OFFLINE -> {
                     refreshSingleDevice(event.deviceID)
-                    _uiEvents.emit(UiEvent.ShowSnackbar("🔴 Device Offline: ${event.deviceID.takeLast(8)}"))
+                    if (shouldShowToast) {
+                        recentToastMap[toastKey] = now
+                        _uiEvents.emit(UiEvent.ShowSnackbar("🔴 Device Offline: ${event.deviceID.takeLast(8)}"))
+                    }
+                }
+                EventConstants.EFFECTIVE_STATUS_CHANGED -> {
+                    refreshAll()
                 }
                 EventConstants.HOSTNAME_CHANGED,
                 EventConstants.FINGERPRINT_UPDATED,
@@ -160,7 +208,10 @@ class EventRepository(
                             devices = _state.value.devices.filterNot { it.pdid == payload.oldPdid }
                         )
                         refreshSingleDevice(payload.newPdid)
-                        _uiEvents.emit(UiEvent.ShowSnackbar("🔄 Device identified: ${payload.newPdid.takeLast(8)} (promoted from ${payload.reason})"))
+                        if (shouldShowToast) {
+                            recentToastMap[toastKey] = now
+                            _uiEvents.emit(UiEvent.ShowSnackbar("🔄 Device identified: ${payload.newPdid.takeLast(8)} (promoted from ${payload.reason})"))
+                        }
                     }
                 }
                 EventConstants.SECURITY_ALERT -> {

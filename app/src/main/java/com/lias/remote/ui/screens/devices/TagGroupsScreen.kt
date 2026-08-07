@@ -1,9 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 2.0.0
-// Audit Fixes:
-//   1. Supports devices belonging to multiple tags by displaying devices in all assigned groups.
-//   2. Smooth HIG scrollability and full action row handling.
+// Version: 2.2.0
+// Purpose: Expandable Tag Group view with inline device cards and tag actions.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -34,8 +32,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -44,8 +42,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,32 +58,35 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.DeviceCard
+import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigSearchPill
+import com.lias.remote.ui.theme.HigSpec
 
 @Composable
-fun TagGroupsScreen(viewModel: LiasViewModel) {
+fun TagGroupsScreen(
+    viewModel: LiasViewModel,
+    onNavigateToDeviceDetail: (String) -> Unit = {}
+) {
     val state by viewModel.state.collectAsState()
-    
+
     var showEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
-    
-    var searchQuery by remember { mutableStateOf("") }
 
-    var selectedDeviceForDetails by remember { mutableStateOf<Device?>(null) }
-    var deviceToPause by remember { mutableStateOf<Device?>(null) }
-    var deviceToUnpause by remember { mutableStateOf<Device?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
 
-    // Multi-tag grouping: devices appear under every tag group they belong to
     val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) {
             state.devices
         } else {
             state.devices.filter { d ->
-                d.hostname.contains(searchQuery, ignoreCase = true) ||
+                d.displayName.contains(searchQuery, ignoreCase = true) ||
                 d.currentMAC.contains(searchQuery, ignoreCase = true) ||
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
@@ -105,36 +104,33 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
         map
     }
 
-    Scaffold(
+    HigLargeTitleScaffold(
+        title = "Tag Groups",
+        searchField = {
+            HigSearchPill(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = "Search devices..."
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
                     editingTag = null
                     showEditor = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(HigSpec.FabSize)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Tag Group")
+                Icon(Icons.Filled.Add, contentDescription = "Add Tag Group", tint = Color.White)
             }
         }
-    ) { padding ->
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search devices...") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true
-            )
-            
-            Spacer(modifier = Modifier.size(16.dp))
-
             if (state.tags.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -156,10 +152,10 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                         allTags = state.tags,
                         policies = state.policies,
                         onTagsSelected = { pdid, tagIds -> viewModel.assignTags(pdid, tagIds) },
-                        onPauseClick = { deviceToPause = it },
-                        onUnpauseClick = { deviceToUnpause = it },
+                        onPauseClick = { viewModel.pauseInternet(it.pdid) },
+                        onUnpauseClick = { viewModel.unpauseInternet(it.pdid) },
                         onRenameClick = { deviceToRename = it },
-                        onDetailsClick = { selectedDeviceForDetails = it },
+                        onDetailsClick = { onNavigateToDeviceDetail(it.pdid) },
                         onEditClick = {
                             editingTag = tag
                             showEditor = true
@@ -185,52 +181,8 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
         )
     }
 
-    selectedDeviceForDetails?.let { device ->
-        DeviceDetailsSheet(
-            device = device,
-            viewModel = viewModel,
-            onDismiss = { selectedDeviceForDetails = null }
-        )
-    }
-
-    deviceToPause?.let { device ->
-        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
-        AlertDialog(
-            onDismissRequest = { deviceToPause = null },
-            title = { Text("Pause Internet") },
-            text = { Text("Are you sure you want to pause internet access for $name for 1 hour?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.pauseInternet(device.pdid)
-                    deviceToPause = null
-                }) { Text("Pause") }
-            },
-            dismissButton = {
-                TextButton(onClick = { deviceToPause = null }) { Text("Cancel") }
-            }
-        )
-    }
-
-    deviceToUnpause?.let { device ->
-        val name = device.friendlyName.ifBlank { device.hostname.ifBlank { device.pdid } }
-        AlertDialog(
-            onDismissRequest = { deviceToUnpause = null },
-            title = { Text("Resume Internet") },
-            text = { Text("Are you sure you want to resume internet access for $name?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.unpauseInternet(device.pdid)
-                    deviceToUnpause = null
-                }) { Text("Unpause") }
-            },
-            dismissButton = {
-                TextButton(onClick = { deviceToUnpause = null }) { Text("Cancel") }
-            }
-        )
-    }
-
     deviceToRename?.let { device ->
-        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        var newName by remember { mutableStateOf(device.displayName) }
         AlertDialog(
             onDismissRequest = { deviceToRename = null },
             title = { Text("Rename Device") },
@@ -238,11 +190,10 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                 Column {
                     Text("Enter a new friendly name:")
                     Spacer(modifier = Modifier.size(8.dp))
-                    OutlinedTextField(
+                    HigField(
                         value = newName,
                         onValueChange = { newName = it },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        label = "Friendly Name"
                     )
                 }
             },
@@ -252,7 +203,7 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                         viewModel.renameDevice(device.pdid, newName)
                     }
                     deviceToRename = null
-                }) { Text("Save") }
+                }) { Text("Save", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { deviceToRename = null }) { Text("Cancel") }
@@ -271,8 +222,8 @@ fun TagGroupsScreen(viewModel: LiasViewModel) {
                         viewModel.deleteTag(tag.id)
                         tagToDelete = null
                     },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { tagToDelete = null }) { Text("Cancel") }
@@ -286,7 +237,7 @@ private fun ExpandableTagGroup(
     tag: Tag,
     devices: List<Device>,
     allTags: List<Tag>,
-    policies: List<com.lias.remote.core.models.Policy>,
+    policies: List<Policy>,
     onTagsSelected: (String, List<String>) -> Unit,
     onPauseClick: (Device) -> Unit,
     onUnpauseClick: (Device) -> Unit,
@@ -331,25 +282,25 @@ private fun ExpandableTagGroup(
                         .background(tagColor)
                 )
                 Spacer(modifier = Modifier.size(12.dp))
-                
+
                 Text(
                     text = tag.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                
+
                 if (tag.id == "infrastructure") {
                     Icon(Icons.Filled.Lock, contentDescription = "Immune", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.size(8.dp))
                 }
-                
+
                 Text(
                     text = "(${devices.size})",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 Spacer(modifier = Modifier.size(8.dp))
 
                 Icon(
@@ -376,7 +327,8 @@ private fun ExpandableTagGroup(
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
+                        onDismissRequest = { menuExpanded = false },
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         DropdownMenuItem(
                             text = { Text("Edit Tag") },
@@ -399,7 +351,7 @@ private fun ExpandableTagGroup(
                     }
                 }
             }
-            
+
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),

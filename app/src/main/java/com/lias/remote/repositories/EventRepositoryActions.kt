@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 1.8.0
-// Audit Fixes: 
-//   1. Added copyPolicy and copySchedule helper actions for full feature parity
-//      with LIAS Web Dashboard policy/schedule duplication features.
+// Version: 2.1.0
+// Audit Fixes:
+//   1. Added toast ACK emission and refreshAll() synchronization to
+//      toggleVacationMode and flushNftables.
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Conflict
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
@@ -24,6 +25,46 @@ import com.lias.remote.core.network.RenameDeviceRequest
 import com.lias.remote.core.network.UserDeviceRequest
 import com.lias.remote.core.network.VacationRequest
 import com.lias.remote.core.network.VacationResponse
+
+suspend fun EventRepository.extendDeviceAccess(pdid: String, minutes: Int): ApiResult<Unit> {
+    val result = api.extendDeviceAccess(pdid, minutes)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.cancelDeviceExtension(pdid: String): ApiResult<Unit> {
+    val result = api.cancelDeviceExtension(pdid)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.extendTagAccess(tagId: String, minutes: Int): ApiResult<Unit> {
+    val result = api.extendTagAccess(tagId, minutes)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.cancelTagExtension(tagId: String): ApiResult<Unit> {
+    val result = api.cancelTagExtension(tagId)
+    if (result is ApiResult.Success) {
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.getDeviceEffectiveStatus(pdid: String): ApiResult<EffectiveStatus> {
+    return api.getDeviceEffectiveStatus(pdid)
+}
+
+suspend fun EventRepository.getTagEffectiveStatus(tagId: String): ApiResult<EffectiveStatus> {
+    return api.getTagEffectiveStatus(tagId)
+}
 
 suspend fun EventRepository.assignDeviceTags(pdid: String, tagIds: List<String>): ApiResult<Unit> {
     val previousTags = _state.value.devices.find { it.pdid == pdid }?.tags
@@ -94,6 +135,17 @@ suspend fun EventRepository.getDeviceLogs(pdid: String): ApiResult<List<FlowLog>
 suspend fun EventRepository.toggleVacationMode(enabled: Boolean): ApiResult<VacationResponse> {
     val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
     if (result is ApiResult.Success) {
+        val statusText = if (result.data.vacationMode) "Enabled" else "Disabled"
+        _uiEvents.emit(UiEvent.ShowSnackbar("✈️ Vacation Mode $statusText"))
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.flushNftables(): ApiResult<Unit> {
+    val result = api.post<Unit, Unit>(Endpoints.NFTABLES_FLUSH, Unit)
+    if (result is ApiResult.Success) {
+        _uiEvents.emit(UiEvent.ShowSnackbar("🛡️ Nftables table flushed successfully"))
         refreshAll()
     }
     return result
