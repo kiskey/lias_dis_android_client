@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 3.2.0
-// Purpose: Native iOS Settings Screen with CupertinoSwitch & Appearance controls.
+// Version: 3.3.0
+// Purpose: Native iOS Settings Screen with full-width SegmentedControl theme selector.
 // Audit Fixes:
-//   1. Added Appearance section with SegmentedControl for System/Light/Dark mode.
+//   1. Formatted Theme Mode selector to use 48dp full-width SegmentedControl pills.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -97,17 +98,18 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Auto switches between Light and Dark based on time of day (6 PM - 6 AM)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             SegmentedControl(
                                 selected = uiState.themeMode,
                                 onSelected = { mode -> viewModel.updateThemeMode(mode) },
-                                options = listOf("System", "Light", "Dark")
+                                options = listOf("System", "Light", "Dark"),
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
