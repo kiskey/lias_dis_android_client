@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 2.2.0
-// Purpose: Expandable Tag Group view with inline device cards and tag actions.
+// Version: 3.0.0
+// Purpose: Expandable Tag Group view formatted with native iOS HIG inset surfaces.
+// Audit Fixes:
+//   1. Replaced Material 3 Card and AlertDialog with iOS Surface and HigAlertDialog.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -32,16 +34,14 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +62,7 @@ import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.DeviceCard
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSearchPill
@@ -183,7 +184,7 @@ fun TagGroupsScreen(
 
     deviceToRename?.let { device ->
         var newName by remember { mutableStateOf(device.displayName) }
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { deviceToRename = null },
             title = { Text("Rename Device") },
             text = {
@@ -212,7 +213,7 @@ fun TagGroupsScreen(
     }
 
     tagToDelete?.let { tag ->
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { tagToDelete = null },
             title = { Text("Delete Tag") },
             text = { Text("Are you sure you want to delete the tag '${tag.name}'? Devices will revert to 'Generic'.") },
@@ -262,10 +263,10 @@ private fun ExpandableTagGroup(
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column {
             Row(
