@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt
-// Version: 2.2.0
-// Audit Fixes:
-//   1. Integrated trailing clock action button on blocked Tag Rules rows (§4.4).
-//   2. Surfaced `"Allowed · {X}m left"` status pill during active tag extensions (§4.4).
-//   3. Attached MinutePickerSheet for tag extensions.
+// Version: 2.3.0
+// Purpose: Policy Rules screen with categorized Global/Tag/Device policy cards.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -79,7 +76,6 @@ fun RulesScreen(viewModel: LiasViewModel) {
     var policyToDelete by remember { mutableStateOf<Policy?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
 
-    // Extend Tag Access Sheet
     var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -150,7 +146,6 @@ fun RulesScreen(viewModel: LiasViewModel) {
                 }
             } else {
                 GroupedList {
-                    // Section 1: Global Policies
                     val globalPolicies = state.policies.filter { it.type == "global" }
                     if (globalPolicies.isNotEmpty()) {
                         item { ListSectionHeader("Global Rules") }
@@ -174,7 +169,6 @@ fun RulesScreen(viewModel: LiasViewModel) {
                         }
                     }
 
-                    // Section 2: Tag Rules
                     val tagPolicies = state.policies.filter { it.type == "tag" }
                     if (tagPolicies.isNotEmpty()) {
                         item { ListSectionHeader("Tag Rules") }
@@ -198,7 +192,6 @@ fun RulesScreen(viewModel: LiasViewModel) {
                         }
                     }
 
-                    // Section 3: Device Rules
                     val devicePolicies = state.policies.filter { it.type == "device" }
                     if (devicePolicies.isNotEmpty()) {
                         item { ListSectionHeader("Device Rules") }
