@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 3.3.0
+// Version: 3.4.0
 // Purpose: iOS segmented control wrapper using CupertinoSegmentedControl.
 // Audit Fixes:
-//   1. Increased height to 48dp and scaled font size to 16sp for Pixel 6a thumb accessibility.
+//   1. Added adaptive font scaling (14sp-16sp) based on option label lengths to ensure 3-pill controls do not crowd.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -15,9 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.lias.remote.ui.theme.HigSpec
-import io.github.robinpcrd.cupertino.CupertinoSegmentedControl
-import io.github.robinpcrd.cupertino.CupertinoSegmentedControlTab
 
 @Composable
 fun SegmentedControl(
@@ -27,6 +26,13 @@ fun SegmentedControl(
     options: List<String> = listOf("Allow", "Schedule", "Block")
 ) {
     val selectedIndex = options.indexOfFirst { it.equals(selected, ignoreCase = true) }.coerceAtLeast(0)
+
+    val maxOptionLength = options.maxOfOrNull { it.length } ?: 0
+    val textStyle = when {
+        options.size >= 3 && maxOptionLength > 10 -> MaterialTheme.typography.labelLarge // 14sp w600
+        options.size >= 3 -> MaterialTheme.typography.bodyLarge // 15sp w600
+        else -> MaterialTheme.typography.titleLarge // 16sp w700
+    }
 
     CupertinoSegmentedControl(
         selectedTabIndex = selectedIndex,
@@ -48,8 +54,10 @@ fun SegmentedControl(
                         isSelected -> MaterialTheme.colorScheme.onSurface
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    style = MaterialTheme.typography.titleLarge, // 16sp w700
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                    style = textStyle,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
