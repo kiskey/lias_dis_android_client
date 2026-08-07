@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
-// Version: 2.2.0
+// Version: 3.0.0
+// Purpose: Native iOS Connection Settings Screen with CupertinoActivityIndicator.
 // Audit Fixes:
-//   1. Replaced progress indicator with CupertinoActivityIndicator.
-//   2. Maintained HigField inputs and HigButton test triggers.
+//   1. Maintained CupertinoActivityIndicator loading state and HigField inputs.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
