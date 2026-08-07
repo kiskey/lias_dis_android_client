@@ -1,8 +1,12 @@
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Used `device.displayName` to show full friendly/hostname/vendor display name (AUD-01).
+//   1. Overhauled computeActiveEnforcements to evaluate allow, block, and schedule
+//      actions for both device-level and tag-level policies.
+//   2. Added expiresAt time-left checks to automatically display temporary device
+//      extensions and pauses in Active Enforcements until they expire.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -22,9 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,7 @@ import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ConnectionStatusBanner
@@ -122,7 +125,7 @@ fun HomeScreen(
                         )
                     }
 
-                    // Contextual Active Enforcements Section (shown only when enforcements active)
+                    // Contextual Active Enforcements Section (shown when enforcements active)
                     if (activeEnforcements.isNotEmpty()) {
                         item {
                             Column {
@@ -299,39 +302,75 @@ private fun computeActiveEnforcements(
 ): List<ActiveEnforcementItem> {
     val items = mutableListOf<ActiveEnforcementItem>()
 
+    // 1. Evaluate Global Access Switch
     val globalPol = policies.find { it.id == "global_default" }
-    if (globalPol != null && globalPol.action == "block") {
-        items.add(
-            ActiveEnforcementItem(
-                policyName = "Global Kill-Switch",
-                targetName = "Entire Network",
-                targetColor = Color.Red,
-                scheduleName = "Vacation Mode / Block All",
-                action = "block",
-                isGlobal = true
+    if (globalPol != null && globalPol.enabled) {
+        if (globalPol.action == "block") {
+            items.add(
+                ActiveEnforcementItem(
+                    policyName = "Global Kill-Switch",
+                    targetName = "Entire Network",
+                    targetColor = Color.Red,
+                    scheduleName = "Vacation Mode / Block All",
+                    action = "block",
+                    isGlobal = true
+                )
             )
-        )
-        return items
-    } else if (globalPol != null && globalPol.action == "allow") {
-        items.add(
-            ActiveEnforcementItem(
-                policyName = "Global Allow Override",
-                targetName = "Entire Network",
-                targetColor = Color.Green,
-                scheduleName = "Allow All Active",
-                action = "allow",
-                isGlobal = true
+            return items
+        } else if (globalPol.action == "allow") {
+            items.add(
+                ActiveEnforcementItem(
+                    policyName = "Global Allow Override",
+                    targetName = "Entire Network",
+                    targetColor = Color.Green,
+                    scheduleName = "Allow All Active",
+                    action = "allow",
+                    isGlobal = true
+                )
             )
-        )
-        return items
+            return items
+        }
     }
 
+    // 2. Evaluate Non-Global Policies (Device & Tag level)
     policies.forEach { p ->
-        if (p.action == "schedule" && p.type != "global" && p.enabled) {
-            val targetTag = tags.find { it.id == p.targetID }
-            val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.displayName ?: p.targetID)
-            val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color.Gray
+        if (!p.enabled || p.type == "global" || p.targetID == "infrastructure") return@forEach
 
+        // Exclude expired temporary policies
+        if (p.expiresAt != null) {
+            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
+            if (minsLeft <= 0) return@forEach
+        }
+
+        val targetTag = tags.find { it.id == p.targetID }
+        val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.displayName ?: p.targetID)
+        val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color(0xFF0A84FF)
+
+        if (p.action == "allow") {
+            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
+            val schedLabel = if (p.id.startsWith("pol_extend_")) "Extended Access (${minsLeft}m left)" else "Allow Always"
+            items.add(
+                ActiveEnforcementItem(
+                    policyName = p.name,
+                    targetName = targetName,
+                    targetColor = targetColor,
+                    scheduleName = schedLabel,
+                    action = "allow"
+                )
+            )
+        } else if (p.action == "block") {
+            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
+            val schedLabel = if (p.id.startsWith("pol_pause_")) "Paused Internet (${minsLeft}m left)" else "Block Always"
+            items.add(
+                ActiveEnforcementItem(
+                    policyName = p.name,
+                    targetName = targetName,
+                    targetColor = targetColor,
+                    scheduleName = schedLabel,
+                    action = "block"
+                )
+            )
+        } else if (p.action == "schedule") {
             val schedIDs = p.resolveScheduleIDs()
             val attachedScheds = schedules.filter { it.id in schedIDs }
 
@@ -347,7 +386,7 @@ private fun computeActiveEnforcements(
                             policyName = p.name,
                             targetName = targetName,
                             targetColor = targetColor,
-                            scheduleName = s.name,
+                            scheduleName = "${s.name} (${activeAction.uppercase()})",
                             action = activeAction,
                             timezone = s.timezone,
                             isDST = isDST
