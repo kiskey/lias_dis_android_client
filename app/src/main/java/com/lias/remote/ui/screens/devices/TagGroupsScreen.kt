@@ -1,9 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. Migrated to HigLargeTitleScaffold and HigSearchPill.
-//   2. Integrated HigField for rename dialogs and HigSpec constants for FAB size.
+// Version: 2.2.0
+// Purpose: Expandable Tag Group view with inline device cards and tag actions.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -35,6 +33,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -59,6 +58,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
+import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.DeviceCard
@@ -86,8 +86,7 @@ fun TagGroupsScreen(
             state.devices
         } else {
             state.devices.filter { d ->
-                d.hostname.contains(searchQuery, ignoreCase = true) ||
-                d.friendlyName.contains(searchQuery, ignoreCase = true) ||
+                d.displayName.contains(searchQuery, ignoreCase = true) ||
                 d.currentMAC.contains(searchQuery, ignoreCase = true) ||
                 d.currentIP.contains(searchQuery, ignoreCase = true)
             }
@@ -183,7 +182,7 @@ fun TagGroupsScreen(
     }
 
     deviceToRename?.let { device ->
-        var newName by remember { mutableStateOf(device.friendlyName.ifBlank { device.hostname }) }
+        var newName by remember { mutableStateOf(device.displayName) }
         AlertDialog(
             onDismissRequest = { deviceToRename = null },
             title = { Text("Rename Device") },
@@ -223,7 +222,7 @@ fun TagGroupsScreen(
                         viewModel.deleteTag(tag.id)
                         tagToDelete = null
                     },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
@@ -238,7 +237,7 @@ private fun ExpandableTagGroup(
     tag: Tag,
     devices: List<Device>,
     allTags: List<Tag>,
-    policies: List<com.lias.remote.core.models.Policy>,
+    policies: List<Policy>,
     onTagsSelected: (String, List<String>) -> Unit,
     onPauseClick: (Device) -> Unit,
     onUnpauseClick: (Device) -> Unit,
