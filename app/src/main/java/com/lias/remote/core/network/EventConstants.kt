@@ -1,7 +1,3 @@
-# ====================================================================
-# File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
-# ====================================================================
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
 // Version: 1.3.0
