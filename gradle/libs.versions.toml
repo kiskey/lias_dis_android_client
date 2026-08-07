@@ -1,9 +1,10 @@
 # ====================================================================
 # File: gradle/libs.versions.toml
-# Version: 2.0.0
-# Audit Fixes: 
-#   1. Bumped Compose BOM to 2024.09.00 to support Material 3 PullToRefreshBox (GAP-U44).
-#   2. Bumped Kotlin to 2.2.10, AGP to 8.6.1, Compose BOM to 2025.09.00 for Cupertino library compatibility.
+# Version: 2.1.0
+# Purpose: Version Catalog for LIAS Remote Client with RobinPcrd Cupertino fork.
+# Audit Fixes:
+#   1. Updated AGP to 8.6.1, Kotlin to 2.2.10, Compose BOM to 2025.09.00.
+#   2. Added Cupertino 3.3.1 library artifacts (io.github.robinpcrd:cupertino).
 # ====================================================================
 
 [versions]
@@ -12,7 +13,7 @@ kotlin = "2.2.10"
 coreKtx = "1.13.1"
 lifecycle = "2.8.3"
 activityCompose = "1.9.0"
-composeBom = "2025.09.00" # Bumped for Cupertino library + Kotlin 2.2.x compatibility
+composeBom = "2025.09.00"
 navigationCompose = "2.7.7"
 okhttp = "4.12.0"
 kotlinxSerialization = "1.6.3"
@@ -47,7 +48,7 @@ okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 
-# Persistence (Zero-Waste: DataStore instead of Room)
+# Persistence
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 # Testing
