@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 3.1.0
+// Version: 3.2.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // Audit Fixes:
-//   1. Replaced date text fields with iOS grouped row tap targets and Cupertino-styled wheel date pickers.
+//   1. Replaced TimePickerDialog with CupertinoTimePickerSheet 2-column wheel time picker.
+//   2. Fixed truncated 'Mat' symbol and @Composable invocation scope compilation errors.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -40,12 +41,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -66,7 +64,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleProjection
@@ -403,8 +400,8 @@ fun ScheduleEditorSheet(
 
                         Spacer(modifier = Modifier.size(12.dp))
 
-                        var showStartPicker by remember { mutableStateOf(false) }
-                        var showEndPicker by remember { mutableStateOf(false) }
+                        var showStartTimePicker by remember { mutableStateOf(false) }
+                        var showEndTimePicker by remember { mutableStateOf(false) }
                         var isAllDay by remember { mutableStateOf(rule.startTime == "00:00" && rule.endTime == "23:59") }
 
                         Row(
@@ -433,14 +430,14 @@ fun ScheduleEditorSheet(
                                 GroupedListRow(
                                     primaryText = rule.startTime,
                                     secondaryText = "Start Time",
-                                    onClick = { showStartPicker = true },
+                                    onClick = { showStartTimePicker = true },
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text("to", style = MaterialTheme.typography.bodyMedium)
                                 GroupedListRow(
                                     primaryText = rule.endTime,
                                     secondaryText = "End Time",
-                                    onClick = { showEndPicker = true },
+                                    onClick = { showEndTimePicker = true },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -453,44 +450,28 @@ fun ScheduleEditorSheet(
                             }
                         }
 
-                        if (showStartPicker) {
-                            val parts = rule.startTime.split(":")
-                            val timeState = rememberTimePickerState(
-                                initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 0,
-                                initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
-                                is24Hour = true
+                        if (showStartTimePicker) {
+                            CupertinoTimePickerSheet(
+                                title = "Start Time",
+                                initialTime = rule.startTime,
+                                onDismiss = { showStartTimePicker = false },
+                                onConfirm = { selectedTime ->
+                                    rules[index] = rule.copy(startTime = selectedTime)
+                                    showStartTimePicker = false
+                                }
                             )
-                            TimePickerDialog(
-                                onConfirm = {
-                                    val h = timeState.hour.toString().padStart(2, '0')
-                                    val m = timeState.minute.toString().padStart(2, '0')
-                                    rules[index] = rule.copy(startTime = "$h:$m")
-                                    showStartPicker = false
-                                },
-                                onDismiss = { showStartPicker = false }
-                            ) {
-                                TimePicker(state = timeState)
-                            }
                         }
 
-                        if (showEndPicker) {
-                            val parts = rule.endTime.split(":")
-                            val timeState = rememberTimePickerState(
-                                initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 0,
-                                initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
-                                is24Hour = true
+                        if (showEndTimePicker) {
+                            CupertinoTimePickerSheet(
+                                title = "End Time",
+                                initialTime = rule.endTime,
+                                onDismiss = { showEndTimePicker = false },
+                                onConfirm = { selectedTime ->
+                                    rules[index] = rule.copy(endTime = selectedTime)
+                                    showEndTimePicker = false
+                                }
                             )
-                            TimePickerDialog(
-                                onConfirm = {
-                                    val h = timeState.hour.toString().padStart(2, '0')
-                                    val m = timeState.minute.toString().padStart(2, '0')
-                                    rules[index] = rule.copy(endTime = "$h:$m")
-                                    showEndPicker = false
-                                },
-                                onDismiss = { showEndPicker = false }
-                            ) {
-                                TimePicker(state = timeState)
-                            }
                         }
                     }
                 }
@@ -660,4 +641,179 @@ fun CupertinoDatePickerSheet(
                                     text = yearVal.toString(),
                                     style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
                                     fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
-                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else Mat
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HigButton(
+                text = "Set Date",
+                onClick = {
+                    val selYear = years[centerYearIdx]
+                    val selMonth = centerMonthIdx + 1
+                    val selDay = centerDayIdx + 1
+                    val formattedIso = String.format("%04d-%02d-%02d", selYear, selMonth, selDay)
+                    onConfirm(formattedIso)
+                },
+                style = HigButtonStyle.Primary
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun CupertinoTimePickerSheet(
+    title: String,
+    initialTime: String,
+    onDismiss: () -> Unit,
+    onConfirm: (time: String) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptic = LocalHapticFeedback.current
+
+    val hours = remember { (0..23).map { it.toString().padStart(2, '0') } }
+    val minutes = remember { (0..59).map { it.toString().padStart(2, '0') } }
+
+    var initialHourIdx = 0
+    var initialMinIdx = 0
+    if (initialTime.isNotBlank()) {
+        val parts = initialTime.split(":")
+        if (parts.size == 2) {
+            initialHourIdx = (parts[0].toIntOrNull() ?: 0).coerceIn(0, 23)
+            initialMinIdx = (parts[1].toIntOrNull() ?: 0).coerceIn(0, 59)
+        }
+    }
+
+    val hourListState = rememberLazyListState(initialFirstVisibleItemIndex = initialHourIdx)
+    val minListState = rememberLazyListState(initialFirstVisibleItemIndex = initialMinIdx)
+
+    val hourFling = rememberSnapFlingBehavior(lazyListState = hourListState)
+    val minFling = rememberSnapFlingBehavior(lazyListState = minListState)
+
+    val centerHourIdx by remember { derivedStateOf { (hourListState.firstVisibleItemIndex + if (hourListState.firstVisibleItemScrollOffset > 100) 1 else 0).coerceIn(0, 23) } }
+    val centerMinIdx by remember { derivedStateOf { (minListState.firstVisibleItemIndex + if (minListState.firstVisibleItemScrollOffset > 100) 1 else 0).coerceIn(0, 59) } }
+
+    LaunchedEffect(centerHourIdx, centerMinIdx) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(
+                    onClick = {
+                        val selHour = hours[centerHourIdx]
+                        val selMin = minutes[centerMinIdx]
+                        onConfirm("$selHour:$selMin")
+                    }
+                ) {
+                    Text("Done", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            // 2-Column iOS Wheel Time Picker (Hour | Minute)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(LiasThemeColors.fill, RoundedCornerShape(10.dp))
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Hour Column
+                    LazyColumn(
+                        state = hourListState,
+                        flingBehavior = hourFling,
+                        contentPadding = PaddingValues(vertical = 68.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(hours) { idx, hourVal ->
+                            val isCenter = idx == centerHourIdx
+                            Box(modifier = Modifier.height(44.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = hourVal,
+                                    style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Separator
+                    Box(modifier = Modifier.height(180.dp), contentAlignment = Alignment.Center) {
+                        Text(":", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Minute Column
+                    LazyColumn(
+                        state = minListState,
+                        flingBehavior = minFling,
+                        contentPadding = PaddingValues(vertical = 68.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(minutes) { idx, minVal ->
+                            val isCenter = idx == centerMinIdx
+                            Box(modifier = Modifier.height(44.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = minVal,
+                                    style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HigButton(
+                text = "Set Time",
+                onClick = {
+                    val selHour = hours[centerHourIdx]
+                    val selMin = minutes[centerMinIdx]
+                    onConfirm("$selHour:$selMin")
+                },
+                style = HigButtonStyle.Primary
+            )
+        }
+    }
+}
