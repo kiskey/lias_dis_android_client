@@ -1,10 +1,11 @@
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 2.3.0
+// Version: 2.4.0
 // Audit Fixes:
-//   1. Added Extend Access action to `•••` overflow menu (§4.2).
-//   2. Added green `"Extended · {X}m left"` countdown pill under hero status line (§4.2).
-//   3. Attached MinutePickerSheet pre-filled with remaining minutes.
+//   1. Provided explicit leading icons for ALL items in 3-dot DropdownMenu to
+//      guarantee HIG alignment parity.
+//   2. Displayed active extension remaining minutes using ExtendHelper.minutesUntil.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -25,12 +26,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -124,6 +126,7 @@ fun DeviceDetailScreen(
                     }
                     DropdownMenuItem(
                         text = { Text(if (isPaused) "Resume Internet" else "Pause Internet (1 hr)") },
+                        leadingIcon = { Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             menuExpanded = false
                             if (isPaused) viewModel.unpauseInternet(device.pdid)
