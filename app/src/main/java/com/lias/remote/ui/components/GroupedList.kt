@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 2.3.0
+// Version: 3.0.0
+// Purpose: Native iOS Inset Grouped List cards and row items.
 // Audit Fixes:
-//   1. Retained trailingAction slot for section-level Extend Access clock triggers.
-//   2. Preserved full API contract and compatibility with LazyColumn sections.
+//   1. Replaced Material 3 ListItem with native iOS row layout.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -13,17 +13,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemColors
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -99,39 +98,44 @@ fun GroupedListRow(
     leadingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     showDivider: Boolean = false,
-    onClick: () -> Unit = {},
-    colors: ListItemColors = ListItemDefaults.colors(
-        containerColor = MaterialTheme.colorScheme.surface,
-        headlineColor = MaterialTheme.colorScheme.onSurface,
-        supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    onClick: () -> Unit = {}
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    text = primaryText,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            supportingContent = secondaryText?.let {
-                {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            leadingContent = leadingContent,
-            trailingContent = trailingContent,
-            colors = colors,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = HigSpec.RowMinHeight)
                 .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp)
-        )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            leadingContent?.let { leading ->
+                leading()
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = primaryText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                secondaryText?.let { secondary ->
+                    Text(
+                        text = secondary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            trailingContent?.let { trailing ->
+                Spacer(modifier = Modifier.width(12.dp))
+                trailing()
+            }
+        }
+
         if (showDivider) {
             HorizontalDivider(
                 thickness = 0.5.dp,
