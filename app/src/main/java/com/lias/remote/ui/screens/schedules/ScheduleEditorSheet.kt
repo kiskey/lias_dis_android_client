@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // ====================================================================
 
