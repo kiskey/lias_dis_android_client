@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt
-// Version: 2.3.0
-// Purpose: Policy Rules screen with categorized Global/Tag/Device policy cards.
+// Version: 3.0.0
+// Purpose: Rules Screen formatted with native iOS HIG grouped cards.
+// Audit Fixes:
+//   1. Replaced Material 3 AlertDialog with Cupertino-styled HigAlertDialog.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -23,14 +24,13 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +54,7 @@ import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigContextMenu
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSwipeRow
@@ -65,6 +66,7 @@ import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemGreenDark
+import io.github.robinpcrd.cupertino.CupertinoSwitch
 
 @Composable
 fun RulesScreen(viewModel: LiasViewModel) {
@@ -252,7 +254,7 @@ fun RulesScreen(viewModel: LiasViewModel) {
     }
 
     policyToDelete?.let { policy ->
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { policyToDelete = null },
             title = { Text("Confirm Delete") },
             text = { Text("Are you sure you want to delete the policy '${policy.name}'?") },
@@ -262,7 +264,7 @@ fun RulesScreen(viewModel: LiasViewModel) {
                         viewModel.deletePolicy(policy.id)
                         policyToDelete = null
                     },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
@@ -358,7 +360,7 @@ private fun PolicyRow(
                                 tone = PillTone.Allowed
                             )
                         } else if (canToggle) {
-                            Switch(
+                            CupertinoSwitch(
                                 checked = policy.enabled,
                                 onCheckedChange = { enabled ->
                                     viewModel.savePolicy(policy.copy(enabled = enabled))
