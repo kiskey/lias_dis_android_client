@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 3.1.0
-// Purpose: Navigation host with iOS spatial push/pop slide transitions and edge back.
+// Version: 3.2.0
+// Purpose: Navigation host with enlarged 28dp iOS tab bar icons and transitions.
 // Audit Fixes:
-//   1. Added iOS right-to-left push/pop spatial slide transitions with spring physics.
+//   1. Enlarged bottom tab bar icons to 28dp for better visual fill on Pixel 6a without clipping.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -45,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -162,13 +161,13 @@ fun LiasNavHost(
                                             restoreState = true
                                         }
                                     }
-                                    .padding(vertical = 8.dp)
+                                    .padding(vertical = 6.dp)
                             ) {
                                 Icon(
                                     imageVector = screen.icon,
                                     contentDescription = screen.label,
                                     tint = if (isSelected) activeColor else inactiveColor,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(28.dp) // Enlarged to 28dp for prominent Pixel 6a fit
                                 )
                                 Text(
                                     text = screen.label,
