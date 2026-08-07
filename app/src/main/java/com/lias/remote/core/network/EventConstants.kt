@@ -1,8 +1,13 @@
+# ====================================================================
+# File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
+# ====================================================================
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes:
-//   1. Added EFFECTIVE_STATUS_CHANGED constant matching DIS/LIAS backend event (§2.5).
+//   1. Aligned EFFECTIVE_STATUS_CHANGED wire event string to "effective.status_changed"
+//      matching DIS/LIAS Go backend EventEffectiveStatusChanged.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -18,6 +23,6 @@ object EventConstants {
     const val MAC_CHANGED = "device.mac_changed"
     const val DEVICE_REIDENTIFIED = "device.reidentified"
     const val SECURITY_ALERT = "security.alert"
-    const val EFFECTIVE_STATUS_CHANGED = "effective_status_changed"
+    const val EFFECTIVE_STATUS_CHANGED = "effective.status_changed"
     const val PING = "ping"
 }
