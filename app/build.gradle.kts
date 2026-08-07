@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.4.0
+// Version: 1.5.0
 // Audit Fixes:
-//   1. Incremented versionCode to 3 and versionName to 1.4.0.
-//   2. Confirmed compileSdk/targetSdk 35 and aligned with Cupertino dependencies.
+//   1. Updated compileSdk to 36 to satisfy Cupertino 3.3.1 AAR metadata requirement.
+//   2. Retained targetSdk 35 and minSdk 26 for 100% runtime parity.
 // ====================================================================
 
 plugins {
@@ -15,14 +15,14 @@ plugins {
 
 android {
     namespace = "com.lias.remote"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.lias.remote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.4.0"
+        versionCode = 4
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
