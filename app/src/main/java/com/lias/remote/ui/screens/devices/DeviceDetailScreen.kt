@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 2.5.0
+// Version: 3.0.0
+// Purpose: Device detail view formatted with native iOS HIG inset grouped cards.
 // Audit Fixes:
-//   1. Maintained device details screen with identity metadata and activity logs.
-//   2. Preserved active extension timer and 3-dot overflow menu.
+//   1. Formatted device details and service list with iOS inset grouped surface cards.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
