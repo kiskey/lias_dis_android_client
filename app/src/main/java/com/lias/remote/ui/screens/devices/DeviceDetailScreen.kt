@@ -1,11 +1,8 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
 // Version: 2.4.0
-// Audit Fixes:
-//   1. Provided explicit leading icons for ALL items in 3-dot DropdownMenu to
-//      guarantee HIG alignment parity.
-//   2. Displayed active extension remaining minutes using ExtendHelper.minutesUntil.
+// Purpose: Device details screen with identity metadata, active extension timer,
+//          aligned 3-dot overflow menu, and activity flow logs.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -143,7 +140,6 @@ fun DeviceDetailScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Hero Header
             item {
                 Box(
                     modifier = Modifier
@@ -179,7 +175,6 @@ fun DeviceDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
 
-                        // Extended Access Active Pill
                         if (activeExtension != null) {
                             val left = ExtendHelper.minutesUntil(activeExtension.expiresAt)
                             Spacer(modifier = Modifier.height(6.dp))
@@ -193,7 +188,6 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Identity Group
             item { ListSectionHeader("Identity") }
             item {
                 GroupedListCard {
@@ -205,7 +199,6 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Discovered Services Section
             item { ListSectionHeader("Discovered Services") }
             item {
                 if (device.safeServices.isNotEmpty()) {
@@ -233,7 +226,6 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Activity History Section
             item { ListSectionHeader("Activity — Last 100 events") }
             if (isLoadingLogs) {
                 item { SkeletonRow() }
