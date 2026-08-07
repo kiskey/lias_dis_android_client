@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Added Extend Access ViewModel methods and optimistic effective status helpers (§5).
+//   1. Enhanced savePolicy to emit explicit action-specific snackbar ACK for
+//      Global Access Switch updates (global_default).
 // ====================================================================
 
 package com.lias.remote.ui
@@ -288,7 +289,12 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.savePolicy(policy)
             if (result is ApiResult.Success) {
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Policy saved successfully"))
+                val toastMsg = if (policy.id == "global_default") {
+                    "Global Access Switch set to: ${policy.action.uppercase()}"
+                } else {
+                    "Policy saved successfully"
+                }
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar(toastMsg))
             } else {
                 val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to save policy: $msg"))
