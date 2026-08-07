@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/store/SettingsRepository.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Audit Fixes: 
-//   1. Removed hardcoded default server URL to force first-run configuration (GAP-S03).
+//   1. Added THEME_MODE preference key ("system", "light", "dark").
 // ====================================================================
 
 package com.lias.remote.core.store
@@ -23,14 +23,17 @@ class SettingsRepository(private val context: Context) {
     companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
+        val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
     }
 
-    // GAP-S03 Fix: Default to empty string instead of hardcoded IP
     val serverUrl: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[SERVER_URL] ?: "" }
 
     val authToken: Flow<String?> = context.dataStore.data
         .map { preferences -> preferences[AUTH_TOKEN] }
+
+    val themeMode: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[THEME_MODE] ?: "system" }
 
     suspend fun saveServerUrl(url: String) {
         context.dataStore.edit { preferences ->
@@ -45,6 +48,12 @@ class SettingsRepository(private val context: Context) {
             } else {
                 preferences[AUTH_TOKEN] = token
             }
+        }
+    }
+
+    suspend fun saveThemeMode(mode: String) {
+        context.dataStore.edit { preferences ->
+            preferences[THEME_MODE] = mode
         }
     }
 }
