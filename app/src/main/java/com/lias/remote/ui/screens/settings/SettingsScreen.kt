@@ -1,6 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 2.2.0
+// Version: 3.0.0
+// Purpose: Native iOS Settings Screen with CupertinoSwitch controls.
 // Audit Fixes:
 //   1. Migrated toggle switch to CupertinoSwitch.
 //   2. Preserved HigLargeTitleScaffold and Flush Nftables confirmation dialog.
