@@ -1,10 +1,7 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
 // Version: 2.4.0
-// Audit Fixes:
-//   1. Added server-authoritative effective status sync for devices and tags
-//      inside refreshAll().
+// Purpose: Real-time SSE event collector and state repository.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -129,7 +126,6 @@ class EventRepository(
                 isInitialLoaded = true
             )
 
-            // Asynchronously fetch server-authoritative effective statuses
             launch {
                 val devStatusMap = mutableMapOf<String, EffectiveStatus>()
                 currentDevs.forEach { d ->
