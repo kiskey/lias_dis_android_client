@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes:
-//   1. Incremented versionCode to 2 and versionName to 1.3.0.
-//   2. Preserved Compose compiler plugin alignment for Kotlin 2.0.0.
+//   1. Incremented versionCode to 3 and versionName to 1.4.0.
+//   2. Confirmed compileSdk/targetSdk 35 and aligned with Cupertino dependencies.
 // ====================================================================
 
 plugins {
@@ -21,8 +21,8 @@ android {
         applicationId = "com.lias.remote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.3.0"
+        versionCode = 3
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
