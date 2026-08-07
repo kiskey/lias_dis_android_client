@@ -1,9 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/EventConstants.kt
 // Version: 1.3.0
-// Audit Fixes:
-//   1. Aligned EFFECTIVE_STATUS_CHANGED wire event string to "effective.status_changed"
-//      matching DIS/LIAS Go backend EventEffectiveStatusChanged.
+// Purpose: SSE Wire Event constants aligned with DIS/LIAS backend.
 // ====================================================================
 
 package com.lias.remote.core.network
