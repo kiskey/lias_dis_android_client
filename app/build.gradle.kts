@@ -15,12 +15,12 @@ plugins {
 
 android {
     namespace = "com.lias.remote"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.lias.remote"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 2
         versionName = "1.3.0"
 
@@ -93,6 +93,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     
     implementation(libs.androidx.datastore.preferences)
+    
+    // Cupertino library (RobinPcrd fork - active maintenance)
+    implementation(libs.cupertino)
+    implementation(libs.cupertino.icons.extended)
     
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

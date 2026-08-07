@@ -1,7 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/Theme.kt
-// Version: 2.0.0
+// Version: 3.0.0
 // Purpose: Material 3 Theme mapping iOS HIG colors and system bar insets.
+//          Updated to wrap with CupertinoTheme for Cupertino library components.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -16,6 +17,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import io.github.robinpcrd.cupertino.CupertinoTheme
+import io.github.robinpcrd.cupertino.CupertinoColorScheme
 
 private val LightColorScheme = lightColorScheme(
     primary = SystemBlueLight,
@@ -62,9 +65,15 @@ fun LiasTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = LiasTypography,
+    // Wrap with CupertinoTheme for Cupertino components while keeping MaterialTheme for interop
+    CupertinoTheme(
+        darkTheme = darkTheme,
         content = content
-    )
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = LiasTypography,
+            content = content
+        )
+    }
 }
