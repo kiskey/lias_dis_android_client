@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 2.3.0
+// Version: 3.0.0
 // Purpose: 3-step Policy Wizard Sheet with DetailedWeekGrid conflict preview.
+// Audit Fixes:
+//   1. Formatted 3-step wizard sheet with iOS corner radii and HigButton controls.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
