@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Purpose: Cupertino-styled alert dialog wrapper matching iOS HIG design.
-// Migration: Wraps CupertinoDialog to provide same API as Material3 AlertDialog.
+// Audit Fixes:
+//   1. Replaced CupertinoDialog with CupertinoAlertDialog.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.runtime.Composable
-import io.github.robinpcrd.cupertino.CupertinoDialog
+import io.github.robinpcrd.cupertino.CupertinoAlertDialog
 
 @Composable
 fun HigAlertDialog(
@@ -18,7 +19,7 @@ fun HigAlertDialog(
     confirmButton: @Composable () -> Unit,
     dismissButton: (@Composable () -> Unit)? = null
 ) {
-    CupertinoDialog(
+    CupertinoAlertDialog(
         onDismissRequest = onDismissRequest,
         title = title,
         message = text,
