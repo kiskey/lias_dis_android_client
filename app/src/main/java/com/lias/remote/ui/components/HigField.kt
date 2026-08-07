@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigField.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Migration: Replaced hand-drawn Material3 TextField with CupertinoTextField
-// Purpose: iOS field card input component (label above value, rounded surface background)
-//          used in Connect, Tag Editor, Schedule Editor, and Policy Wizard.
+// Audit Fixes:
+//   1. Removed unsupported Material 3 color parameters from CupertinoTextField.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -21,11 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.robinpcrd.cupertino.CupertinoTextField
-import io.github.robinpcrd.cupertino.CupertinoTextFieldDefaults
 
 @Composable
 fun HigField(
@@ -69,12 +67,6 @@ fun HigField(
             enabled = enabled && onClick == null,
             visualTransformation = visualTransformation,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-            colors = CupertinoTextFieldDefaults.colors(
-                containerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
             modifier = Modifier.fillMaxWidth()
         )
     }
