@@ -1,10 +1,7 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
 // Version: 1.3.0
-// Audit Fixes:
-//   1. Added deviceEffectiveStatuses and tagEffectiveStatuses maps to cache
-//      authoritative server-computed status payloads.
+// Purpose: State container holding models and effective statuses.
 // ====================================================================
 
 package com.lias.remote.repositories
