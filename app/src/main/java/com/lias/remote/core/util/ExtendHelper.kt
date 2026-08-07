@@ -1,11 +1,7 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/util/ExtendHelper.kt
 // Version: 1.1.0
-// Audit Fixes:
-//   1. Added robust multi-format RFC3339/ISO-8601 parsing fallback using
-//      Instant.parse, OffsetDateTime.parse, and ZonedDateTime.parse to ensure
-//      Go RFC3339 timestamps accurately yield remaining minutes.
+// Purpose: Multi-format RFC3339/ISO-8601 parsing helper for extension timers.
 // ====================================================================
 
 package com.lias.remote.core.util
