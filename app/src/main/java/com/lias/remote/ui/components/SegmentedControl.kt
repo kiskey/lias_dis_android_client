@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 3.1.0
+// Version: 3.2.0
 // Purpose: iOS segmented control wrapper using CupertinoSegmentedControl.
+// Audit Fixes:
+//   1. Corrected parameter name to selectedTabIndex.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -25,17 +27,14 @@ fun SegmentedControl(
     val selectedIndex = options.indexOfFirst { it.equals(selected, ignoreCase = true) }.coerceAtLeast(0)
 
     CupertinoSegmentedControl(
-        modifier = modifier.height(HigSpec.SegmentedControlHeight),
         selectedTabIndex = selectedIndex,
-        onTabClick = { index ->
-            onSelected(options[index].lowercase())
-        }
+        modifier = modifier.height(HigSpec.SegmentedControlHeight)
     ) {
         options.forEachIndexed { index, label ->
             val isSelected = index == selectedIndex
             CupertinoSegmentedControlTab(
-                onClick = { onSelected(label.lowercase()) },
-                isSelected = isSelected
+                isSelected = isSelected,
+                onClick = { onSelected(label.lowercase()) }
             ) {
                 Text(
                     text = label,
