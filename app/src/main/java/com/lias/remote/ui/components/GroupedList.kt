@@ -1,14 +1,18 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 3.1.0
+// Version: 3.2.0
 // Purpose: Native iOS Inset Grouped List cards and row items.
 // Audit Fixes:
-//   1. Added isDestructive and primaryTextColor support to GroupedListRow.
+//   1. Added iOS press dimming feedback (55% opacity spring) on row taps.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,11 +31,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
 
@@ -106,12 +113,28 @@ fun GroupedListRow(
     val headlineColor = primaryTextColor
         ?: if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.55f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f),
+        label = "iosRowPressAlpha"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = pressAlpha }
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = HigSpec.RowMinHeight)
-                .clickable(onClick = onClick)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
