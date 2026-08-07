@@ -1,10 +1,9 @@
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.3.0
+// Version: 2.4.0
 // Audit Fixes:
-//   1. Integrated Extend Access context menu item on device rows (§4.1).
-//   2. Added trailing clock action button on tag section headers (`ListSectionHeader`) for group extensions (§4.1).
-//   3. Attached MinutePickerSheet for device and tag level extensions.
+//   1. Standardized context menu leading icons to ensure 100% HIG alignment.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
