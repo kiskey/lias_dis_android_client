@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Added `trailingAction` slot to ListSectionHeader for section clock buttons (§4.1).
+//   1. Retained trailingAction slot for section-level Extend Access clock triggers.
+//   2. Preserved full API contract and compatibility with LazyColumn sections.
 // ====================================================================
 
 package com.lias.remote.ui.components
