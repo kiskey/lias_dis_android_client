@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/Theme.kt
-// Version: 3.2.0
+// Version: 3.3.0
 // Purpose: Material 3 & Cupertino Theme integration mapping iOS HIG colors.
 // Audit Fixes:
-//   1. Updated import to io.github.robinpcrd.cupertino.theme.CupertinoTheme.
+//   1. Replaced unsupported darkTheme parameter with colorScheme in CupertinoTheme.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import io.github.robinpcrd.cupertino.theme.CupertinoTheme
+import io.github.robinpcrd.cupertino.theme.darkColorScheme as cupertinoDarkColorScheme
+import io.github.robinpcrd.cupertino.theme.lightColorScheme as cupertinoLightColorScheme
 
 private val LightColorScheme = lightColorScheme(
     primary = SystemBlueLight,
@@ -54,6 +56,7 @@ fun LiasTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val cupertinoColorScheme = if (darkTheme) cupertinoDarkColorScheme() else cupertinoLightColorScheme()
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -66,7 +69,7 @@ fun LiasTheme(
     }
 
     CupertinoTheme(
-        darkTheme = darkTheme,
+        colorScheme = cupertinoColorScheme,
         content = {
             MaterialTheme(
                 colorScheme = colorScheme,
