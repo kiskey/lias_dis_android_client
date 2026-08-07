@@ -1,8 +1,14 @@
+# ====================================================================
+# File: app/src/main/java/com/lias/remote/core/models/Models.kt
+# ====================================================================
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/models/Models.kt
-// Version: 1.8.0
+// Version: 1.9.0
 // Audit Fixes:
-//   1. Added ExtensionInfo and EffectiveStatus models (§2.1).
+//   1. Added @SerialName("expires_at") and @SerialName("reason_tag") to
+//      Policy data class to prevent JSON deserialization data loss for
+//      temporary Pause & Extend Access policies.
 // ====================================================================
 
 package com.lias.remote.core.models
@@ -57,7 +63,8 @@ data class Device(
 @Serializable
 data class ExtensionInfo(
     @SerialName("expires_at") val expiresAt: String = "",
-    @SerialName("minutes_left") val minutesLeft: Int = 0
+    @SerialName("minutes_left") val minutesLeft: Int = 0,
+    @SerialName("reason_tag") val reasonTag: String = ""
 )
 
 @Serializable
@@ -65,6 +72,7 @@ data class EffectiveStatus(
     val action: String = "allow",
     val source: String = "global",
     @SerialName("extend_available") val extendAvailable: Boolean = false,
+    @SerialName("pause_available") val pauseAvailable: Boolean = false,
     @SerialName("active_extension") val activeExtension: ExtensionInfo? = null
 )
 
@@ -89,7 +97,9 @@ data class Policy(
     val priority: Int = 50,
     val enabled: Boolean = true,
     @SerialName("created_at") val createdAt: String = "",
-    @SerialName("updated_at") val updatedAt: String = ""
+    @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("reason_tag") val reasonTag: String? = null
 ) {
     val safeScheduleIDs: List<String> get() = scheduleIDs ?: emptyList()
 
