@@ -1,9 +1,8 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
 // Version: 2.4.0
-// Audit Fixes:
-//   1. Standardized context menu leading icons to ensure 100% HIG alignment.
+// Purpose: Main Device Inventory List Screen with search, context menus,
+//          and MinutePickerSheet extension triggers.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -71,7 +70,6 @@ fun DevicesScreen(
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
 
-    // Extend Access Sheet State
     var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
     var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
 
@@ -266,7 +264,6 @@ fun DevicesScreen(
         )
     }
 
-    // Extend Device Access Sheet
     activeDeviceForExtend?.let { device ->
         val effectiveStatus = viewModel.effectiveStatusFor(device.pdid)
         MinutePickerSheet(
@@ -287,7 +284,6 @@ fun DevicesScreen(
         )
     }
 
-    // Extend Tag Group Access Sheet
     activeTagForExtend?.let { tag ->
         val tagDevices = groupedDevices[tag.id] ?: emptyList()
         val effectiveStatus = viewModel.effectiveStatusForTag(tag.id)
