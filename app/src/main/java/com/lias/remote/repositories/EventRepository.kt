@@ -1,10 +1,10 @@
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 2.3.0
+// Version: 2.4.0
 // Audit Fixes:
-//   1. Added SSE replay suppression (<2.5s post-connect) and duplicate event
-//      toast debouncing (<3.0s window) to eliminate toast flooding.
-//   2. Handled EFFECTIVE_STATUS_CHANGED event to trigger refreshAll().
+//   1. Added server-authoritative effective status sync for devices and tags
+//      inside refreshAll().
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -12,6 +12,7 @@ package com.lias.remote.repositories
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
+import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -101,12 +102,12 @@ class EventRepository(
         if (api.baseUrl.isBlank()) return
         coroutineScope {
             val devsResult = api.get<DeviceListResponse>(Endpoints.DEVICES)
-            if (devsResult is ApiResult.Success) {
-                _state.value = _state.value.copy(
-                    devices = devsResult.data.devices,
-                    isInitialLoaded = true
-                )
-            }
+            val currentDevs = if (devsResult is ApiResult.Success) devsResult.data.devices else _state.value.devices
+
+            _state.value = _state.value.copy(
+                devices = currentDevs,
+                isInitialLoaded = true
+            )
 
             val tagsDeferred = async { api.get<List<Tag>>(Endpoints.TAGS) }
             val polsDeferred = async { api.get<List<Policy>>(Endpoints.POLICIES) }
@@ -118,13 +119,37 @@ class EventRepository(
             val schedulesResult = schedsDeferred.await()
             val statsResult = statsDeferred.await()
 
+            val loadedTags = (tagsResult as? ApiResult.Success)?.data ?: _state.value.tags
+
             _state.value = _state.value.copy(
-                tags = (tagsResult as? ApiResult.Success)?.data ?: _state.value.tags,
+                tags = loadedTags,
                 policies = (policiesResult as? ApiResult.Success)?.data ?: _state.value.policies,
                 schedules = (schedulesResult as? ApiResult.Success)?.data ?: _state.value.schedules,
                 stats = (statsResult as? ApiResult.Success)?.data ?: _state.value.stats,
                 isInitialLoaded = true
             )
+
+            // Asynchronously fetch server-authoritative effective statuses
+            launch {
+                val devStatusMap = mutableMapOf<String, EffectiveStatus>()
+                currentDevs.forEach { d ->
+                    val statusRes = api.getDeviceEffectiveStatus(d.pdid)
+                    if (statusRes is ApiResult.Success) {
+                        devStatusMap[d.pdid] = statusRes.data
+                    }
+                }
+                val tagStatusMap = mutableMapOf<String, EffectiveStatus>()
+                loadedTags.forEach { t ->
+                    val statusRes = api.getTagEffectiveStatus(t.id)
+                    if (statusRes is ApiResult.Success) {
+                        tagStatusMap[t.id] = statusRes.data
+                    }
+                }
+                _state.value = _state.value.copy(
+                    deviceEffectiveStatuses = devStatusMap,
+                    tagEffectiveStatuses = tagStatusMap
+                )
+            }
         }
     }
 
