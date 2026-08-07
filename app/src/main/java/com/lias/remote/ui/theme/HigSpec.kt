@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/HigSpec.kt
-// Version: 1.1.0
+// Version: 1.2.0
 // Purpose: Codifies Apple HIG layout, radius, dimension, and spacing
 //          constants optimized for tall 20:9 displays (Pixel 6a).
 // Audit Fixes:
-//   1. Increased min row height to 48dp and tab bar height to 84dp for tall screen density.
+//   1. Scaled SegmentedControlHeight to 48dp for comfortable thumb touch target on Pixel 6a.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -23,7 +23,7 @@ object HigSpec {
     val IconBubbleSize = 28.dp         // Spec .ibubble 28x28, radius 8
     val IconBubbleCorner = 8.dp
     val StatusDotSize = 10.dp          // Spec .dot 10x10
-    val SegmentedControlHeight = 40.dp // Spec .segctrl height: 40px
+    val SegmentedControlHeight = 48.dp // Spec .segctrl height: 48px (iOS Large Segmented Control)
     val FabSize = 56.dp                // Spec .fab width/height: 56px
     val FabOffsetFromTabBar = 16.dp    // Spec bottom offset
     val TabBarHeight = 84.dp           // Spec .tabbar height: 84px
