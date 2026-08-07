@@ -1,12 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. ModalBottomSheet with 22dp top corner radius (HigSpec.SheetCorner).
-//   2. iOS Nav Row (Cancel / Schedule Name / Save).
-//   3. Styled "+ Add Rule" action row as unboxed blue text row (no card outline).
-//   4. Surfaced overnight indicator "🌙 Continues past midnight" on rules crossing 24:00.
-//   5. Preserved conflict detection banner and downtime-vs-whitelist mode logic byte-for-byte.
+// Version: 2.2.0
+// Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -28,7 +23,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -113,7 +107,6 @@ fun ScheduleEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // HIG Navigation Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -241,7 +234,6 @@ fun ScheduleEditorSheet(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Day Mode Selector
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
