@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt
-// Version: 1.2.0
-// Purpose: Scrollable minute wheel picker sheet with HIG haptic snapping wheel.
+// Version: 2.0.0
+// Purpose: Native iOS minute picker sheet with snapping wheel and quick-pick chips.
 // Audit Fixes:
-//   1. Replaced unexported picker references with LazyColumn + rememberSnapFlingBehavior.
+//   1. Formatted minute picker sheet with iOS HIG corner specs and snapping wheel physics.
 // ====================================================================
 
 package com.lias.remote.ui.components
