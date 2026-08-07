@@ -1,8 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigButton.kt
-// Version: 2.0.0
-// Purpose: HIG full-width button (12dp corner, 48dp min-height, 16sp/700 font)
-//          supporting Primary, Secondary, and Danger visual styles.
+// Version: 2.1.0
+// Purpose: HIG full-width button supporting Primary, Secondary, and Danger styles.
 // Migration: Replaced Material3 Button with CupertinoButton for iOS HIG fidelity.
 // ====================================================================
 
