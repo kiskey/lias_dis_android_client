@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.5.0
+// Version: 1.6.0
 // Audit Fixes:
-//   1. Separated draft `serverUrl` string from committed `savedServerUrl` state
-//      to fix premature navigation on keypress bug (AUD-02).
+//   1. Delegated toggleVacationMode and flushNftables to EventRepository
+//      for immediate server ACK toast emissions and state synchronization.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -14,9 +14,10 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.HealthResponse
 import com.lias.remote.core.network.LiasApiClient
-import com.lias.remote.core.network.VacationRequest
-import com.lias.remote.core.network.VacationResponse
 import com.lias.remote.core.store.SettingsRepository
+import com.lias.remote.repositories.EventRepository
+import com.lias.remote.repositories.flushNftables
+import com.lias.remote.repositories.toggleVacationMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +35,8 @@ data class SettingsUiState(
 
 class SettingsViewModel(
     private val settings: SettingsRepository,
-    private val api: LiasApiClient
+    private val api: LiasApiClient,
+    private val eventRepository: EventRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -102,7 +104,7 @@ class SettingsViewModel(
 
     fun toggleVacationMode(enabled: Boolean) {
         viewModelScope.launch {
-            val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
+            val result = eventRepository.toggleVacationMode(enabled)
             if (result is ApiResult.Success) {
                 val stateText = if (result.data.vacationMode) "enabled" else "disabled"
                 _uiState.value = _uiState.value.copy(
@@ -118,7 +120,7 @@ class SettingsViewModel(
     fun flushNftables() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isFlushing = true)
-            val result = api.post<Unit, Unit>(Endpoints.NFTABLES_FLUSH, Unit)
+            val result = eventRepository.flushNftables()
             _uiState.value = _uiState.value.copy(
                 isFlushing = false,
                 testResult = when (result) {
