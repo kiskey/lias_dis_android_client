@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 2.1.1
-// Audit Fixes:
-//   1. Removed invalid nested `item {` block inside `items(...)` lambda to resolve
-//      Gradle compileDebugKotlin failure (ERR-01 & ERR-02).
-//   2. Preserved HigLargeTitleScaffold, MiniWeekStrip, and HigContextMenu duplication parity.
+// Version: 2.2.0
+// Purpose: Main Schedules Screen displaying configured time schedules and MiniWeekStrips.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -27,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -253,7 +251,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                         viewModel.deleteSchedule(schedule.id)
                         scheduleToDelete = null
                     },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
