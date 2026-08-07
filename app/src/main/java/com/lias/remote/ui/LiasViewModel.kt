@@ -1,9 +1,11 @@
+
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Audit Fixes:
-//   1. Enhanced savePolicy to emit explicit action-specific snackbar ACK for
-//      Global Access Switch updates (global_default).
+//   1. Updated effectiveStatusFor and effectiveStatusForTag to compute
+//      remaining extension minutes directly from policy expiresAt timestamp
+//      and fallback to server-synced effective statuses.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -19,6 +21,7 @@ import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
@@ -107,36 +110,73 @@ class LiasViewModel(
     }
 
     fun effectiveStatusFor(pdid: String): EffectiveStatus {
+        state.value.deviceEffectiveStatuses[pdid]?.let { return it }
+
         val device = state.value.devices.find { it.pdid == pdid }
         if (device != null && device.safeTags.contains("infrastructure")) {
-            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false)
+            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false, pauseAvailable = false)
         }
         val extensionPol = state.value.policies.find { it.id == "pol_extend_device_$pdid" }
         if (extensionPol != null && extensionPol.enabled) {
-            return EffectiveStatus(
-                action = "allow",
-                source = "device_policy",
-                extendAvailable = false,
-                activeExtension = ExtensionInfo(expiresAt = extensionPol.updatedAt, minutesLeft = 30)
-            )
+            val minsLeft = ExtendHelper.minutesUntil(extensionPol.expiresAt)
+            if (minsLeft > 0) {
+                return EffectiveStatus(
+                    action = "allow",
+                    source = "device_policy",
+                    extendAvailable = false,
+                    pauseAvailable = true,
+                    activeExtension = ExtensionInfo(
+                        expiresAt = extensionPol.expiresAt ?: "",
+                        minutesLeft = minsLeft,
+                        reasonTag = extensionPol.reasonTag ?: "extend_access"
+                    )
+                )
+            }
         }
-        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true)
+        val pausePol = state.value.policies.find { it.id == "pol_pause_$pdid" }
+        if (pausePol != null && pausePol.enabled) {
+            val minsLeft = ExtendHelper.minutesUntil(pausePol.expiresAt)
+            if (minsLeft > 0) {
+                return EffectiveStatus(
+                    action = "block",
+                    source = "device_policy",
+                    extendAvailable = true,
+                    pauseAvailable = false,
+                    activeExtension = ExtensionInfo(
+                        expiresAt = pausePol.expiresAt ?: "",
+                        minutesLeft = minsLeft,
+                        reasonTag = pausePol.reasonTag ?: "pause"
+                    )
+                )
+            }
+        }
+        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true, pauseAvailable = true)
     }
 
     fun effectiveStatusForTag(tagId: String): EffectiveStatus {
+        state.value.tagEffectiveStatuses[tagId]?.let { return it }
+
         if (tagId == "infrastructure") {
-            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false)
+            return EffectiveStatus(action = "allow", source = "infrastructure", extendAvailable = false, pauseAvailable = false)
         }
         val extensionPol = state.value.policies.find { it.id == "pol_extend_tag_$tagId" }
         if (extensionPol != null && extensionPol.enabled) {
-            return EffectiveStatus(
-                action = "allow",
-                source = "tag_policy",
-                extendAvailable = false,
-                activeExtension = ExtensionInfo(expiresAt = extensionPol.updatedAt, minutesLeft = 30)
-            )
+            val minsLeft = ExtendHelper.minutesUntil(extensionPol.expiresAt)
+            if (minsLeft > 0) {
+                return EffectiveStatus(
+                    action = "allow",
+                    source = "tag_policy",
+                    extendAvailable = false,
+                    pauseAvailable = true,
+                    activeExtension = ExtensionInfo(
+                        expiresAt = extensionPol.expiresAt ?: "",
+                        minutesLeft = minsLeft,
+                        reasonTag = extensionPol.reasonTag ?: "extend_access"
+                    )
+                )
+            }
         }
-        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true)
+        return EffectiveStatus(action = "block", source = "schedule", extendAvailable = true, pauseAvailable = true)
     }
 
     suspend fun validatePolicy(scheduleIds: List<String>): ApiResult<List<Conflict>> {
