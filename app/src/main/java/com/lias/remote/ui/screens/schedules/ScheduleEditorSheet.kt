@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 2.3.0
+// Version: 3.0.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
+// Audit Fixes:
+//   1. Formatted schedule editor sheet with CupertinoSegmentedControl and HigField.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
