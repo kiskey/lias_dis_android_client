@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/Theme.kt
-// Version: 3.1.0
+// Version: 3.2.0
 // Purpose: Material 3 & Cupertino Theme integration mapping iOS HIG colors.
 // Audit Fixes:
-//   1. Wrapped tree in CupertinoTheme from RobinPcrd fork.
+//   1. Updated import to io.github.robinpcrd.cupertino.theme.CupertinoTheme.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -18,7 +18,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import io.github.robinpcrd.cupertino.CupertinoTheme
+import io.github.robinpcrd.cupertino.theme.CupertinoTheme
 
 private val LightColorScheme = lightColorScheme(
     primary = SystemBlueLight,
