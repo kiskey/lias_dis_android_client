@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Added toast ACK emission and refreshAll() synchronization to
-//      toggleVacationMode and flushNftables.
+//   1. Added duplicate pause check before issuing pauseDeviceInternet network call.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -92,6 +91,11 @@ suspend fun EventRepository.assignDeviceTag(pdid: String, tagId: String): ApiRes
 }
 
 suspend fun EventRepository.pauseDeviceInternet(pdid: String): ApiResult<Unit> {
+    val isAlreadyPaused = _state.value.policies.any { it.id == "pol_pause_$pdid" }
+    if (isAlreadyPaused) {
+        return ApiResult.Success(Unit)
+    }
+
     val result = api.post<Unit, Unit>(Endpoints.devicePause(pdid), Unit)
     if (result is ApiResult.Success) {
         refreshAll()
