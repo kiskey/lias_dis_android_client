@@ -1,26 +1,37 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // Audit Fixes:
-//   1. Formatted schedule editor sheet with CupertinoSegmentedControl and HigField.
+//   1. Replaced date text fields with iOS grouped row tap targets and Cupertino-styled wheel date pickers.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,14 +47,24 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.lias.remote.core.models.Schedule
@@ -51,9 +72,13 @@ import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.LiasThemeColors
+import java.util.Calendar
 
 enum class RuleDayMode { RANGE, SPECIFIC, CALENDAR }
 
@@ -326,22 +351,51 @@ fun ScheduleEditorSheet(
                                 var startDate by remember { mutableStateOf(rule.startDate ?: "") }
                                 var endDate by remember { mutableStateOf(rule.endDate ?: "") }
 
+                                var showStartDatePicker by remember { mutableStateOf(false) }
+                                var showEndDatePicker by remember { mutableStateOf(false) }
+
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    HigField(
-                                        value = startDate,
-                                        onValueChange = {
-                                            startDate = it
-                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                    GroupedListRow(
+                                        primaryText = startDate.ifBlank { "Select Start Date" },
+                                        secondaryText = "Start Date",
+                                        trailingContent = {
+                                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         },
-                                        label = "Start Date (YYYY-MM-DD)"
+                                        onClick = { showStartDatePicker = true }
                                     )
-                                    HigField(
-                                        value = endDate,
-                                        onValueChange = {
-                                            endDate = it
-                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                    GroupedListRow(
+                                        primaryText = endDate.ifBlank { "Select End Date" },
+                                        secondaryText = "End Date",
+                                        trailingContent = {
+                                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         },
-                                        label = "End Date (YYYY-MM-DD)"
+                                        onClick = { showEndDatePicker = true }
+                                    )
+                                }
+
+                                if (showStartDatePicker) {
+                                    CupertinoDatePickerSheet(
+                                        title = "Start Date",
+                                        initialDateIso = startDate,
+                                        onDismiss = { showStartDatePicker = false },
+                                        onConfirm = { dateIso ->
+                                            startDate = dateIso
+                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                            showStartDatePicker = false
+                                        }
+                                    )
+                                }
+
+                                if (showEndDatePicker) {
+                                    CupertinoDatePickerSheet(
+                                        title = "End Date",
+                                        initialDateIso = endDate,
+                                        onDismiss = { showEndDatePicker = false },
+                                        onConfirm = { dateIso ->
+                                            endDate = dateIso
+                                            rules[index] = rule.copy(startDate = startDate, endDate = endDate)
+                                            showEndDatePicker = false
+                                        }
                                     )
                                 }
                             }
@@ -445,28 +499,165 @@ fun ScheduleEditorSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun TimePickerDialog(
-    onConfirm: () -> Unit,
+fun CupertinoDatePickerSheet(
+    title: String,
+    initialDateIso: String,
     onDismiss: () -> Unit,
-    content: @Composable () -> Unit
+    onConfirm: (dateIso: String) -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 6.dp
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Select Time", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
-                content()
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    TextButton(onClick = onConfirm) { Text("OK", fontWeight = FontWeight.Bold) }
-                }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptic = LocalHapticFeedback.current
+
+    val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    val years = remember { (currentYear..currentYear + 5).toList() }
+    val days = remember { (1..31).toList() }
+
+    var parsedYear by remember { mutableIntStateOf(currentYear) }
+    var parsedMonth by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH) + 1) }
+    var parsedDay by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) }
+
+    LaunchedEffect(initialDateIso) {
+        if (initialDateIso.isNotBlank()) {
+            val parts = initialDateIso.split("-")
+            if (parts.size == 3) {
+                parsedYear = parts[0].toIntOrNull() ?: currentYear
+                parsedMonth = (parts[1].toIntOrNull() ?: 1).coerceIn(1, 12)
+                parsedDay = (parts[2].toIntOrNull() ?: 1).coerceIn(1, 31)
             }
         }
     }
-}
+
+    val monthListState = rememberLazyListState(initialFirstVisibleItemIndex = (parsedMonth - 1).coerceIn(0, 11))
+    val dayListState = rememberLazyListState(initialFirstVisibleItemIndex = (parsedDay - 1).coerceIn(0, 30))
+    val yearListState = rememberLazyListState(initialFirstVisibleItemIndex = (years.indexOf(parsedYear)).coerceAtLeast(0))
+
+    val monthFling = rememberSnapFlingBehavior(lazyListState = monthListState)
+    val dayFling = rememberSnapFlingBehavior(lazyListState = dayListState)
+    val yearFling = rememberSnapFlingBehavior(lazyListState = yearListState)
+
+    val centerMonthIdx by remember { derivedStateOf { (monthListState.firstVisibleItemIndex + if (monthListState.firstVisibleItemScrollOffset > 100) 1 else 0).coerceIn(0, 11) } }
+    val centerDayIdx by remember { derivedStateOf { (dayListState.firstVisibleItemIndex + if (dayListState.firstVisibleItemScrollOffset > 100) 1 else 0).coerceIn(0, 30) } }
+    val centerYearIdx by remember { derivedStateOf { (yearListState.firstVisibleItemIndex + if (yearListState.firstVisibleItemScrollOffset > 100) 1 else 0).coerceIn(0, years.size - 1) } }
+
+    LaunchedEffect(centerMonthIdx, centerDayIdx, centerYearIdx) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(
+                    onClick = {
+                        val selYear = years[centerYearIdx]
+                        val selMonth = centerMonthIdx + 1
+                        val selDay = centerDayIdx + 1
+                        val formattedIso = String.format("%04d-%02d-%02d", selYear, selMonth, selDay)
+                        onConfirm(formattedIso)
+                    }
+                ) {
+                    Text("Done", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            // 3-Column iOS Wheel Date Picker (Month | Day | Year)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(LiasThemeColors.fill, RoundedCornerShape(10.dp))
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Month Column
+                    LazyColumn(
+                        state = monthListState,
+                        flingBehavior = monthFling,
+                        contentPadding = PaddingValues(vertical = 68.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(months) { idx, monthName ->
+                            val isCenter = idx == centerMonthIdx
+                            Box(modifier = Modifier.height(44.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = monthName,
+                                    style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Day Column
+                    LazyColumn(
+                        state = dayListState,
+                        flingBehavior = dayFling,
+                        contentPadding = PaddingValues(vertical = 68.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(days) { idx, dayVal ->
+                            val isCenter = idx == centerDayIdx
+                            Box(modifier = Modifier.height(44.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = dayVal.toString(),
+                                    style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Year Column
+                    LazyColumn(
+                        state = yearListState,
+                        flingBehavior = yearFling,
+                        contentPadding = PaddingValues(vertical = 68.dp),
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        itemsIndexed(years) { idx, yearVal ->
+                            val isCenter = idx == centerYearIdx
+                            Box(modifier = Modifier.height(44.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = yearVal.toString(),
+                                    style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
+                                    color = if (isCenter) MaterialTheme.colorScheme.onSurface else Mat
