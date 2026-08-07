@@ -1,14 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 3.0.0
-// Purpose: Main navigation host using native iOS bottom tab bar and transitions.
+// Version: 3.1.0
+// Purpose: Navigation host with iOS spatial push/pop slide transitions and edge back.
 // Audit Fixes:
-//   1. Replaced Material 3 NavigationBar and Scaffold with iOS CupertinoTabBar.
+//   1. Added iOS right-to-left push/pop spatial slide transitions with spring physics.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
 
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -44,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -127,7 +129,6 @@ fun LiasNavHost(
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
-                // Native iOS Bottom Tab Bar without Material pills or ripples
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -186,8 +187,32 @@ fun LiasNavHost(
                 navController = navController,
                 startDestination = LiasScreen.Home.route,
                 modifier = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(animationSpec = tween(150)) },
-                exitTransition = { fadeOut(animationSpec = tween(150)) }
+                enterTransition = {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
+                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
+                },
+                exitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                        targetOffset = { fullWidth -> fullWidth / 3 },
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
+                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
+                },
+                popEnterTransition = {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                        initialOffset = { fullWidth -> fullWidth / 3 },
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
+                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
+                },
+                popExitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
+                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
+                }
             ) {
                 composable(LiasScreen.Home.route) {
                     HomeScreen(
