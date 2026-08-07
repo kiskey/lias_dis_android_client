@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 2.4.0
-// Purpose: Device details screen with identity metadata, active extension timer,
-//          aligned 3-dot overflow menu, and activity flow logs.
+// Version: 2.5.0
+// Audit Fixes:
+//   1. Maintained device details screen with identity metadata and activity logs.
+//   2. Preserved active extension timer and 3-dot overflow menu.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
