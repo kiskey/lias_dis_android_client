@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.4.0
-// Purpose: View-model managing policy evaluation, extensions, and device state.
+// Version: 2.5.0
 // Audit Fixes:
-//   1. Added duplicate pause guard and in-flight request tracking to pause/unpause methods.
+//   1. Explicitly imported UiState and UiEvent from repositories package.
+//   2. Typed inFlightPauseRequests as MutableSet<String> for clean Kotlin interop.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -22,6 +22,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
+import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTag
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
@@ -55,7 +56,7 @@ class LiasViewModel(
     val state: StateFlow<UiState> = eventRepository.state
     val uiEvents = eventRepository.uiEvents
 
-    private val inFlightPauseRequests = ConcurrentHashMap.newKeySet<String>()
+    private val inFlightPauseRequests: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     init {
         eventRepository.start()
@@ -206,9 +207,10 @@ class LiasViewModel(
                 eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏸ Internet is already paused for this device"))
                 return@launch
             }
-            if (!inFlightPauseRequests.add(pdid)) {
+            if (inFlightPauseRequests.contains(pdid)) {
                 return@launch
             }
+            inFlightPauseRequests.add(pdid)
             try {
                 val result = eventRepository.pauseDeviceInternet(pdid)
                 if (result is ApiResult.Success) {
@@ -229,9 +231,10 @@ class LiasViewModel(
             if (!isPaused) {
                 return@launch
             }
-            if (!inFlightPauseRequests.add(pdid)) {
+            if (inFlightPauseRequests.contains(pdid)) {
                 return@launch
             }
+            inFlightPauseRequests.add(pdid)
             try {
                 val result = eventRepository.unpauseDeviceInternet(pdid)
                 if (result is ApiResult.Success) {
