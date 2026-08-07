@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt
-// Version: 1.2.0
-// Audit Fixes:
-//   1. Replaced TextField with BasicTextField + TextFieldDefaults.DecorationBox in HigSearchPill
-//      to fix Kotlin compiler parameter resolution error on contentPadding (COMP-01 & COMP-02).
-//   2. Preserved 44dp top bar height, zero-padding action layout, and 38dp search pill shape.
+// Version: 1.3.0
+// Purpose: Two-tier iOS large title navigation bar scaffold and search pill.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -62,7 +59,7 @@ fun HigLargeTitleScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Tier 1: Secondary Navigation Bar Row (44dp target)
+            // Tier 1: Secondary Navigation Bar Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,7 +75,7 @@ fun HigLargeTitleScaffold(
                 }
             }
 
-            // Tier 2: Large Title (29sp w800)
+            // Tier 2: Large Title
             if (title.isNotBlank()) {
                 Text(
                     text = title,
