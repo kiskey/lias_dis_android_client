@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.6.0
+// Version: 1.7.0
 // Audit Fixes:
-//   1. Delegated toggleVacationMode and flushNftables to EventRepository
-//      for immediate server ACK toast emissions and state synchronization.
+//   1. Added themeMode state and updateThemeMode action.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -27,6 +26,7 @@ data class SettingsUiState(
     val serverUrl: String = "",        // Transient editing draft
     val savedServerUrl: String = "",   // Committed URL from DataStore
     val authToken: String = "",
+    val themeMode: String = "system",  // "system", "light", "dark"
     val vacationMode: Boolean = false,
     val isTesting: Boolean = false,
     val testResult: String? = null,
@@ -56,6 +56,11 @@ class SettingsViewModel(
                 _uiState.value = _uiState.value.copy(authToken = token ?: "")
             }
         }
+        viewModelScope.launch {
+            settings.themeMode.collect { mode ->
+                _uiState.value = _uiState.value.copy(themeMode = mode)
+            }
+        }
     }
 
     fun updateServerUrl(url: String) {
@@ -64,6 +69,13 @@ class SettingsViewModel(
 
     fun updateAuthToken(token: String) {
         _uiState.value = _uiState.value.copy(authToken = token)
+    }
+
+    fun updateThemeMode(mode: String) {
+        viewModelScope.launch {
+            settings.saveThemeMode(mode)
+            _uiState.value = _uiState.value.copy(themeMode = mode)
+        }
     }
 
     fun testConnection() {
