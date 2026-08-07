@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigField.kt
-// Version: 2.2.0
-// Migration: Replaced hand-drawn Material3 TextField with CupertinoTextField
+// Version: 3.0.0
+// Purpose: iOS field card input component using CupertinoTextField.
 // Audit Fixes:
-//   1. Removed unsupported Material 3 color parameters from CupertinoTextField.
+//   1. Formatted input field with iOS surface background and label-above-value layout.
 // ====================================================================
 
 package com.lias.remote.ui.components
