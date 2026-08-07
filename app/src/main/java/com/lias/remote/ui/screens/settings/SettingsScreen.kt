@@ -1,11 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Audit Fixes:
-//   1. Migrated scaffold to HigLargeTitleScaffold.
-//   2. Normalized icon bubbles to 26dp (HigSpec.IconBubbleSize) with 7dp corner.
-//   3. Fixed Vacation Mode icon bubble color to theme-resolved SystemOrangeDark token.
-//   4. Rendered "Flush Nftables Table" primary text in red (MaterialTheme.colorScheme.error).
+//   1. Migrated toggle switch to CupertinoSwitch.
+//   2. Preserved HigLargeTitleScaffold and Flush Nftables confirmation dialog.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -14,18 +12,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,10 +37,12 @@ import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedList
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemOrangeDark
+import io.github.robinpcrd.cupertino.CupertinoSwitch
 
 @Composable
 fun SettingsScreen(
@@ -103,7 +100,7 @@ fun SettingsScreen(
                                 }
                             },
                             trailingContent = {
-                                Switch(
+                                CupertinoSwitch(
                                     checked = uiState.vacationMode,
                                     onCheckedChange = { viewModel.toggleVacationMode(it) }
                                 )
@@ -136,7 +133,7 @@ fun SettingsScreen(
     }
 
     if (showFlushDialog) {
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { showFlushDialog = false },
             title = { Text("Confirm Flush") },
             text = { Text("Are you sure you want to flush all nftables rules? Internet access will be temporarily unrestricted until LIAS rebuilds the table.") },
