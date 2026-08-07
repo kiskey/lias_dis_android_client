@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.3.0
+// Version: 2.4.0
 // Purpose: View-model managing policy evaluation, extensions, and device state.
+// Audit Fixes:
+//   1. Added duplicate pause guard and in-flight request tracking to pause/unpause methods.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -20,7 +22,6 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
-import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTag
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
@@ -45,6 +46,7 @@ import com.lias.remote.repositories.updateTag
 import com.lias.remote.repositories.validatePolicy
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 class LiasViewModel(
     private val eventRepository: EventRepository
@@ -52,6 +54,8 @@ class LiasViewModel(
 
     val state: StateFlow<UiState> = eventRepository.state
     val uiEvents = eventRepository.uiEvents
+
+    private val inFlightPauseRequests = ConcurrentHashMap.newKeySet<String>()
 
     init {
         eventRepository.start()
@@ -197,24 +201,47 @@ class LiasViewModel(
 
     fun pauseInternet(pdid: String) {
         viewModelScope.launch {
-            val result = eventRepository.pauseDeviceInternet(pdid)
-            if (result is ApiResult.Success) {
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏸ Internet paused for 1 hour"))
-            } else {
-                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to pause internet: $msg"))
+            val isPaused = state.value.policies.any { it.id == "pol_pause_$pdid" }
+            if (isPaused) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏸ Internet is already paused for this device"))
+                return@launch
+            }
+            if (!inFlightPauseRequests.add(pdid)) {
+                return@launch
+            }
+            try {
+                val result = eventRepository.pauseDeviceInternet(pdid)
+                if (result is ApiResult.Success) {
+                    eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("⏸ Internet paused for 1 hour"))
+                } else {
+                    val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                    eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to pause internet: $msg"))
+                }
+            } finally {
+                inFlightPauseRequests.remove(pdid)
             }
         }
     }
 
     fun unpauseInternet(pdid: String) {
         viewModelScope.launch {
-            val result = eventRepository.unpauseDeviceInternet(pdid)
-            if (result is ApiResult.Success) {
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("▶ Internet resumed"))
-            } else {
-                val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
-                eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to unpause internet: $msg"))
+            val isPaused = state.value.policies.any { it.id == "pol_pause_$pdid" }
+            if (!isPaused) {
+                return@launch
+            }
+            if (!inFlightPauseRequests.add(pdid)) {
+                return@launch
+            }
+            try {
+                val result = eventRepository.unpauseDeviceInternet(pdid)
+                if (result is ApiResult.Success) {
+                    eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("▶ Internet resumed"))
+                } else {
+                    val msg = (result as? ApiResult.HttpError)?.message ?: (result as? ApiResult.NetworkError)?.cause?.message ?: "Network Error"
+                    eventRepository._uiEvents.emit(UiEvent.ShowSnackbarError("Failed to unpause internet: $msg"))
+                }
+            } finally {
+                inFlightPauseRequests.remove(pdid)
             }
         }
     }
