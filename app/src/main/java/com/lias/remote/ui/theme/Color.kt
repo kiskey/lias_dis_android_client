@@ -1,10 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/theme/Color.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. Extended with Apple HIG semantic status pill background pairs (light/dark).
-//   2. Added LiasFill light and dark tokens for borderless filled fields.
-//   3. Retained all existing system colors and legacy aliases byte-for-byte.
+// Version: 2.2.0
+// Purpose: HIG system palette and theme-resolved semantic colors.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -56,14 +53,14 @@ val SystemSecondaryLabelDark = Color(0xFF8E8E93)
 val SystemSeparatorDark = Color(0x38383A38)
 
 // Dark Mode Semantic Pill Backgrounds
-val PillGreenBgDark  = Color(0x2930D158) // SystemGreenDark 16% alpha
-val PillRedBgDark    = Color(0x29FF453A) // SystemRedDark 16% alpha
-val PillOrangeBgDark = Color(0x29FF9F0A) // SystemOrangeDark 16% alpha
-val PillBlueBgDark   = Color(0x290A84FF) // SystemBlueDark 16% alpha
+val PillGreenBgDark  = Color(0x2930D158)
+val PillRedBgDark    = Color(0x29FF453A)
+val PillOrangeBgDark = Color(0x29FF9F0A)
+val PillBlueBgDark   = Color(0x290A84FF)
 
 // Search Pill & Input Fill Tokens
-val LiasFillLight = Color(0x1F767680) // rgba(118,118,128,0.12)
-val LiasFillDark  = Color(0x3D767680) // rgba(118,118,128,0.24)
+val LiasFillLight = Color(0x1F767680)
+val LiasFillDark  = Color(0x3D767680)
 
 // Backward Compatibility Preset Aliases
 val LiasBgPrimaryLight = SystemBackgroundLight

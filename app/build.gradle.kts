@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.3.0
+// Version: 1.6.0
 // Audit Fixes:
-//   1. Incremented versionCode to 2 and versionName to 1.3.0.
-//   2. Preserved Compose compiler plugin alignment for Kotlin 2.0.0.
+//   1. Incremented versionCode to 5 and versionName to 1.6.0.
+//   2. Retained compileSdk 36 and targetSdk 35 for Cupertino 3.3.1 compatibility.
 // ====================================================================
 
 plugins {
@@ -15,14 +15,14 @@ plugins {
 
 android {
     namespace = "com.lias.remote"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.lias.remote"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 2
-        versionName = "1.3.0"
+        targetSdk = 35
+        versionCode = 5
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -93,6 +93,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     
     implementation(libs.androidx.datastore.preferences)
+    
+    // Cupertino library (RobinPcrd fork - active maintenance)
+    implementation(libs.cupertino)
+    implementation(libs.cupertino.icons.extended)
     
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

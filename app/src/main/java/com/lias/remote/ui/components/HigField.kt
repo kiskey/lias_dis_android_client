@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigField.kt
-// Version: 1.0.0
-// Purpose: iOS field card input component (label above value, rounded surface background)
-//          used in Connect, Tag Editor, Schedule Editor, and Policy Wizard.
+// Version: 3.0.0
+// Purpose: iOS field card input component using CupertinoTextField.
+// Audit Fixes:
+//   1. Formatted input field with iOS surface background and label-above-value layout.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -17,14 +18,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import io.github.robinpcrd.cupertino.CupertinoTextField
 
 @Composable
 fun HigField(
@@ -52,7 +51,7 @@ fun HigField(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(2.dp))
-        TextField(
+        CupertinoTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = {
@@ -68,14 +67,6 @@ fun HigField(
             enabled = enabled && onClick == null,
             visualTransformation = visualTransformation,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
             modifier = Modifier.fillMaxWidth()
         )
     }

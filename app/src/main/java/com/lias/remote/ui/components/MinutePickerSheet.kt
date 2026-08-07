@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt
-// Version: 1.0.0
-// Purpose: Apple-style scrollable minute wheel picker sheet with haptic ticks,
-//          quick-pick chips, live readout, and solid green Allow CTA (§3).
+// Version: 2.0.0
+// Purpose: Native iOS minute picker sheet with snapping wheel and quick-pick chips.
+// Audit Fixes:
+//   1. Formatted minute picker sheet with iOS HIG corner specs and snapping wheel physics.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,7 +83,8 @@ fun MinutePickerSheet(
     var selectedMinutes by remember { mutableIntStateOf(initialMinutes) }
 
     val wheelItems = remember(minMinutes, maxMinutes) { (minMinutes..maxMinutes).toList() }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (selectedMinutes - minMinutes).coerceAtLeast(0))
+    val initialIdx = (initialMinutes - minMinutes).coerceIn(0, wheelItems.size - 1)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIdx)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
     val centerIndex by remember {
@@ -180,7 +183,7 @@ fun MinutePickerSheet(
                 }
             }
 
-            // Scrollable Minute Wheel
+            // Scrollable Minute Wheel with Snapping
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -201,10 +204,9 @@ fun MinutePickerSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(wheelItems.size) { index ->
-                        val minuteValue = wheelItems[index]
+                    itemsIndexed(wheelItems) { index, minuteValue ->
                         val isCenter = index == centerIndex
-                        val distanceFromCenter = Math.abs(index - centerIndex)
+                        val distanceFromCenter = kotlin.math.abs(index - centerIndex)
                         val scale = if (isCenter) 1.15f else (1.0f - (distanceFromCenter * 0.12f)).coerceAtLeast(0.7f)
                         val alpha = if (isCenter) 1.0f else (1.0f - (distanceFromCenter * 0.3f)).coerceAtLeast(0.3f)
 

@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.4.0
-// Purpose: Main Device Inventory List Screen with search, context menus,
-//          and MinutePickerSheet extension triggers.
+// Version: 3.0.0
+// Audit Fixes:
+//   1. Maintained native iOS CupertinoSearchTextField search bar and inset grouped cards.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -10,10 +10,7 @@ package com.lias.remote.ui.screens.devices
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -23,7 +20,6 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,7 +45,9 @@ import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigContextMenu
+import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSearchPill
 import com.lias.remote.ui.components.HigSwipeRow
@@ -307,13 +305,13 @@ fun DevicesScreen(
 
     deviceToRename?.let { device ->
         var newName by remember { mutableStateOf(device.displayName) }
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { deviceToRename = null },
             title = { Text("Rename Device") },
             text = {
                 Column {
                     Text("Enter a new friendly name:")
-                    com.lias.remote.ui.components.HigField(
+                    HigField(
                         value = newName,
                         onValueChange = { newName = it },
                         label = "Friendly Name"

@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
-// Version: 2.1.0
+// Version: 3.0.0
+// Purpose: Native iOS Connection Settings Screen with CupertinoActivityIndicator.
 // Audit Fixes:
-//   1. Migrated inputs to HigField and test trigger to HigButton.
-//   2. Added thin navigation bar header (`‹ Settings` back and `Save`).
-//   3. Rendered connection status feedback banner.
+//   1. Maintained CupertinoActivityIndicator loading state and HigField inputs.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +37,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import io.github.robinpcrd.cupertino.CupertinoActivityIndicator
 
 @Composable
 fun ConnectionSettingsScreen(
@@ -109,7 +108,7 @@ fun ConnectionSettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    CupertinoActivityIndicator(modifier = Modifier.size(28.dp))
                 }
             }
 

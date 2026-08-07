@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 2.1.0
+// Version: 3.0.0
+// Purpose: Native iOS Device Card with CupertinoButton quick actions.
 // Audit Fixes:
-//   1. Updated online status dot color to SystemGreenDark (never blue).
-//   2. Migrated quick action buttons to HigButton primitives.
-//   3. Styled discovered service tags with LiasThemeColors.fill.
+//   1. Replaced Material 3 Card with Surface and CupertinoButton controls.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -26,12 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
@@ -76,9 +75,11 @@ fun DeviceCard(
         }
     }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(HigSpec.CardCorner)),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(HigSpec.CardCorner)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -142,7 +143,9 @@ fun DeviceCard(
 
             if (tagsExpanded) {
                 FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     tags.forEach { tag ->

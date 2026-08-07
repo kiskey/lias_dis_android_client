@@ -1,11 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 2.1.0
+// Version: 3.3.0
+// Purpose: Native iOS Settings Screen with full-width SegmentedControl theme selector.
 // Audit Fixes:
-//   1. Migrated scaffold to HigLargeTitleScaffold.
-//   2. Normalized icon bubbles to 26dp (HigSpec.IconBubbleSize) with 7dp corner.
-//   3. Fixed Vacation Mode icon bubble color to theme-resolved SystemOrangeDark token.
-//   4. Rendered "Flush Nftables Table" primary text in red (MaterialTheme.colorScheme.error).
+//   1. Formatted Theme Mode selector to use 48dp full-width SegmentedControl pills.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -13,7 +11,10 @@ package com.lias.remote.ui.screens.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,11 +22,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,15 +36,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedList
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemOrangeDark
+import io.github.robinpcrd.cupertino.CupertinoSwitch
 
 @Composable
 fun SettingsScreen(
@@ -85,7 +88,34 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 2 - Controls
+                // Section 2 - Appearance
+                item { ListSectionHeader("Appearance") }
+                item {
+                    GroupedListCard {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Theme Mode",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Auto switches between Light and Dark based on time of day (6 PM - 6 AM)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            SegmentedControl(
+                                selected = uiState.themeMode,
+                                onSelected = { mode -> viewModel.updateThemeMode(mode) },
+                                options = listOf("System", "Light", "Dark"),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+                // Section 3 - Controls
                 item { ListSectionHeader("Controls") }
                 item {
                     GroupedListCard {
@@ -103,7 +133,7 @@ fun SettingsScreen(
                                 }
                             },
                             trailingContent = {
-                                Switch(
+                                CupertinoSwitch(
                                     checked = uiState.vacationMode,
                                     onCheckedChange = { viewModel.toggleVacationMode(it) }
                                 )
@@ -112,22 +142,18 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 3 - Danger Zone
+                // Section 4 - Danger Zone
                 item { ListSectionHeader("Danger Zone") }
                 item {
                     GroupedListCard {
                         GroupedListRow(
                             primaryText = "Flush Nftables Table",
                             secondaryText = "Rebuilds automatically on next sync",
+                            isDestructive = true,
                             trailingContent = {
                                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             },
-                            onClick = { showFlushDialog = true },
-                            colors = androidx.compose.material3.ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                headlineColor = MaterialTheme.colorScheme.error,
-                                supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            onClick = { showFlushDialog = true }
                         )
                     }
                 }
@@ -136,7 +162,7 @@ fun SettingsScreen(
     }
 
     if (showFlushDialog) {
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { showFlushDialog = false },
             title = { Text("Confirm Flush") },
             text = { Text("Are you sure you want to flush all nftables rules? Internet access will be temporarily unrestricted until LIAS rebuilds the table.") },

@@ -1,8 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 1.3.0
+// Version: 1.4.0
 // Audit Fixes: 
-//   1. Passed `container.eventRepository` to `SettingsViewModel` factory.
+//   1. Passed settingsState.themeMode to LiasTheme for dynamic theme switching.
 // ====================================================================
 
 package com.lias.remote
@@ -11,6 +11,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.lias.remote.ui.LiasViewModel
@@ -44,7 +46,9 @@ class MainActivity : ComponentActivity() {
         val settingsViewModel = ViewModelProvider(this, viewModelFactory)[SettingsViewModel::class.java]
 
         setContent {
-            LiasTheme {
+            val settingsState by settingsViewModel.uiState.collectAsState()
+
+            LiasTheme(themeMode = settingsState.themeMode) {
                 LiasNavHost(
                     liasViewModel = liasViewModel,
                     settingsViewModel = settingsViewModel

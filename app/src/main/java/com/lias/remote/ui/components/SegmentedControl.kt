@@ -1,20 +1,19 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 2.1.0
+// Version: 3.5.0
+// Purpose: iOS segmented control with native Apple spring-sliding thumb physics.
 // Audit Fixes:
-//   1. Added physics spring animation (`dampingRatio = 0.86f`) to white thumb offset.
-//   2. Enforced 38dp container height (`HigSpec.SegmentedControlHeight`).
-//   3. Styled Allow (primary blue), Block (error red), and default states dynamically.
+//   1. Built self-contained iOS segmented control with spring physics (dampingRatio 0.82f)
+//      to eliminate unresolved CupertinoSegmentedControl references.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -30,12 +29,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.LiasThemeColors
 
 @Composable
 fun SegmentedControl(
@@ -46,68 +50,69 @@ fun SegmentedControl(
 ) {
     val selectedIndex = options.indexOfFirst { it.equals(selected, ignoreCase = true) }.coerceAtLeast(0)
 
-    val animatedIndex by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.86f,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "SegmentedControlThumbSpring"
-    )
+    val maxOptionLength = options.maxOfOrNull { it.length } ?: 0
+    val textStyle = when {
+        options.size >= 3 && maxOptionLength > 10 -> MaterialTheme.typography.labelLarge // 14sp w600
+        options.size >= 3 -> MaterialTheme.typography.bodyLarge // 15sp w600
+        else -> MaterialTheme.typography.titleLarge // 16sp w700
+    }
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(HigSpec.SegmentedControlHeight)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(9.dp)
-            )
-            .padding(2.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(LiasThemeColors.fill)
+            .padding(3.dp)
     ) {
         val segmentWidth = maxWidth / options.size
-
-        // Sliding white/surface thumb indicator with spring motion
-        Box(
-            modifier = Modifier
-                .offset(x = segmentWidth * animatedIndex)
-                .width(segmentWidth)
-                .fillMaxHeight()
-                .padding(2.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(7.dp)
-                )
+        val animatedOffset by animateDpAsState(
+            targetValue = segmentWidth * selectedIndex,
+            animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f),
+            label = "iosSegmentThumbOffset"
         )
 
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
+        // Animated iOS White Thumb
+        Box(
+            modifier = Modifier
+                .offset(x = animatedOffset)
+                .width(segmentWidth)
+                .fillMaxHeight()
+                .shadow(elevation = 2.dp, shape = RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+        )
+
+        // Option Labels Row
+        Row(modifier = Modifier.fillMaxSize()) {
             options.forEachIndexed { index, label ->
                 val isSelected = index == selectedIndex
-                val contentColor = when {
-                    isSelected && label.equals("Block", ignoreCase = true) -> MaterialTheme.colorScheme.error
-                    isSelected && label.equals("Allow", ignoreCase = true) -> MaterialTheme.colorScheme.primary
-                    isSelected -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                val interactionSource = remember { MutableInteractionSource() }
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(7.dp))
-                        .clickable {
-                            onSelected(label.lowercase())
-                        },
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { onSelected(label.lowercase()) }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = label,
-                        color = contentColor,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        color = when {
+                            isSelected && label.equals("Block", ignoreCase = true) -> MaterialTheme.colorScheme.error
+                            isSelected && label.equals("Allow", ignoreCase = true) -> MaterialTheme.colorScheme.primary
+                            isSelected -> MaterialTheme.colorScheme.onSurface
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        style = textStyle,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

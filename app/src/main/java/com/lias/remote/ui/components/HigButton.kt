@@ -1,17 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigButton.kt
-// Version: 1.0.0
-// Purpose: HIG full-width button (12dp corner, 48dp min-height, 16sp/700 font)
-//          supporting Primary, Secondary, and Danger visual styles.
+// Version: 2.2.0
+// Purpose: HIG full-width button supporting Primary, Secondary, and Danger styles.
+// Audit Fixes:
+//   1. Replaced direct CupertinoButtonColors constructor call with CupertinoButtonDefaults factory methods.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.robinpcrd.cupertino.CupertinoButton
+import io.github.robinpcrd.cupertino.CupertinoButtonDefaults
 
 enum class HigButtonStyle {
     Primary,
@@ -35,22 +35,25 @@ fun HigButton(
     style: HigButtonStyle = HigButtonStyle.Primary,
     enabled: Boolean = true
 ) {
-    val (containerColor, contentColor) = when (style) {
-        HigButtonStyle.Primary -> MaterialTheme.colorScheme.primary to Color.White
-        HigButtonStyle.Secondary -> LiasThemeColors.fill to MaterialTheme.colorScheme.primary
-        HigButtonStyle.Danger -> MaterialTheme.colorScheme.error to Color.White
+    val buttonColors = when (style) {
+        HigButtonStyle.Primary -> CupertinoButtonDefaults.filledButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.White
+        )
+        HigButtonStyle.Secondary -> CupertinoButtonDefaults.tintedButtonColors(
+            containerColor = LiasThemeColors.fill,
+            contentColor = MaterialTheme.colorScheme.primary
+        )
+        HigButtonStyle.Danger -> CupertinoButtonDefaults.filledButtonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = Color.White
+        )
     }
 
-    Button(
+    CupertinoButton(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-            disabledContainerColor = LiasThemeColors.fill,
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        ),
+        colors = buttonColors,
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)

@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 2.3.0
-// Purpose: Home Dashboard Screen with Global Access Switch, Active Enforcements,
-//          metrics row, and recent devices.
+// Version: 3.1.0
+// Purpose: Home Dashboard Screen with full-width 48dp segmented control hero card.
+// Audit Fixes:
+//   1. Ensured GlobalSwitchHero fills 100% available card width for thumb control.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -27,11 +28,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -64,6 +64,7 @@ import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.components.SkeletonGroupedList
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.screens.policies.PolicyWizardSheet
+import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemGreenDark
 import java.util.Calendar
 import java.util.TimeZone
@@ -142,7 +143,7 @@ fun HomeScreen(
                                     leadingContent = {
                                         Box(
                                             modifier = Modifier
-                                                .size(9.dp)
+                                                .size(10.dp)
                                                 .background(
                                                     color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                                     shape = CircleShape
@@ -188,21 +189,24 @@ private fun GlobalSwitchHero(
 ) {
     val pol = globalPolicy ?: Policy(id = "global_default", name = "Global Access Switch", type = "global", action = "schedule")
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(HigSpec.CardCorner)),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(HigSpec.CardCorner)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("All Access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("Master switch for every managed device", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             SegmentedControl(
                 selected = pol.action,
                 onSelected = { newAction ->
                     onSavePolicy(pol.copy(action = newAction))
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             )
 
             AnimatedVisibility(
@@ -239,7 +243,7 @@ private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
                 primaryText = item.targetName,
                 secondaryText = item.scheduleName,
                 leadingContent = {
-                    Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(item.targetColor))
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(item.targetColor))
                 },
                 trailingContent = {
                     StatusPill(
@@ -271,9 +275,9 @@ private fun MetricsRow(devices: List<Device>) {
 
 @Composable
 private fun MetricCard(label: String, value: String, textColor: Color, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    Surface(
+        modifier = modifier.clip(RoundedCornerShape(14.dp)),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(14.dp)
     ) {
         Column(

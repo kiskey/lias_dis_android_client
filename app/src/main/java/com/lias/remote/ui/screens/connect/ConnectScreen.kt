@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
-// Version: 2.2.0
+// Version: 3.0.0
+// Purpose: Native iOS Connect Onboarding Screen.
 // Audit Fixes:
-//   1. Safely triggers `saveSettings()` on Connect button tap without duplicate
-//      `navController.navigate` calls to prevent ConnectScreen crash (CRASH-01).
-//   2. Retained gradient shield container, HigField inputs, and QR scanner affordance.
+//   1. Formatted onboarding screen with native iOS gradient shield and HigField inputs.
 // ====================================================================
 
 package com.lias.remote.ui.screens.connect

@@ -1,36 +1,44 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 2.2.0
+// Version: 3.2.0
+// Purpose: Native iOS Inset Grouped List cards and row items.
 // Audit Fixes:
-//   1. Added `trailingAction` slot to ListSectionHeader for section clock buttons (§4.1).
+//   1. Added iOS press dimming feedback (55% opacity spring) on row taps.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemColors
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
 
@@ -98,39 +106,65 @@ fun GroupedListRow(
     leadingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     showDivider: Boolean = false,
-    onClick: () -> Unit = {},
-    colors: ListItemColors = ListItemDefaults.colors(
-        containerColor = MaterialTheme.colorScheme.surface,
-        headlineColor = MaterialTheme.colorScheme.onSurface,
-        supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    isDestructive: Boolean = false,
+    primaryTextColor: Color? = null,
+    onClick: () -> Unit = {}
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    text = primaryText,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            supportingContent = secondaryText?.let {
-                {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            leadingContent = leadingContent,
-            trailingContent = trailingContent,
-            colors = colors,
+    val headlineColor = primaryTextColor
+        ?: if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.55f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f),
+        label = "iosRowPressAlpha"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = pressAlpha }
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = HigSpec.RowMinHeight)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp)
-        )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            leadingContent?.let { leading ->
+                leading()
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = primaryText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = headlineColor
+                )
+                secondaryText?.let { secondary ->
+                    Text(
+                        text = secondary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            trailingContent?.let { trailing ->
+                Spacer(modifier = Modifier.width(12.dp))
+                trailing()
+            }
+        }
+
         if (showDivider) {
             HorizontalDivider(
                 thickness = 0.5.dp,

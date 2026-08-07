@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 2.2.0
-// Purpose: Main Schedules Screen displaying configured time schedules and MiniWeekStrips.
+// Version: 3.0.0
+// Purpose: Native iOS Schedules Screen with inset card items and MiniWeekStrips.
+// Audit Fixes:
+//   1. Replaced Material 3 AlertDialog with Cupertino-styled HigAlertDialog.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -23,7 +25,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigContextMenu
@@ -229,7 +231,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             p.resolveScheduleIDs().contains(schedule.id)
         }
 
-        AlertDialog(
+        HigAlertDialog(
             onDismissRequest = { scheduleToDelete = null },
             title = { Text("Confirm Delete") },
             text = {
