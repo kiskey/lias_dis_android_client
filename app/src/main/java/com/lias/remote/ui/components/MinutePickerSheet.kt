@@ -1,8 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt
-// Version: 1.0.0
-// Purpose: Apple-style scrollable minute wheel picker sheet with haptic ticks,
-//          quick-pick chips, live readout, and solid green Allow CTA (§3).
+// Version: 1.1.0
+// Purpose: Scrollable minute wheel picker sheet with CupertinoPicker integration.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -11,7 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,21 +28,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -55,7 +43,8 @@ import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemGreenDark
-import kotlinx.coroutines.launch
+import io.github.robinpcrd.cupertino.CupertinoPicker
+import io.github.robinpcrd.cupertino.rememberCupertinoPickerState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -71,36 +60,17 @@ fun MinutePickerSheet(
     quickPicks: List<Int> = listOf(15, 30, 60, 90, 120)
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val coroutineScope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
 
     val initialMinutes = remember(currentExtension) {
         currentExtension?.let { ExtendHelper.minutesUntil(it.expiresAt) }?.takeIf { it in minMinutes..maxMinutes } ?: 30
     }
 
-    var selectedMinutes by remember { mutableIntStateOf(initialMinutes) }
-
     val wheelItems = remember(minMinutes, maxMinutes) { (minMinutes..maxMinutes).toList() }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (selectedMinutes - minMinutes).coerceAtLeast(0))
-    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    val initialIndex = (initialMinutes - minMinutes).coerceIn(0, wheelItems.size - 1)
+    val pickerState = rememberCupertinoPickerState(initialItem = initialIndex)
 
-    val centerIndex by remember {
-        derivedStateOf {
-            val firstVisible = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset
-            if (offset > 100) firstVisible + 1 else firstVisible
-        }
-    }
-
-    LaunchedEffect(listState) {
-        snapshotFlow { centerIndex }.collect { index ->
-            val value = wheelItems.getOrNull(index) ?: selectedMinutes
-            if (value != selectedMinutes) {
-                selectedMinutes = value
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            }
-        }
-    }
+    var selectedMinutes by remember { mutableIntStateOf(initialMinutes) }
+    selectedMinutes = wheelItems.getOrNull(pickerState.selectedItem) ?: initialMinutes
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -162,11 +132,8 @@ fun MinutePickerSheet(
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .clickable {
-                                selectedMinutes = pick
-                                coroutineScope.launch {
-                                    val targetIdx = (pick - minMinutes).coerceIn(0, wheelItems.size - 1)
-                                    listState.animateScrollToItem(targetIdx)
-                                }
+                                val targetIdx = (pick - minMinutes).coerceIn(0, wheelItems.size - 1)
+                                pickerState.setValue(targetIdx)
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -180,50 +147,24 @@ fun MinutePickerSheet(
                 }
             }
 
-            // Scrollable Minute Wheel
+            // Scrollable Cupertino Minute Wheel
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .background(LiasThemeColors.fill, RoundedCornerShape(10.dp))
-                )
-
-                LazyColumn(
-                    state = listState,
-                    flingBehavior = flingBehavior,
-                    contentPadding = PaddingValues(vertical = 68.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                CupertinoPicker(
+                    state = pickerState,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     items(wheelItems.size) { index ->
                         val minuteValue = wheelItems[index]
-                        val isCenter = index == centerIndex
-                        val distanceFromCenter = Math.abs(index - centerIndex)
-                        val scale = if (isCenter) 1.15f else (1.0f - (distanceFromCenter * 0.12f)).coerceAtLeast(0.7f)
-                        val alpha = if (isCenter) 1.0f else (1.0f - (distanceFromCenter * 0.3f)).coerceAtLeast(0.3f)
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "$minuteValue min",
-                                style = if (isCenter) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
-                                fontWeight = if (isCenter) FontWeight.W800 else FontWeight.Normal,
-                                color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .scale(scale)
-                                    .alpha(alpha)
-                            )
-                        }
+                        Text(
+                            text = "$minuteValue min",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
