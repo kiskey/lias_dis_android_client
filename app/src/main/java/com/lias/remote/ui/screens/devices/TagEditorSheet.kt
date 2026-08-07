@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Purpose: Modal bottom sheet for creating/editing tag groups with swatches.
 // ====================================================================
 
