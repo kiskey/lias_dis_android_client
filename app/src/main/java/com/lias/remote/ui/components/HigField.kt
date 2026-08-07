@@ -1,11 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigField.kt
-// Version: 2.0.0
+// Version: 2.1.0
 // Migration: Replaced hand-drawn Material3 TextField with CupertinoTextField
 // Purpose: iOS field card input component (label above value, rounded surface background)
 //          used in Connect, Tag Editor, Schedule Editor, and Policy Wizard.
-// Verification: §7 protocol - CupertinoTextField API confirmed from library source
-//               https://raw.githubusercontent.com/RobinPcrd/compose-cupertino/main/cupertino/src/commonMain/kotlin/io/github/robinpcrd/cupertino/CupertinoTextField.kt
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -41,9 +39,6 @@ fun HigField(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
-    // Keep the "label above value" layout pattern as required by iOS HIG
-    // and this app's existing design. CupertinoTextField doesn't have a built-in
-    // floating label, so we maintain the external label approach.
     Column(
         modifier = modifier
             .fillMaxWidth()
