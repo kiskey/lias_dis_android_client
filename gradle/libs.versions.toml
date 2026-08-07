@@ -1,9 +1,8 @@
 # ====================================================================
 # File: gradle/libs.versions.toml
-# Version: 2.2.0
+# Version: 2.3.0
 # Audit Fixes:
-#   1. Updated AGP to 8.8.0 to support Android compileSdk 36 required by
-#      RobinPcrd Cupertino 3.3.1 libraries.
+#   1. Retained AGP 8.8.0 and Cupertino 3.3.1 for API 36 support.
 # ====================================================================
 
 [versions]
