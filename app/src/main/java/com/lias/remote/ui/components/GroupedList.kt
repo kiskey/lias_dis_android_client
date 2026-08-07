@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/GroupedList.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Native iOS Inset Grouped List cards and row items.
 // Audit Fixes:
-//   1. Replaced Material 3 ListItem with native iOS row layout.
+//   1. Added isDestructive and primaryTextColor support to GroupedListRow.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
@@ -98,8 +99,13 @@ fun GroupedListRow(
     leadingContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     showDivider: Boolean = false,
+    isDestructive: Boolean = false,
+    primaryTextColor: Color? = null,
     onClick: () -> Unit = {}
 ) {
+    val headlineColor = primaryTextColor
+        ?: if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -118,7 +124,7 @@ fun GroupedListRow(
                 Text(
                     text = primaryText,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = headlineColor
                 )
                 secondaryText?.let { secondary ->
                     Text(
