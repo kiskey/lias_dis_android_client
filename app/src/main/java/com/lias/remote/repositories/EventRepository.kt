@@ -1,7 +1,3 @@
-# ====================================================================
-# File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-# ====================================================================
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
 // Version: 2.3.0
