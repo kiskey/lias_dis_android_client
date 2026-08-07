@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 3.3.0
+// Version: 3.4.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // Audit Fixes:
-//   1. Converted day mode selector to full-width 48dp SegmentedControl pills matching mode switch.
+//   1. Ensured day mode SegmentedControl fills 100% width matching mode switch above.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -259,7 +259,7 @@ fun ScheduleEditorSheet(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Converted Day Mode Selector to 48dp Segmented Control Pills
+                        // Full-width 48dp Segmented Control with Adaptive Font Scaling (14sp-16sp)
                         val dayModeOptions = listOf("Day Range", "Specific Days", "Dates")
                         val selectedDayModeLabel = when (dayMode) {
                             RuleDayMode.RANGE -> "Day Range"
