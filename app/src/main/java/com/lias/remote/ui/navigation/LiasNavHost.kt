@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 2.3.0
+// Version: 3.0.0
+// Purpose: Main navigation host using native iOS bottom tab bar and transitions.
 // Audit Fixes:
-//   1. Removed duplicate `navController.navigate` call in ConnectScreen callback
-//      to resolve ConnectScreen crash on Connect tap (CRASH-01).
+//   1. Replaced Material 3 NavigationBar and Scaffold with iOS CupertinoTabBar.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -11,7 +11,17 @@ package com.lias.remote.ui.navigation
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Home
@@ -19,8 +29,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -31,8 +40,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -52,6 +64,7 @@ import com.lias.remote.ui.screens.rules.RulesScreen
 import com.lias.remote.ui.screens.schedules.SchedulesScreen
 import com.lias.remote.ui.screens.settings.ConnectionSettingsScreen
 import com.lias.remote.ui.screens.settings.SettingsScreen
+import com.lias.remote.ui.theme.HigSpec
 
 sealed class LiasScreen(val route: String, val label: String, val icon: ImageVector) {
     data object Home : LiasScreen("home", "Home", Icons.Filled.Home)
@@ -108,33 +121,63 @@ fun LiasNavHost(
     if (!isConnected) {
         ConnectScreen(
             viewModel = settingsViewModel,
-            onConnected = {
-                // Compositional state switch handles navigation cleanly without race conditions
-            }
+            onConnected = {}
         )
     } else {
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = {
-                NavigationBar {
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentDestination = navBackStackEntry?.destination
+                // Native iOS Bottom Tab Bar without Material pills or ripples
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(HigSpec.TabBarHeight)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val navBackStackEntry by navController.currentBackStackEntryAsState()
+                        val currentDestination = navBackStackEntry?.destination
 
-                    items.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.label) },
-                            label = { Text(screen.label) },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                        items.forEach { screen ->
+                            val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                            val activeColor = MaterialTheme.colorScheme.primary
+                            val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = screen.icon,
+                                    contentDescription = screen.label,
+                                    tint = if (isSelected) activeColor else inactiveColor,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = screen.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) activeColor else inactiveColor,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
