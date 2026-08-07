@@ -1,11 +1,7 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
 // Version: 2.3.0
-// Audit Fixes:
-//   1. Updated effectiveStatusFor and effectiveStatusForTag to compute
-//      remaining extension minutes directly from policy expiresAt timestamp
-//      and fallback to server-synced effective statuses.
+// Purpose: View-model managing policy evaluation, extensions, and device state.
 // ====================================================================
 
 package com.lias.remote.ui
