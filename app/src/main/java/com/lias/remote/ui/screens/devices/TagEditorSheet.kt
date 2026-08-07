@@ -1,11 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. ModalBottomSheet with 22dp top corner radius (HigSpec.SheetCorner).
-//   2. iOS Nav Row (Cancel / Title / Save).
-//   3. Migrated Tag Name input to HigField.
-//   4. Selected color swatch gets double border halo ring effect.
+// Version: 2.2.0
+// Purpose: Modal bottom sheet for creating/editing tag groups with swatches.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -76,7 +72,6 @@ fun TagEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // HIG Navigation Row: Cancel / Title / Save
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -122,7 +117,6 @@ fun TagEditorSheet(
             Spacer(modifier = Modifier.height(4.dp))
             Text("BADGE COLOR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            // Swatch Row with Halo Ring on Selected Swatch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
