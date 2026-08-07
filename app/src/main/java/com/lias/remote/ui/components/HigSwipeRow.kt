@@ -1,21 +1,26 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigSwipeRow.kt
-// Version: 1.0.0
-// Purpose: Full-bleed swipe action row parameterized with label, icon,
-//          and custom action color; auto-commits on full-swipe threshold.
+// Version: 1.1.0
+// Purpose: Full-bleed swipe action row with Cupertino cancel 'X' option
+//          on opposite end and spring auto-reset.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +29,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
+import kotlinx.coroutines.launch
 
 data class SwipeAction(
     val label: String,
@@ -48,16 +55,24 @@ fun HigSwipeRow(
     fullSwipeCommits: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    leadingAction?.onTrigger?.invoke()
-                    fullSwipeCommits
+                    if (leadingAction != null) {
+                        leadingAction.onTrigger()
+                        coroutineScope.launch { state.reset() }
+                    }
+                    false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
-                    trailingAction?.onTrigger?.invoke()
-                    fullSwipeCommits
+                    if (trailingAction != null) {
+                        trailingAction.onTrigger()
+                        coroutineScope.launch { state.reset() }
+                    }
+                    false
                 }
                 else -> false
             }
@@ -74,21 +89,55 @@ fun HigSwipeRow(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(leadingAction.color)
-                        .padding(horizontal = 20.dp)
-                        .wrapContentSize(Alignment.CenterStart)
+                        .padding(horizontal = 12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = leadingAction.icon,
-                            contentDescription = leadingAction.label,
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = leadingAction.label,
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Leading Action Button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    leadingAction.onTrigger()
+                                    coroutineScope.launch { state.reset() }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = leadingAction.icon,
+                                contentDescription = leadingAction.label,
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = leadingAction.label,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+
+                        // Cupertino Cancel 'X' Button on opposite end
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.25f))
+                                .clickable {
+                                    coroutineScope.launch { state.reset() }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             } else if (direction == SwipeToDismissBoxValue.EndToStart && trailingAction != null) {
@@ -96,21 +145,55 @@ fun HigSwipeRow(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(trailingAction.color)
-                        .padding(horizontal = 20.dp)
-                        .wrapContentSize(Alignment.CenterEnd)
+                        .padding(horizontal = 12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = trailingAction.label,
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = trailingAction.icon,
-                            contentDescription = trailingAction.label,
-                            tint = Color.White
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Cupertino Cancel 'X' Button on opposite end
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.25f))
+                                .clickable {
+                                    coroutineScope.launch { state.reset() }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Trailing Action Button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    trailingAction.onTrigger()
+                                    coroutineScope.launch { state.reset() }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = trailingAction.label,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = trailingAction.icon,
+                                contentDescription = trailingAction.label,
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
             }
