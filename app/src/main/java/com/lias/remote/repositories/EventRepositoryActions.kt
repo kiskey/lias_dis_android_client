@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 2.0.0
+// Version: 2.1.0
 // Audit Fixes:
-//   1. Added Extend Access repository suspend functions (§2.4).
+//   1. Added toast ACK emission and refreshAll() synchronization to
+//      toggleVacationMode and flushNftables.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -134,6 +135,17 @@ suspend fun EventRepository.getDeviceLogs(pdid: String): ApiResult<List<FlowLog>
 suspend fun EventRepository.toggleVacationMode(enabled: Boolean): ApiResult<VacationResponse> {
     val result = api.post<VacationResponse, VacationRequest>(Endpoints.VACATION, VacationRequest(enabled))
     if (result is ApiResult.Success) {
+        val statusText = if (result.data.vacationMode) "Enabled" else "Disabled"
+        _uiEvents.emit(UiEvent.ShowSnackbar("✈️ Vacation Mode $statusText"))
+        refreshAll()
+    }
+    return result
+}
+
+suspend fun EventRepository.flushNftables(): ApiResult<Unit> {
+    val result = api.post<Unit, Unit>(Endpoints.NFTABLES_FLUSH, Unit)
+    if (result is ApiResult.Success) {
+        _uiEvents.emit(UiEvent.ShowSnackbar("🛡️ Nftables table flushed successfully"))
         refreshAll()
     }
     return result
