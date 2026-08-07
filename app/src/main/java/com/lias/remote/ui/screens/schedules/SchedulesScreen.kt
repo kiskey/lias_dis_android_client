@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Native iOS Schedules Screen with inset card items and MiniWeekStrips.
 // Audit Fixes:
-//   1. Replaced Material 3 AlertDialog with Cupertino-styled HigAlertDialog.
+//   1. Fixed Composable invocation inside forEach by using for loop.
+//   2. Fixed type inference and delegate imports for collectAsState.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -43,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.repositories.UiState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.ContextMenuItem
 import com.lias.remote.ui.components.GroupedList
@@ -62,7 +65,7 @@ import com.lias.remote.ui.theme.HigSpec
 
 @Composable
 fun SchedulesScreen(viewModel: LiasViewModel) {
-    val state by viewModel.state.collectAsState()
+    val state: UiState by viewModel.state.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
     var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
@@ -227,7 +230,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
     }
 
     scheduleToDelete?.let { schedule ->
-        val impactedPolicies = state.policies.filter { p ->
+        val impactedPolicies: List<Policy> = state.policies.filter { p ->
             p.resolveScheduleIDs().contains(schedule.id)
         }
 
@@ -238,7 +241,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                 if (impactedPolicies.isNotEmpty()) {
                     Column {
                         Text("⚠️ Warning: This schedule is attached to the following policies:")
-                        impactedPolicies.forEach { p ->
+                        for (p in impactedPolicies) {
                             Text("• ${p.name}", fontWeight = FontWeight.Bold)
                         }
                         Text("These policies will default to ALLOW ALL.")
