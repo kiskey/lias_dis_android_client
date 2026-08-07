@@ -1,12 +1,8 @@
-
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
 // Version: 2.3.0
-// Audit Fixes:
-//   1. Overhauled computeActiveEnforcements to evaluate allow, block, and schedule
-//      actions for both device-level and tag-level policies.
-//   2. Added expiresAt time-left checks to automatically display temporary device
-//      extensions and pauses in Active Enforcements until they expire.
+// Purpose: Home Dashboard Screen with Global Access Switch, Active Enforcements,
+//          metrics row, and recent devices.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -115,7 +111,6 @@ fun HomeScreen(
                 if (!state.isInitialLoaded && state.devices.isEmpty()) {
                     item { SkeletonGroupedList(count = 4) }
                 } else {
-                    // All Access Hero Switch
                     item {
                         GlobalSwitchHero(
                             globalPolicy = state.policies.find { it.id == "global_default" },
@@ -125,7 +120,6 @@ fun HomeScreen(
                         )
                     }
 
-                    // Contextual Active Enforcements Section (shown when enforcements active)
                     if (activeEnforcements.isNotEmpty()) {
                         item {
                             Column {
@@ -135,10 +129,8 @@ fun HomeScreen(
                         }
                     }
 
-                    // Metrics Row
                     item { MetricsRow(devices = state.devices) }
 
-                    // Recent Devices Section
                     item { ListSectionHeader("Recent Devices") }
 
                     item {
@@ -302,7 +294,6 @@ private fun computeActiveEnforcements(
 ): List<ActiveEnforcementItem> {
     val items = mutableListOf<ActiveEnforcementItem>()
 
-    // 1. Evaluate Global Access Switch
     val globalPol = policies.find { it.id == "global_default" }
     if (globalPol != null && globalPol.enabled) {
         if (globalPol.action == "block") {
@@ -332,11 +323,9 @@ private fun computeActiveEnforcements(
         }
     }
 
-    // 2. Evaluate Non-Global Policies (Device & Tag level)
     policies.forEach { p ->
         if (!p.enabled || p.type == "global" || p.targetID == "infrastructure") return@forEach
 
-        // Exclude expired temporary policies
         if (p.expiresAt != null) {
             val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
             if (minsLeft <= 0) return@forEach
