@@ -1,17 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 3.0.0
-// Audit Fixes:
-//   1. Added physics spring animation (`dampingRatio = 0.86f`) to white thumb offset.
-//   2. Enforced 38dp container height (`HigSpec.SegmentedControlHeight`).
-//   3. Styled Allow (primary blue), Block (error red), and default states dynamically.
-// Migration: Replaced hand-rolled implementation with CupertinoSegmentedControl for native iOS behavior.
+// Version: 3.1.0
+// Purpose: iOS segmented control wrapper using CupertinoSegmentedControl.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.lias.remote.ui.theme.HigSpec
@@ -40,7 +37,7 @@ fun SegmentedControl(
                 onClick = { onSelected(label.lowercase()) },
                 isSelected = isSelected
             ) {
-                androidx.compose.material3.Text(
+                Text(
                     text = label,
                     color = when {
                         isSelected && label.equals("Block", ignoreCase = true) -> MaterialTheme.colorScheme.error
