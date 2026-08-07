@@ -1,14 +1,13 @@
 # ====================================================================
 # File: gradle/libs.versions.toml
-# Version: 2.1.0
-# Purpose: Version Catalog for LIAS Remote Client with RobinPcrd Cupertino fork.
+# Version: 2.2.0
 # Audit Fixes:
-#   1. Updated AGP to 8.6.1, Kotlin to 2.2.10, Compose BOM to 2025.09.00.
-#   2. Added Cupertino 3.3.1 library artifacts (io.github.robinpcrd:cupertino).
+#   1. Updated AGP to 8.8.0 to support Android compileSdk 36 required by
+#      RobinPcrd Cupertino 3.3.1 libraries.
 # ====================================================================
 
 [versions]
-agp = "8.6.1"
+agp = "8.8.0"
 kotlin = "2.2.10"
 coreKtx = "1.13.1"
 lifecycle = "2.8.3"
