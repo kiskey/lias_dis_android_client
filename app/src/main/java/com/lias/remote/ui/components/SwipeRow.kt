@@ -1,8 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SwipeRow.kt
-// Version: 2.1.0
+// Version: 2.2.0
 // Purpose: Apple HIG SwipeToDismiss row component with full-bleed action
 //          backgrounds, Cupertino cancel 'X' option, and auto-reset.
+// Audit Fixes:
+//   1. Removed invalid self-reference to 'state' inside confirmValueChange lambda.
+//   2. Ensured returning false from confirmValueChange spring-resets the box.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -51,12 +54,10 @@ fun SwipeActionRow(
             when (value) {
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onSwipeRight?.invoke()
-                    coroutineScope.launch { state.reset() }
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
                     onSwipeLeft?.invoke()
-                    coroutineScope.launch { state.reset() }
                     false
                 }
                 else -> false
