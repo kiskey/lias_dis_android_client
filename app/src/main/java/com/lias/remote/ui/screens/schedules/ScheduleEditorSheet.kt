@@ -1,10 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 3.2.0
+// Version: 3.3.0
 // Purpose: Modal bottom sheet for creating/editing multi-rule time schedules.
 // Audit Fixes:
-//   1. Replaced TimePickerDialog with CupertinoTimePickerSheet 2-column wheel time picker.
-//   2. Fixed truncated 'Mat' symbol and @Composable invocation scope compilation errors.
+//   1. Converted day mode selector to full-width 48dp SegmentedControl pills matching mode switch.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -41,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -178,7 +178,8 @@ fun ScheduleEditorSheet(
                 onSelected = { selectedLabel ->
                     mode = if (selectedLabel.equals("Block", ignoreCase = true)) "downtime" else "whitelist"
                 },
-                options = listOf("Block", "Allow")
+                options = listOf("Block", "Allow"),
+                modifier = Modifier.fillMaxWidth()
             )
 
             ExposedDropdownMenuBox(
@@ -258,32 +259,29 @@ fun ScheduleEditorSheet(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val options = listOf(
-                                RuleDayMode.RANGE to "Day Range",
-                                RuleDayMode.SPECIFIC to "Specific Days",
-                                RuleDayMode.CALENDAR to "Dates"
-                            )
-                            options.forEach { (modeOpt, label) ->
-                                val selected = dayMode == modeOpt
-                                TextButton(
-                                    onClick = { dayMode = modeOpt },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+                        // Converted Day Mode Selector to 48dp Segmented Control Pills
+                        val dayModeOptions = listOf("Day Range", "Specific Days", "Dates")
+                        val selectedDayModeLabel = when (dayMode) {
+                            RuleDayMode.RANGE -> "Day Range"
+                            RuleDayMode.SPECIFIC -> "Specific Days"
+                            RuleDayMode.CALENDAR -> "Dates"
                         }
 
-                        Spacer(modifier = Modifier.size(8.dp))
+                        SegmentedControl(
+                            selected = selectedDayModeLabel,
+                            onSelected = { label ->
+                                dayMode = when (label) {
+                                    "day range" -> RuleDayMode.RANGE
+                                    "specific days" -> RuleDayMode.SPECIFIC
+                                    "dates" -> RuleDayMode.CALENDAR
+                                    else -> RuleDayMode.RANGE
+                                }
+                            },
+                            options = dayModeOptions,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.size(12.dp))
 
                         when (dayMode) {
                             RuleDayMode.RANGE -> {
