@@ -1,15 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Audit Fixes:
-//   1. Maintained native iOS CupertinoSearchTextField search bar and inset grouped cards.
+//   1. Added MoveTagSheet to let users switch/move devices between all tag groups.
+//   2. Added Cupertino HIG cancel 'X' swipe options and duplicate pause protection.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -32,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +67,7 @@ fun DevicesScreen(
     var showTagEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
+    var deviceToMoveTag by remember { mutableStateOf<Device?>(null) }
 
     var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
     var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
@@ -168,6 +169,13 @@ fun DevicesScreen(
                                             onClick = { onNavigateToDeviceDetail(device.pdid) }
                                         )
                                     )
+                                    add(
+                                        ContextMenuItem(
+                                            label = "Move Tag Group",
+                                            icon = Icons.Default.Sell,
+                                            onClick = { deviceToMoveTag = device }
+                                        )
+                                    )
                                     if (canExtendDevice) {
                                         add(
                                             ContextMenuItem(
@@ -203,12 +211,11 @@ fun DevicesScreen(
                                 ) {
                                     HigSwipeRow(
                                         leadingAction = SwipeAction(
-                                            label = "Edit Tag",
-                                            icon = Icons.Default.Edit,
+                                            label = "Move Tag",
+                                            icon = Icons.Default.Sell,
                                             color = MaterialTheme.colorScheme.primary,
                                             onTrigger = {
-                                                editingTag = tag
-                                                showTagEditor = true
+                                                deviceToMoveTag = device
                                             }
                                         ),
                                         trailingAction = SwipeAction(
@@ -258,6 +265,18 @@ fun DevicesScreen(
                 if (editingTag == null) viewModel.createTag(tag)
                 else viewModel.updateTag(tag)
                 showTagEditor = false
+            }
+        )
+    }
+
+    deviceToMoveTag?.let { device ->
+        MoveTagSheet(
+            device = device,
+            allTags = state.tags,
+            onDismiss = { deviceToMoveTag = null },
+            onConfirm = { tagIds ->
+                viewModel.assignTags(device.pdid, tagIds)
+                deviceToMoveTag = null
             }
         )
     }
