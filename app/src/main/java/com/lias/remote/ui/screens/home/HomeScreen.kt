@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 3.0.0
-// Purpose: Home Dashboard Screen with native iOS HIG layout and live enforcements.
+// Version: 3.1.0
+// Purpose: Home Dashboard Screen with full-width 48dp segmented control hero card.
 // Audit Fixes:
-//   1. Replaced Material 3 Card with iOS Surface inset card containers.
+//   1. Ensured GlobalSwitchHero fills 100% available card width for thumb control.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -143,7 +143,7 @@ fun HomeScreen(
                                     leadingContent = {
                                         Box(
                                             modifier = Modifier
-                                                .size(9.dp)
+                                                .size(10.dp)
                                                 .background(
                                                     color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                                     shape = CircleShape
@@ -199,13 +199,14 @@ private fun GlobalSwitchHero(
         Column(modifier = Modifier.padding(16.dp)) {
             Text("All Access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("Master switch for every managed device", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             SegmentedControl(
                 selected = pol.action,
                 onSelected = { newAction ->
                     onSavePolicy(pol.copy(action = newAction))
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             )
 
             AnimatedVisibility(
@@ -242,7 +243,7 @@ private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
                 primaryText = item.targetName,
                 secondaryText = item.scheduleName,
                 leadingContent = {
-                    Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(item.targetColor))
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(item.targetColor))
                 },
                 trailingContent = {
                     StatusPill(
