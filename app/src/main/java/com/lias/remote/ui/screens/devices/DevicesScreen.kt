@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 2.5.0
+// Version: 3.0.0
 // Audit Fixes:
-//   1. Replaced Material3 AlertDialog with Cupertino-styled HigAlertDialog for Rename prompt.
-//   2. Preserved all Extend Access triggers and tag grouping logic.
+//   1. Maintained native iOS CupertinoSearchTextField search bar and inset grouped cards.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
