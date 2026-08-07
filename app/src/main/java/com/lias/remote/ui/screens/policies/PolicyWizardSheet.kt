@@ -1,11 +1,7 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/policies/PolicyWizardSheet.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. Replaced all Checkbox and FilterChip selection controls with single-select GroupedListRows with trailing checkmarks.
-//   2. Replaced progress bar with HIG step pills and caption ("Step N of 3 — Enforcement").
-//   3. Migrated inputs to HigField and wizard actions to HigButton.
-//   4. Step 3 conflict preview renders using DetailedWeekGrid with red conflict bands.
+// Version: 2.2.0
+// Purpose: 3-step Policy Wizard Sheet with DetailedWeekGrid conflict preview.
 // ====================================================================
 
 package com.lias.remote.ui.screens.policies
@@ -129,7 +125,6 @@ fun PolicyWizardSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // HIG Step Indicator Pills
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -155,7 +150,6 @@ fun PolicyWizardSheet(
                 )
             }
 
-            // Navigation Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -169,7 +163,7 @@ fun PolicyWizardSheet(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-                Box(modifier = Modifier.size(48.dp)) // Spacer symmetry
+                Box(modifier = Modifier.size(48.dp))
             }
 
             when (step) {
@@ -183,7 +177,6 @@ fun PolicyWizardSheet(
 
                     Text("TARGET TYPE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    // Single-select GroupedListRow with trailing checkmarks (No Material chips/checkboxes)
                     GroupedListCard {
                         listOf("global" to "Global (Network-wide)", "tag" to "Tag Group", "device" to "Specific Device").forEachIndexed { index, (typeOpt, labelStr) ->
                             val isSelected = type == typeOpt
@@ -234,7 +227,6 @@ fun PolicyWizardSheet(
                 2 -> {
                     Text("ENFORCEMENT ACTION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    // Single-select GroupedListRow with colored leading dot and trailing checkmarks
                     GroupedListCard {
                         val actions = listOf(
                             Triple("schedule", "Scheduled Access", SystemOrangeDark),
