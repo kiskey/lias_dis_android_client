@@ -1,18 +1,20 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 3.2.0
+// Version: 3.3.0
 // Purpose: iOS segmented control wrapper using CupertinoSegmentedControl.
 // Audit Fixes:
-//   1. Corrected parameter name to selectedTabIndex.
+//   1. Increased height to 48dp and scaled font size to 16sp for Pixel 6a thumb accessibility.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import com.lias.remote.ui.theme.HigSpec
 import io.github.robinpcrd.cupertino.CupertinoSegmentedControl
 import io.github.robinpcrd.cupertino.CupertinoSegmentedControlTab
@@ -28,7 +30,9 @@ fun SegmentedControl(
 
     CupertinoSegmentedControl(
         selectedTabIndex = selectedIndex,
-        modifier = modifier.height(HigSpec.SegmentedControlHeight)
+        modifier = modifier
+            .fillMaxWidth()
+            .height(HigSpec.SegmentedControlHeight)
     ) {
         options.forEachIndexed { index, label ->
             val isSelected = index == selectedIndex
@@ -44,7 +48,8 @@ fun SegmentedControl(
                         isSelected -> MaterialTheme.colorScheme.onSurface
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    style = MaterialTheme.typography.labelLarge
+                    style = MaterialTheme.typography.titleLarge, // 16sp w700
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                 )
             }
         }
