@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 3.1.0
-// Purpose: Native iOS Settings Screen with CupertinoSwitch controls.
+// Version: 3.2.0
+// Purpose: Native iOS Settings Screen with CupertinoSwitch & Appearance controls.
 // Audit Fixes:
-//   1. Replaced colors parameter in GroupedListRow with isDestructive = true.
+//   1. Added Appearance section with SegmentedControl for System/Light/Dark mode.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -11,7 +11,10 @@ package com.lias.remote.ui.screens.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedList
@@ -40,6 +44,7 @@ import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemOrangeDark
 import io.github.robinpcrd.cupertino.CupertinoSwitch
@@ -82,7 +87,33 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 2 - Controls
+                // Section 2 - Appearance
+                item { ListSectionHeader("Appearance") }
+                item {
+                    GroupedListCard {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Theme Mode",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Auto switches between Light and Dark based on time of day (6 PM - 6 AM)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            SegmentedControl(
+                                selected = uiState.themeMode,
+                                onSelected = { mode -> viewModel.updateThemeMode(mode) },
+                                options = listOf("System", "Light", "Dark")
+                            )
+                        }
+                    }
+                }
+
+                // Section 3 - Controls
                 item { ListSectionHeader("Controls") }
                 item {
                     GroupedListCard {
@@ -109,7 +140,7 @@ fun SettingsScreen(
                     }
                 }
 
-                // Section 3 - Danger Zone
+                // Section 4 - Danger Zone
                 item { ListSectionHeader("Danger Zone") }
                 item {
                     GroupedListCard {
