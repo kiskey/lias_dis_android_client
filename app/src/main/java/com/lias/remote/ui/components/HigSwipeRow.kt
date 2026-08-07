@@ -1,8 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigSwipeRow.kt
-// Version: 1.1.0
-// Purpose: Full-bleed swipe action row with Cupertino cancel 'X' option
-//          on opposite end and spring auto-reset.
+// Version: 1.2.0
+// Audit Fixes:
+//   1. Removed invalid self-reference to 'state' inside confirmValueChange lambda.
+//   2. Ensured returning false from confirmValueChange spring-resets the box.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -61,17 +62,11 @@ fun HigSwipeRow(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    if (leadingAction != null) {
-                        leadingAction.onTrigger()
-                        coroutineScope.launch { state.reset() }
-                    }
+                    leadingAction?.onTrigger?.invoke()
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (trailingAction != null) {
-                        trailingAction.onTrigger()
-                        coroutineScope.launch { state.reset() }
-                    }
+                    trailingAction?.onTrigger?.invoke()
                     false
                 }
                 else -> false
@@ -96,7 +91,7 @@ fun HigSwipeRow(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Leading Action Button
+                        // Leading Action Button (Left side)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -120,7 +115,7 @@ fun HigSwipeRow(
                             )
                         }
 
-                        // Cupertino Cancel 'X' Button on opposite end
+                        // Cupertino Cancel 'X' Button (Opposite End / Right side)
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
@@ -152,7 +147,7 @@ fun HigSwipeRow(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Cupertino Cancel 'X' Button on opposite end
+                        // Cupertino Cancel 'X' Button (Opposite End / Left side)
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
@@ -171,7 +166,7 @@ fun HigSwipeRow(
                             )
                         }
 
-                        // Trailing Action Button
+                        // Trailing Action Button (Right side)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
