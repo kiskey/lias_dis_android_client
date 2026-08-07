@@ -1,8 +1,8 @@
 # ====================================================================
 # File: .github/workflows/release.yml
-# Version: 1.0.3
+# Version: 1.1.0
 # Audit Fixes:
-#   1. Updated build metadata headers and standardized release pipeline.
+#   1. Updated Gradle wrapper generation to 8.10.2 for AGP 8.8.0 compatibility.
 # ====================================================================
 
 name: Release Debug APK
@@ -31,7 +31,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.7
+        run: gradle wrapper --gradle-version 8.10.2
 
       - name: Make gradlew Executable
         run: chmod +x ./gradlew
