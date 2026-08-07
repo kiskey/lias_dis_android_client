@@ -1,7 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 2.3.0
-// Purpose: Modal bottom sheet for creating/editing tag groups with swatches.
+// Version: 3.0.0
+// Purpose: Modal bottom sheet for creating/editing tag groups with iOS swatches.
+// Audit Fixes:
+//   1. Formatted tag editor modal sheet with iOS HIG corner specs and HigField.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
