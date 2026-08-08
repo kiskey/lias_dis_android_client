@@ -1,8 +1,8 @@
 // ====================================================================
 // File: GroupedList.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Native iOS Inset Grouped List card and row items.
-//          10dp corners, 0.5px inset dividers, strict 44dp min height.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Replaced Material3 Surface with CupertinoSection. Fixed
+//          missing fillMaxSize import.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -18,16 +18,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
+import io.github.alexzhirkevich.cupertino.section.CupertinoSection
 
 @Composable
 fun GroupedList(
@@ -84,14 +84,8 @@ fun GroupedListCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(HigSpec.GroupedCardCorner)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            content()
-        }
+    CupertinoSection(modifier = modifier) {
+        content()
     }
 }
 
