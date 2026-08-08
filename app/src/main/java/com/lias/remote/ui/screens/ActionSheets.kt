@@ -142,7 +142,7 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                         .background(LiasThemeColors.red.copy(alpha = 0.12f)).padding(12.dp)
                 ) {
-                    CupertinoText("⚠️ Block All requires Face ID / confirmation and will disconnect all family devices immediately.", style = HigTypography.subheadline, color = LiasThemeColors.red, fontWeight = FontWeight.Medium)
+                    CupertinoText("⚠️ Block All requires confirmation and will disconnect all family devices immediately.", style = HigTypography.subheadline, color = LiasThemeColors.red, fontWeight = FontWeight.Medium)
                 }
             }
 
