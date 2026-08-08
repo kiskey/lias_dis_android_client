@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.lias.remote.ui.SettingsUiState
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.HigButton
@@ -36,9 +37,12 @@ fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
-    val state by viewModel.state.collectAsState()
-    var tempUrl by remember { mutableStateOf(state.serverUrl) }
-    var tempToken by remember { mutableStateOf(state.authToken) }
+    val state: SettingsUiState by viewModel.uiState.collectAsState()
+    var tempUrl by remember(state.serverUrl) { mutableStateOf(state.serverUrl) }
+    var tempToken by remember(state.authToken) { mutableStateOf(state.authToken) }
+
+    val statusSuccessColor = LiasThemeColors.green
+    val statusErrorColor = LiasThemeColors.red
 
     CupertinoScaffold(
         topBar = {
@@ -104,13 +108,20 @@ fun ConnectionSettingsScreen(
             )
 
             if (state.isTesting) {
-                CupertinoText("Testing connection...", modifier = Modifier.align(Alignment.CenterHorizontally), style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel)
+                CupertinoText(
+                    text = "Testing connection...",
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    style = HigTypography.subheadline,
+                    color = LiasThemeColors.secondaryLabel
+                )
             }
 
-            state.testResult?.let { result ->
+            state.testResult?.let { resultText ->
+                val isSuccess = resultText.startsWith("Connection successful", ignoreCase = true) || 
+                                resultText.startsWith("Settings saved", ignoreCase = true)
                 CupertinoText(
-                    text = result,
-                    color = if (result.startsWith("Connection successful")) LiasThemeColors.green else LiasThemeColors.red,
+                    text = resultText,
+                    color = if (isSuccess) statusSuccessColor else statusErrorColor,
                     style = HigTypography.subheadline
                 )
             }
