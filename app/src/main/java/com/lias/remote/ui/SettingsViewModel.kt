@@ -1,111 +1,77 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 12.0.0
+// Version: 20.0.0
 //
 // Purpose:
-//   Connection configuration, server health, appearance and advanced
-//   operational controls.
+//   Connection/settings state owner.
 //
-// Important correctness rules:
-//   - Test Connection never mutates the live client permanently.
-//   - Save/Connect persists only after /health succeeds.
-//   - Auth token is persisted before server URL so a newly selected
-//     authenticated server is not first contacted with stale credentials.
-//   - Real server version + measured request latency replace hard-coded
-//     Settings values.
-//   - Vacation state is derived from the actual global_default policy.
+// Batch 20:
+//   - Distinguishes "settings still loading" from "not configured".
+//   - Hydrates persisted connection values as one logical snapshot.
+//   - First-launch Connect verifies LIAS before persisting credentials.
+//   - Failed connection attempts do not replace saved configuration.
+//   - Retains existing settings/vacation/nftables interfaces.
 // ====================================================================
 
 package com.lias.remote.ui
 
-import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.network.ApiResult
-import com.lias.remote.core.network.ConnectionState
-import com.lias.remote.core.network.ConnectionValidationError
-import com.lias.remote.core.network.ConnectionValidationResult
-import com.lias.remote.core.network.ConnectionValidator
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.HealthResponse
 import com.lias.remote.core.network.LiasApiClient
 import com.lias.remote.core.store.SettingsRepository
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.flushNftables
-import com.lias.remote.repositories.importPolicies
-import com.lias.remote.repositories.exportPolicies
 import com.lias.remote.repositories.toggleVacationMode
+import java.net.URI
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
 
-    val serverUrl: String = "",
-
-    val savedServerUrl: String = "",
-
-    /**
-     * In-memory editable credential.
-     *
-     * Persistent storage is Keystore-backed by SettingsRepository.
+    /*
+     * Editable draft values.
      */
+    val serverUrl: String = "",
     val authToken: String = "",
 
-    val themeMode: String =
-        "system",
+    /*
+     * Persisted authoritative configuration.
+     */
+    val savedServerUrl: String = "",
+    val savedAuthToken: String = "",
 
-    val advancedMode: Boolean =
-        false,
+    /*
+     * False until DataStore has produced its initial persisted snapshot.
+     *
+     * LiasNavHost MUST NOT decide whether ConnectScreen is required
+     * until this becomes true.
+     */
+    val isConfigurationLoaded: Boolean = false,
 
-    val vacationMode: Boolean =
-        false,
+    val themeMode: String = "system",
+    val vacationMode: Boolean = false,
+    val isOnboarded: Boolean = false,
 
-    val connectionState:
-        ConnectionState =
-        ConnectionState.DISCONNECTED,
+    val isTesting: Boolean = false,
+    val isConnecting: Boolean = false,
 
-    val isTesting: Boolean =
-        false,
+    val testResult: String? = null,
+    val connectionError: String? = null,
 
-    val connectionVerified: Boolean =
-        false,
+    val isFlushing: Boolean = false
+) {
 
-    val isApplyingConnection: Boolean =
-        false,
-
-    val testResult: String? =
-        null,
-
-    val hasUnsavedConnectionChanges:
-        Boolean =
-        false,
-
-    val serverVersion: String? =
-        null,
-
-    val healthLatencyMs: Long? =
-        null,
-
-    val healthError: String? =
-        null,
-
-    val isRefreshingHealth: Boolean =
-        false,
-
-    val isFlushing: Boolean =
-        false,
-
-    val isExportingPolicies: Boolean =
-        false,
-
-    val isImportingPolicies: Boolean =
-        false,
-
-    val isOnboarded: Boolean =
-        false
-)
+    val isConfigured: Boolean
+        get() =
+            savedServerUrl
+                .isNotBlank()
+}
 
 class SettingsViewModel(
     private val settings:
@@ -125,165 +91,100 @@ class SettingsViewModel(
         StateFlow<SettingsUiState> =
         _uiState.asStateFlow()
 
+    /*
+     * Prevent later DataStore emissions from overwriting text the user
+     * is actively editing in Connection Settings.
+     */
+    private var draftHydrated =
+        false
+
     init {
-
-        observeSettings()
-        observeRuntimeState()
-    }
-
-    private fun observeSettings() {
 
         viewModelScope.launch {
 
-            settings.serverUrl
-                .collect { url ->
+            combine(
+                settings.serverUrl,
+                settings.authToken,
+                settings.themeMode,
+                settings.isOnboarded
+            ) {
+                    serverUrl,
+                    authToken,
+                    themeMode,
+                    onboarded ->
+
+                PersistedSettings(
+                    serverUrl =
+                        serverUrl,
+                    authToken =
+                        authToken.orEmpty(),
+                    themeMode =
+                        themeMode,
+                    onboarded =
+                        onboarded
+                )
+            }
+                .collect {
+                    persisted ->
 
                     val current =
                         _uiState.value
 
-                    val formUrl =
-                        if (
-                            current.serverUrl
-                                .isBlank()
-                        ) {
-                            url
-                        } else {
-                            current.serverUrl
-                        }
+                    val hydrateDraft =
+                        !draftHydrated
+
+                    if (
+                        hydrateDraft
+                    ) {
+                        draftHydrated =
+                            true
+                    }
 
                     _uiState.value =
                         current.copy(
                             serverUrl =
-                                formUrl,
+                                if (
+                                    hydrateDraft
+                                ) {
+                                    persisted.serverUrl
+                                } else {
+                                    current.serverUrl
+                                },
+                            authToken =
+                                if (
+                                    hydrateDraft
+                                ) {
+                                    persisted.authToken
+                                } else {
+                                    current.authToken
+                                },
                             savedServerUrl =
-                                url,
-                            hasUnsavedConnectionChanges =
-                                formUrl.trim() !=
-                                    url.trim()
-                        )
-                }
-        }
-
-        viewModelScope.launch {
-
-            settings.authToken
-                .collect { token ->
-
-                    /*
-                     * Only replace the editable token when it has not
-                     * diverged from persisted state through user input.
-                     */
-                    val current =
-                        _uiState.value
-
-                    if (
-                        !current
-                            .hasUnsavedConnectionChanges
-                    ) {
-                        _uiState.value =
-                            current.copy(
-                                authToken =
-                                    token.orEmpty()
-                            )
-                    }
-                }
-        }
-
-        viewModelScope.launch {
-
-            settings.themeMode
-                .collect { mode ->
-
-                    _uiState.value =
-                        _uiState.value.copy(
+                                persisted.serverUrl,
+                            savedAuthToken =
+                                persisted.authToken,
                             themeMode =
-                                mode
-                        )
-                }
-        }
-
-        viewModelScope.launch {
-
-            settings.isOnboarded
-                .collect { onboarded ->
-
-                    _uiState.value =
-                        _uiState.value.copy(
+                                persisted.themeMode,
                             isOnboarded =
-                                onboarded
-                        )
-                }
-        }
-
-        viewModelScope.launch {
-
-            settings.advancedMode
-                .collect { enabled ->
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            advancedMode =
-                                enabled
+                                persisted.onboarded,
+                            isConfigurationLoaded =
+                                true
                         )
                 }
         }
     }
-
-    private fun observeRuntimeState() {
-
-        viewModelScope.launch {
-
-            eventRepository.state
-                .collect { runtime ->
-
-                    val globalPolicy =
-                        runtime.policies
-                            .find {
-                                it.id ==
-                                    "global_default"
-                            }
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            connectionState =
-                                runtime
-                                    .connectionState,
-
-                            vacationMode =
-                                globalPolicy
-                                    ?.action ==
-                                    "block"
-                        )
-                }
-        }
-    }
-
-    // ----------------------------------------------------------------
-    // Form
-    // ----------------------------------------------------------------
 
     fun updateServerUrl(
         url: String
     ) {
 
-        val current =
-            _uiState.value
-
         _uiState.value =
-            current.copy(
+            _uiState.value.copy(
                 serverUrl =
                     url,
-                connectionVerified =
-                    false,
                 testResult =
                     null,
-                hasUnsavedConnectionChanges =
-                    url.trim() !=
-                        current
-                            .savedServerUrl
-                            .trim() ||
-                        current.authToken
-                            .isNotBlank()
+                connectionError =
+                    null
             )
     }
 
@@ -295,12 +196,10 @@ class SettingsViewModel(
             _uiState.value.copy(
                 authToken =
                     token,
-                connectionVerified =
-                    false,
                 testResult =
                     null,
-                hasUnsavedConnectionChanges =
-                    true
+                connectionError =
+                    null
             )
     }
 
@@ -316,18 +215,6 @@ class SettingsViewModel(
         }
     }
 
-    fun setAdvancedMode(
-        enabled: Boolean
-    ) {
-
-        viewModelScope.launch {
-
-            settings.setAdvancedMode(
-                enabled
-            )
-        }
-    }
-
     fun completeOnboarding() {
 
         viewModelScope.launch {
@@ -338,350 +225,51 @@ class SettingsViewModel(
         }
     }
 
-    // ----------------------------------------------------------------
-    // Test only
-    // ----------------------------------------------------------------
-
-    fun testConnection() {
-
-        viewModelScope.launch {
-
-            val current =
-                _uiState.value
-
-            val validation =
-                ConnectionValidator
-                    .validate(
-                        current.serverUrl
-                    )
-
-            if (
-                validation !is
-                ConnectionValidationResult.Valid
-            ) {
-
-                _uiState.value =
-                    current.copy(
-                        connectionVerified =
-                            false,
-                        testResult =
-                            validationMessage(
-                                validation.reason
-                            )
-                    )
-
-                return@launch
-            }
-
-            val oldBaseUrl =
-                api.baseUrl
-
-            val oldToken =
-                api.authToken
-
-            _uiState.value =
-                current.copy(
-                    isTesting =
-                        true,
-                    connectionVerified =
-                        false,
-                    testResult =
-                        null
-                )
-
-            try {
-
-                api.baseUrl =
-                    validation.normalizedUrl
-
-                api.authToken =
-                    current.authToken
-                        .trim()
-                        .ifBlank {
-                            null
-                        }
-
-                val start =
-                    SystemClock.elapsedRealtime()
-
-                val result =
-                    api.get<HealthResponse>(
-                        Endpoints.HEALTH
-                    )
-
-                val latency =
-                    SystemClock.elapsedRealtime() -
-                        start
-
-                when (result) {
-
-                    is ApiResult.Success -> {
-
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isTesting =
-                                    false,
-                                connectionVerified =
-                                    true,
-                                serverVersion =
-                                    result.data.version,
-                                healthLatencyMs =
-                                    latency,
-                                healthError =
-                                    null,
-                                testResult =
-                                    "Connection verified · LIAS ${result.data.version}"
-                            )
-                    }
-
-                    else -> {
-
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isTesting =
-                                    false,
-                                connectionVerified =
-                                    false,
-                                testResult =
-                                    apiErrorMessage(
-                                        result
-                                    )
-                            )
-                    }
-                }
-
-            } finally {
-
-                /*
-                 * Critical:
-                 *
-                 * Test Connection is side-effect free with respect to
-                 * the shared live API client — even if only the token
-                 * changed while the URL stayed identical.
-                 */
-                api.baseUrl =
-                    oldBaseUrl
-
-                api.authToken =
-                    oldToken
-            }
-        }
-    }
-
-    // ----------------------------------------------------------------
-    // Verify + persist
-    // ----------------------------------------------------------------
-
-    fun connect(
-        onSuccess: () -> Unit
+    /**
+     * First-launch connection path.
+     *
+     * Unlike the old Connect button, this does NOT persist a server
+     * merely because the URL field is non-empty.
+     *
+     * The health endpoint must respond successfully first.
+     */
+    fun connectAndSave(
+        onConnected: () -> Unit
     ) {
 
-        viewModelScope.launch {
+        if (
+            _uiState.value.isConnecting
+        ) {
+            return
+        }
 
-            val current =
-                _uiState.value
+        val candidateUrl =
+            normalizeServerUrl(
+                _uiState.value.serverUrl
+            )
 
-            val validation =
-                ConnectionValidator
-                    .validate(
-                        current.serverUrl
-                    )
+        val candidateToken =
+            _uiState.value.authToken
+                .trim()
 
-            if (
-                validation !is
-                ConnectionValidationResult.Valid
-            ) {
+        val validationError =
+            validateServerUrl(
+                candidateUrl
+            )
 
-                _uiState.value =
-                    current.copy(
-                        connectionVerified =
-                            false,
-                        testResult =
-                            validationMessage(
-                                validation.reason
-                            )
-                    )
-
-                return@launch
-            }
-
-            val url =
-                validation.normalizedUrl
-
-            val token =
-                current.authToken
-                    .trim()
-                    .ifBlank {
-                        null
-                    }
-
-            val oldBaseUrl =
-                api.baseUrl
-
-            val oldToken =
-                api.authToken
+        if (
+            validationError !=
+            null
+        ) {
 
             _uiState.value =
-                current.copy(
-                    isTesting =
-                        true,
-                    isApplyingConnection =
-                        false,
-                    connectionVerified =
-                        false,
+                _uiState.value.copy(
+                    connectionError =
+                        validationError,
                     testResult =
                         null
                 )
 
-            try {
-
-                api.baseUrl =
-                    url
-
-                api.authToken =
-                    token
-
-                val start =
-                    SystemClock.elapsedRealtime()
-
-                when (
-                    val result =
-                        api.get<HealthResponse>(
-                            Endpoints.HEALTH
-                        )
-                ) {
-
-                    is ApiResult.Success -> {
-
-                        val latency =
-                            SystemClock.elapsedRealtime() -
-                                start
-
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isTesting =
-                                    false,
-                                isApplyingConnection =
-                                    true,
-                                connectionVerified =
-                                    true,
-                                serverVersion =
-                                    result.data.version,
-                                healthLatencyMs =
-                                    latency,
-                                healthError =
-                                    null,
-                                testResult =
-                                    "Connection verified"
-                            )
-
-                        /*
-                         * Credential first.
-                         *
-                         * When serverUrl changes, EventRepository starts
-                         * a new synchronization. The new credential should
-                         * already be available before that happens.
-                         */
-                        settings.saveAuthToken(
-                            token
-                        )
-
-                        settings.saveServerUrl(
-                            url
-                        )
-
-                        _uiState.value =
-                            _uiState.value.copy(
-                                serverUrl =
-                                    url,
-                                savedServerUrl =
-                                    url,
-                                isApplyingConnection =
-                                    false,
-                                hasUnsavedConnectionChanges =
-                                    false,
-                                testResult =
-                                    "Connected to LIAS ${result.data.version}"
-                            )
-
-                        onSuccess()
-                    }
-
-                    else -> {
-
-                        api.baseUrl =
-                            oldBaseUrl
-
-                        api.authToken =
-                            oldToken
-
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isTesting =
-                                    false,
-                                isApplyingConnection =
-                                    false,
-                                connectionVerified =
-                                    false,
-                                testResult =
-                                    apiErrorMessage(
-                                        result
-                                    )
-                            )
-                    }
-                }
-
-            } catch (
-                error: Exception
-            ) {
-
-                api.baseUrl =
-                    oldBaseUrl
-
-                api.authToken =
-                    oldToken
-
-                _uiState.value =
-                    _uiState.value.copy(
-                        isTesting =
-                            false,
-                        isApplyingConnection =
-                            false,
-                        connectionVerified =
-                            false,
-                        testResult =
-                            error.message
-                                ?.takeIf {
-                                    it.isNotBlank()
-                                }
-                                ?: "Unable to connect to LIAS."
-                    )
-            }
-        }
-    }
-
-    fun saveSettings() {
-
-        connect(
-            onSuccess = {}
-        )
-    }
-
-    // ----------------------------------------------------------------
-    // Health
-    // ----------------------------------------------------------------
-
-    fun refreshServerHealth() {
-
-        val serverUrl =
-            _uiState.value
-                .savedServerUrl
-
-        if (
-            serverUrl.isBlank() ||
-            _uiState.value
-                .isRefreshingHealth
-        ) {
             return
         }
 
@@ -689,46 +277,95 @@ class SettingsViewModel(
 
             _uiState.value =
                 _uiState.value.copy(
-                    isRefreshingHealth =
+                    serverUrl =
+                        candidateUrl,
+                    isConnecting =
                         true,
-                    healthError =
+                    connectionError =
+                        null,
+                    testResult =
                         null
                 )
 
-            val start =
-                SystemClock.elapsedRealtime()
+            val previousApiUrl =
+                api.baseUrl
+
+            val previousApiToken =
+                api.authToken
+
+            /*
+             * LiasApiClient is the currently supplied probe surface.
+             * Do not persist the candidate until the health check passes.
+             */
+            api.baseUrl =
+                candidateUrl
+
+            api.authToken =
+                candidateToken
+                    .ifBlank {
+                        null
+                    }
+
+            val result =
+                api.get<HealthResponse>(
+                    Endpoints.HEALTH
+                )
 
             when (
-                val result =
-                    api.get<HealthResponse>(
-                        Endpoints.HEALTH
-                    )
+                result
             ) {
 
                 is ApiResult.Success -> {
 
+                    settings.saveServerUrl(
+                        candidateUrl
+                    )
+
+                    settings.saveAuthToken(
+                        candidateToken
+                            .ifBlank {
+                                null
+                            }
+                    )
+
                     _uiState.value =
                         _uiState.value.copy(
-                            isRefreshingHealth =
+                            savedServerUrl =
+                                candidateUrl,
+                            savedAuthToken =
+                                candidateToken,
+                            isConnecting =
                                 false,
-                            serverVersion =
-                                result.data.version,
-                            healthLatencyMs =
-                                SystemClock.elapsedRealtime() -
-                                    start,
-                            healthError =
-                                null
+                            connectionError =
+                                null,
+                            testResult =
+                                "Connected to LIAS ${result.data.version}"
                         )
+
+                    onConnected()
                 }
 
                 else -> {
 
+                    /*
+                     * Candidate was only a probe.
+                     *
+                     * Restore the currently persisted endpoint so a
+                     * failed edit cannot leave the shared API client
+                     * pointing at the rejected server.
+                     */
+                    api.baseUrl =
+                        previousApiUrl
+
+                    api.authToken =
+                        previousApiToken
+
                     _uiState.value =
                         _uiState.value.copy(
-                            isRefreshingHealth =
+                            isConnecting =
                                 false,
-                            healthError =
-                                apiErrorMessage(
+                            connectionError =
+                                connectionFailureMessage(
                                     result
                                 )
                         )
@@ -737,9 +374,180 @@ class SettingsViewModel(
         }
     }
 
-    // ----------------------------------------------------------------
-    // Vacation Mode
-    // ----------------------------------------------------------------
+    /**
+     * Non-persisting connection test used by Connection Settings.
+     */
+    fun testConnection() {
+
+        if (
+            _uiState.value.isTesting ||
+            _uiState.value.isConnecting
+        ) {
+            return
+        }
+
+        val candidateUrl =
+            normalizeServerUrl(
+                _uiState.value.serverUrl
+            )
+
+        val validationError =
+            validateServerUrl(
+                candidateUrl
+            )
+
+        if (
+            validationError !=
+            null
+        ) {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    connectionError =
+                        validationError,
+                    testResult =
+                        null
+                )
+
+            return
+        }
+
+        viewModelScope.launch {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isTesting =
+                        true,
+                    connectionError =
+                        null,
+                    testResult =
+                        null
+                )
+
+            val previousApiUrl =
+                api.baseUrl
+
+            val previousApiToken =
+                api.authToken
+
+            api.baseUrl =
+                candidateUrl
+
+            api.authToken =
+                _uiState.value
+                    .authToken
+                    .trim()
+                    .ifBlank {
+                        null
+                    }
+
+            val result =
+                api.get<HealthResponse>(
+                    Endpoints.HEALTH
+                )
+
+            api.baseUrl =
+                previousApiUrl
+
+            api.authToken =
+                previousApiToken
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isTesting =
+                        false,
+                    testResult =
+                        when (
+                            result
+                        ) {
+
+                            is ApiResult.Success ->
+                                "Connection successful · LIAS ${result.data.version}"
+
+                            else ->
+                                null
+                        },
+                    connectionError =
+                        when (
+                            result
+                        ) {
+
+                            is ApiResult.Success ->
+                                null
+
+                            else ->
+                                connectionFailureMessage(
+                                    result
+                                )
+                        }
+                )
+        }
+    }
+
+    /**
+     * Existing Connection Settings save interface.
+     *
+     * This remains explicit because an already-configured user may
+     * intentionally replace a server after testing it.
+     */
+    fun saveSettings() {
+
+        val candidateUrl =
+            normalizeServerUrl(
+                _uiState.value.serverUrl
+            )
+
+        val validationError =
+            validateServerUrl(
+                candidateUrl
+            )
+
+        if (
+            validationError !=
+            null
+        ) {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    connectionError =
+                        validationError
+                )
+
+            return
+        }
+
+        viewModelScope.launch {
+
+            val token =
+                _uiState.value
+                    .authToken
+                    .trim()
+
+            settings.saveServerUrl(
+                candidateUrl
+            )
+
+            settings.saveAuthToken(
+                token.ifBlank {
+                    null
+                }
+            )
+
+            _uiState.value =
+                _uiState.value.copy(
+                    serverUrl =
+                        candidateUrl,
+                    savedServerUrl =
+                        candidateUrl,
+                    savedAuthToken =
+                        token,
+                    connectionError =
+                        null,
+                    testResult =
+                        "Settings saved."
+                )
+        }
+    }
 
     fun toggleVacationMode(
         enabled: Boolean
@@ -747,188 +555,28 @@ class SettingsViewModel(
 
         viewModelScope.launch {
 
-            when (
-                val result =
-                    eventRepository
-                        .toggleVacationMode(
-                            enabled
-                        )
-            ) {
-
-                is ApiResult.Success -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            vacationMode =
-                                result.data
-                                    .vacationMode
-                        )
-                }
-
-                else -> {
-
-                    eventRepository
-                        .emitUiEvent(
-                            com.lias.remote.repositories.UiEvent
-                                .ShowSnackbarError(
-                                    apiErrorMessage(
-                                        result
-                                    )
-                                )
-                        )
-                }
-            }
-        }
-    }
-
-    // ----------------------------------------------------------------
-    // Policy backup
-    // ----------------------------------------------------------------
-
-    fun exportPolicies(
-        onReady: (String) -> Unit
-    ) {
-
-        if (
-            _uiState.value
-                .isExportingPolicies
-        ) {
-            return
-        }
-
-        viewModelScope.launch {
-
-            _uiState.value =
-                _uiState.value.copy(
-                    isExportingPolicies =
-                        true
-                )
-
-            when (
-                val result =
-                    eventRepository
-                        .exportPolicies()
-            ) {
-
-                is ApiResult.Success -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isExportingPolicies =
-                                false
-                        )
-
-                    onReady(
-                        result.data
+            val result =
+                eventRepository
+                    .toggleVacationMode(
+                        enabled
                     )
-                }
 
-                else -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isExportingPolicies =
-                                false
-                        )
-
-                    eventRepository
-                        .emitUiEvent(
-                            com.lias.remote.repositories.UiEvent
-                                .ShowSnackbarError(
-                                    apiErrorMessage(
-                                        result
-                                    )
-                                )
-                        )
-                }
-            }
-        }
-    }
-
-    fun importPolicies(
-        payload: String
-    ) {
-
-        if (
-            _uiState.value
-                .isImportingPolicies
-        ) {
-            return
-        }
-
-        if (
-            payload.isBlank()
-        ) {
-            return
-        }
-
-        viewModelScope.launch {
-
-            _uiState.value =
-                _uiState.value.copy(
-                    isImportingPolicies =
-                        true
-                )
-
-            when (
-                val result =
-                    eventRepository
-                        .importPolicies(
-                            payload
-                        )
+            if (
+                result is
+                ApiResult.Success
             ) {
 
-                is ApiResult.Success -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isImportingPolicies =
-                                false
-                        )
-
-                    eventRepository
-                        .emitUiEvent(
-                            com.lias.remote.repositories.UiEvent
-                                .ShowSnackbar(
-                                    "Policies restored"
-                                )
-                        )
-                }
-
-                else -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isImportingPolicies =
-                                false
-                        )
-
-                    eventRepository
-                        .emitUiEvent(
-                            com.lias.remote.repositories.UiEvent
-                                .ShowSnackbarError(
-                                    apiErrorMessage(
-                                        result
-                                    )
-                                )
-                        )
-                }
+                _uiState.value =
+                    _uiState.value.copy(
+                        vacationMode =
+                            result.data
+                                .vacationMode
+                    )
             }
         }
     }
-
-    // ----------------------------------------------------------------
-    // Firewall maintenance
-    // ----------------------------------------------------------------
 
     fun flushNftables() {
-
-        if (
-            _uiState.value
-                .isFlushing
-        ) {
-            return
-        }
 
         viewModelScope.launch {
 
@@ -938,105 +586,137 @@ class SettingsViewModel(
                         true
                 )
 
-            when (
-                val result =
-                    eventRepository
-                        .flushNftables()
-            ) {
+            eventRepository
+                .flushNftables()
 
-                is ApiResult.Success -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isFlushing =
-                                false
-                        )
-                }
-
-                else -> {
-
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isFlushing =
-                                false
-                        )
-
-                    eventRepository
-                        .emitUiEvent(
-                            com.lias.remote.repositories.UiEvent
-                                .ShowSnackbarError(
-                                    apiErrorMessage(
-                                        result
-                                    )
-                                )
-                        )
-                }
-            }
+            _uiState.value =
+                _uiState.value.copy(
+                    isFlushing =
+                        false
+                )
         }
     }
 
-    private fun validationMessage(
-        error:
-            ConnectionValidationError
-    ): String =
-        when (error) {
+    private fun normalizeServerUrl(
+        raw: String
+    ): String {
 
-            ConnectionValidationError.EMPTY ->
-                "Enter your LIAS server address."
+        val trimmed =
+            raw.trim()
+                .trimEnd(
+                    '/'
+                )
 
-            ConnectionValidationError.INVALID_FORMAT ->
-                "Enter a valid server address."
-
-            ConnectionValidationError.UNSUPPORTED_SCHEME ->
-                "Use an HTTP or HTTPS server address."
-
-            ConnectionValidationError.MISSING_HOST ->
-                "The server address must include a host."
-
-            ConnectionValidationError.INVALID_PORT ->
-                "The server port must be between 1 and 65535."
+        if (
+            trimmed.isBlank()
+        ) {
+            return ""
         }
 
-    private fun apiErrorMessage(
-        result:
-            ApiResult<*>
+        return if (
+            trimmed.startsWith(
+                "http://",
+                ignoreCase = true
+            ) ||
+            trimmed.startsWith(
+                "https://",
+                ignoreCase = true
+            )
+        ) {
+            trimmed
+        } else {
+            "http://$trimmed"
+        }
+    }
+
+    private fun validateServerUrl(
+        url: String
+    ): String? {
+
+        if (
+            url.isBlank()
+        ) {
+            return "Enter the LIAS server address."
+        }
+
+        return try {
+
+            val parsed =
+                URI(
+                    url
+                )
+
+            when {
+
+                parsed.scheme !in
+                    setOf(
+                        "http",
+                        "https"
+                    ) ->
+                    "LIAS Server must use http:// or https://."
+
+                parsed.host
+                    .isNullOrBlank() ->
+                    "Enter a valid LIAS server address."
+
+                else ->
+                    null
+            }
+
+        } catch (
+            _: Exception
+        ) {
+            "Enter a valid LIAS server address."
+        }
+    }
+
+    private fun connectionFailureMessage(
+        result: ApiResult<*>
     ): String =
-        when (result) {
-
-            is ApiResult.Success<*> ->
-                "Request completed."
-
-            is ApiResult.AuthenticationError ->
-                result.message
+        when (
+            result
+        ) {
 
             is ApiResult.HttpError ->
-                when (result.code) {
 
-                    401 ->
-                        "The authentication token was rejected."
+                when (
+                    result.code
+                ) {
 
+                    401,
                     403 ->
-                        "The LIAS server denied this operation."
+                        "Authentication failed. Check the LIAS Auth Token."
 
                     404 ->
-                        "The requested LIAS endpoint was not found."
+                        "A server responded, but the LIAS health endpoint was not found."
 
                     else ->
                         result.message
+                            .ifBlank {
+                                "LIAS returned HTTP ${result.code}."
+                            }
                 }
 
-            is ApiResult.ConflictError ->
-                result.message
-
             is ApiResult.NetworkError ->
+
                 result.cause
                     .message
                     ?.takeIf {
                         it.isNotBlank()
                     }
-                    ?: "Unable to reach LIAS."
+                    ?: "LIAS could not be reached."
 
-            is ApiResult.SerializationError ->
-                "LIAS returned an invalid response."
+            is ApiResult.ConflictError ->
+                "LIAS rejected the request."
+
+            else ->
+                "Unable to connect to LIAS."
         }
+
+    private data class PersistedSettings(
+        val serverUrl: String,
+        val authToken: String,
+        val themeMode: String,
+        val onboarded: Boolean
+    )
 }
