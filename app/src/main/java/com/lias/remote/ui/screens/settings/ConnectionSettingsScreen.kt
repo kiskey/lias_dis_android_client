@@ -1,26 +1,20 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
-// Version: 3.0.0
-// Purpose: Native iOS Connection Settings Screen with CupertinoActivityIndicator.
-// Audit Fixes:
-//   1. Maintained CupertinoActivityIndicator loading state and HigField inputs.
+// File: ConnectionSettingsScreen.kt
+// Version: 3.0.0 (HIG Redesign)
+// Purpose: Server connection form. Preserves /health API test contract.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
@@ -37,6 +30,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigTextButton
 import io.github.robinpcrd.cupertino.CupertinoActivityIndicator
 
 @Composable
@@ -50,25 +44,23 @@ fun ConnectionSettingsScreen(
 
     HigLargeTitleScaffold(
         title = "",
-        navLeading = {
-            TextButton(onClick = onBack) {
-                Text("‹ Settings", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            }
-        },
+        navLeading = { HigTextButton(text = "‹ Settings", onClick = onBack) },
         navTrailing = {
-            TextButton(onClick = {
-                viewModel.updateServerUrl(tempUrl)
-                viewModel.updateAuthToken(tempToken)
-                viewModel.saveSettings()
-                onBack()
-            }) {
-                Text("Save", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
+            HigTextButton(
+                text = "Save",
+                onClick = {
+                    viewModel.updateServerUrl(tempUrl)
+                    viewModel.updateAuthToken(tempToken)
+                    viewModel.saveSettings()
+                    onBack()
+                }
+            )
         }
-    ) {
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -76,7 +68,7 @@ fun ConnectionSettingsScreen(
             Text(
                 text = "Connection Settings",
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.W800
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             HigField(
@@ -104,20 +96,14 @@ fun ConnectionSettingsScreen(
             )
 
             if (state.isTesting) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CupertinoActivityIndicator(modifier = Modifier.size(28.dp))
-                }
+                CupertinoActivityIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
 
             state.testResult?.let { result ->
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = result,
                     color = if (result.startsWith("Connection successful") || result.startsWith("Settings saved")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
