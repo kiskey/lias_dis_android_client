@@ -1,10 +1,3 @@
-// ====================================================================
-// File: UndoToast.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: 5-second undo toast replacing silent optimistic rollbacks.
-//          HIG-compliant dark pill with action button.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -19,16 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoButton
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoText
 import kotlinx.coroutines.delay
 
 data class UndoState(
@@ -44,8 +39,8 @@ fun UndoToast(
 ) {
     AnimatedVisibility(
         visible = undoState != null,
-        enter = slideInVertically() + fadeIn(),
-        exit = slideOutVertically() + fadeOut(),
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
         modifier = modifier
     ) {
         LaunchedEffect(undoState) {
@@ -61,25 +56,32 @@ fun UndoToast(
         ) {
             Row(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF3A3A3C))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .background(Color(0xFF48484A))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
+                CupertinoText(
                     text = undoState?.message ?: "",
                     color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = HigTypography.body,
                     modifier = Modifier.weight(1f)
                 )
-                HigTextButton(
-                    text = "UNDO",
+                CupertinoButton(
                     onClick = {
                         undoState?.onUndo?.invoke()
                         onDismiss()
-                    }
-                )
+                    },
+                    colors = CupertinoButtonDefaults.plainButtonColors(contentColor = LiasThemeColors.blue)
+                ) {
+                    CupertinoText(
+                        text = "UNDO",
+                        style = HigTypography.headline,
+                        color = LiasThemeColors.blue
+                    )
+                }
             }
         }
     }
