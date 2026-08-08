@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 2.5.0
+// Version: 2.6.0
 // Audit Fixes:
 //   1. Explicitly imported UiState and UiEvent from repositories package.
-//   2. Typed inFlightPauseRequests as MutableSet<String> for clean Kotlin interop.
+//   2. Added inFlightPauseRequests set to prevent duplicate pause calls.
 // ====================================================================
 
 package com.lias.remote.ui
