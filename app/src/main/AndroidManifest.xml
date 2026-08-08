@@ -1,29 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- ==================================================================== -->
-<!-- File: app/src/main/AndroidManifest.xml                               -->
-<!-- Version: 3.0.0                                                       -->
-<!--                                                                      -->
-<!-- Purpose:                                                             -->
-<!--   Application permissions and external LIAS navigation contract.     -->
-<!--                                                                      -->
-<!-- Deep links:                                                          -->
-<!--   lias://device/device/<pdid>                                        -->
-<!--   https://lias.local/device/<pdid>                                  -->
-<!--                                                                      -->
-<!-- The custom lias:// URI is the primary app-to-app contract.           -->
-<!-- The HTTPS form provides a future web-compatible/shareable contract.  -->
-<!-- ==================================================================== -->
+<!--
+====================================================================
+File: app/src/main/AndroidManifest.xml
+Version: 20.0.0
 
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
+Batch 20:
+  - Registers LIAS Remote navigation deep links.
+  - Does NOT allow configuration/auth data through URI parameters.
+  - Keeps normal launcher behavior unchanged.
+
+Supported:
+
+  liasremote://home
+  liasremote://devices
+  liasremote://device/<pdid>
+  liasremote://devices/<pdid>
+  liasremote://schedules
+  liasremote://rules
+  liasremote://settings
+====================================================================
+-->
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission
-        android:name="android.permission.INTERNET" />
-
-    <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".LiasApplication"
@@ -42,68 +45,34 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.LiasRemote"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Normal application launch -->
+            <!-- Normal launcher entry point. -->
             <intent-filter>
 
-                <action
-                    android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.MAIN" />
 
-                <category
-                    android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
 
             </intent-filter>
 
             <!--
-                Primary LIAS application deep-link contract.
+                LIAS Remote navigation links.
 
-                Example:
-                lias://device/device/pdid-123
+                We intentionally register only the custom scheme here.
+                There is no token, server-address, or credential-bearing
+                URI contract.
             -->
             <intent-filter>
 
-                <action
-                    android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.VIEW" />
 
-                <category
-                    android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
 
-                <category
-                    android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="lias"
-                    android:host="device"
-                    android:pathPrefix="/device" />
-
-            </intent-filter>
-
-            <!--
-                Shareable HTTPS contract.
-
-                Example:
-                https://lias.local/device/pdid-123
-
-                This is deliberately explicit rather than accepting every
-                HTTPS URL associated with the application.
-            -->
-            <intent-filter>
-
-                <action
-                    android:name="android.intent.action.VIEW" />
-
-                <category
-                    android:name="android.intent.category.DEFAULT" />
-
-                <category
-                    android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="https"
-                    android:host="lias.local"
-                    android:pathPrefix="/device" />
+                <data android:scheme="liasremote" />
 
             </intent-filter>
 
