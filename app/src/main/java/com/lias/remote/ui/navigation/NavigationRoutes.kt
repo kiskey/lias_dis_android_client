@@ -1,31 +1,14 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/navigation/NavigationRoutes.kt
-// Version: 20.0.0
+// File:
+// app/src/main/java/com/lias/remote/ui/navigation/NavigationRoutes.kt
+// Version: 25.0.0
 //
 // Purpose:
-//   Central navigation and external-deep-link contract.
-//
-// Supported external URI examples:
-//
-//   liasremote://home
-//   liasremote://devices
-//   liasremote://device/<pdid>
-//   liasremote://devices/<pdid>
-//   liasremote://schedules
-//   liasremote://rules
-//   liasremote://settings
+//   Single navigation/deep-link grammar.
 //
 // Security:
-//   - Deep links NEVER contain or accept authentication tokens.
-//   - Server URL cannot be changed by a deep link.
-//   - Unknown URI paths are rejected.
-//   - Device PDIDs are URI-decoded only after parsing.
-//
-// Deep links are navigation hints only. They do not bypass:
-//   - configuration gate
-//   - authentication
-//   - infrastructure protection
-//   - LIAS authorization
+//   Deep links navigate only.
+//   They cannot configure a LIAS server or authentication token.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -58,7 +41,11 @@ object NavigationRoutes {
     fun deviceDetail(
         pdid: String
     ): String =
-        "device_detail/${Uri.encode(pdid)}"
+        "device_detail/${
+            Uri.encode(
+                pdid
+            )
+        }"
 }
 
 sealed interface ExternalDestination {
@@ -85,24 +72,26 @@ sealed interface ExternalDestination {
 
 object LiasDeepLinks {
 
-    const val SCHEME =
+    private const val SCHEME =
         "liasremote"
 
     fun parse(
-        rawUri: String?
+        raw: String?
     ): ExternalDestination? {
 
         if (
-            rawUri.isNullOrBlank()
+            raw.isNullOrBlank()
         ) {
             return null
         }
 
         val uri =
             try {
+
                 Uri.parse(
-                    rawUri
+                    raw
                 )
+
             } catch (
                 _: Exception
             ) {
@@ -112,19 +101,44 @@ object LiasDeepLinks {
         if (
             !uri.scheme.equals(
                 SCHEME,
-                ignoreCase = true
+                ignoreCase =
+                    true
             )
+        ) {
+            return null
+        }
+
+        /*
+         * Credentials / endpoint configuration are intentionally not
+         * accepted from URI query parameters.
+         */
+        if (
+            uri.getQueryParameter(
+                "token"
+            ) !=
+            null ||
+            uri.getQueryParameter(
+                "auth_token"
+            ) !=
+            null ||
+            uri.getQueryParameter(
+                "server"
+            ) !=
+            null ||
+            uri.getQueryParameter(
+                "url"
+            ) !=
+            null
         ) {
             return null
         }
 
         val host =
             uri.host
-                ?.trim()
                 ?.lowercase()
-                .orEmpty()
+                ?: return null
 
-        val pathSegments =
+        val segments =
             uri.pathSegments
                 .filter {
                     it.isNotBlank()
@@ -134,119 +148,134 @@ object LiasDeepLinks {
             host
         ) {
 
-            "home" -> {
+            "home" ->
 
                 if (
-                    pathSegments.isEmpty()
+                    segments.isEmpty()
                 ) {
                     ExternalDestination.Home
                 } else {
                     null
                 }
-            }
 
-            "devices" -> {
+            "devices" ->
 
                 when (
-                    pathSegments.size
+                    segments.size
                 ) {
 
                     0 ->
                         ExternalDestination.Devices
 
                     1 ->
-                        decodeDevice(
-                            pathSegments[
-                                0
-                            ]
-                        )
+                        segments
+                            .single()
+                            .takeIf {
+                                isSafeIdentifier(
+                                    it
+                                )
+                            }
+                            ?.let {
+                                ExternalDestination.Device(
+                                    Uri.decode(
+                                        it
+                                    )
+                                )
+                            }
 
                     else ->
                         null
                 }
-            }
 
-            "device" -> {
+            "device" ->
 
                 if (
-                    pathSegments.size ==
-                    1
-                ) {
-                    decodeDevice(
-                        pathSegments[
-                            0
-                        ]
+                    segments.size ==
+                    1 &&
+                    isSafeIdentifier(
+                        segments.single()
                     )
+                ) {
+
+                    ExternalDestination.Device(
+                        Uri.decode(
+                            segments.single()
+                        )
+                    )
+
                 } else {
                     null
                 }
-            }
 
-            "schedules" -> {
+            "schedules" ->
 
                 if (
-                    pathSegments.isEmpty()
+                    segments.isEmpty()
                 ) {
                     ExternalDestination.Schedules
                 } else {
                     null
                 }
-            }
 
-            "rules" -> {
+            "rules" ->
 
                 if (
-                    pathSegments.isEmpty()
+                    segments.isEmpty()
                 ) {
                     ExternalDestination.Rules
                 } else {
                     null
                 }
-            }
 
-            "settings" -> {
+            "settings" ->
 
                 if (
-                    pathSegments.isEmpty()
+                    segments.isEmpty()
                 ) {
                     ExternalDestination.Settings
                 } else {
                     null
                 }
-            }
 
             else ->
                 null
         }
     }
 
-    private fun decodeDevice(
+    private fun isSafeIdentifier(
         encoded: String
-    ): ExternalDestination.Device? {
+    ): Boolean {
 
-        val pdid =
-            try {
-                Uri.decode(
-                    encoded
-                )
-                    .trim()
-            } catch (
-                _: Exception
-            ) {
-                ""
-            }
+        val decoded =
+            Uri.decode(
+                encoded
+            )
 
         if (
-            pdid.isBlank() ||
-            pdid.length >
-            512
+            decoded.isBlank() ||
+            decoded.length >
+            256
         ) {
-            return null
+            return false
         }
 
-        return ExternalDestination.Device(
-            pdid =
-                pdid
-        )
+        /*
+         * PDIDs are opaque to Android, but route separators/control
+         * characters must not be allowed to alter navigation grammar.
+         */
+        return decoded.none {
+            character ->
+
+            character ==
+                '/' ||
+                character ==
+                '\\' ||
+                character ==
+                '\u0000' ||
+                character ==
+                '\n' ||
+                character ==
+                '\r'
+        }
     }
 }
