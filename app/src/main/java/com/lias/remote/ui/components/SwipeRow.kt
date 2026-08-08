@@ -1,11 +1,11 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SwipeRow.kt
-// Version: 2.2.0
+// Version: 2.3.0
 // Purpose: Apple HIG SwipeToDismiss row component with full-bleed action
 //          backgrounds, Cupertino cancel 'X' option, and auto-reset.
 // Audit Fixes:
-//   1. Removed invalid self-reference to 'state' inside confirmValueChange lambda.
-//   2. Ensured returning false from confirmValueChange spring-resets the box.
+//   1. Removed side-effects from confirmValueChange to prevent drag-calculation toast spam.
+//   2. Held revealed state open with opposite-end Cupertino 'X' cancel button and auto-reset on tap.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -52,15 +52,9 @@ fun SwipeActionRow(
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onSwipeRight?.invoke()
-                    false
-                }
-                SwipeToDismissBoxValue.EndToStart -> {
-                    onSwipeLeft?.invoke()
-                    false
-                }
-                else -> false
+                SwipeToDismissBoxValue.StartToEnd -> onSwipeRight != null
+                SwipeToDismissBoxValue.EndToStart -> onSwipeLeft != null
+                SwipeToDismissBoxValue.Settled -> true
             }
         }
     )
@@ -100,7 +94,7 @@ fun SwipeActionRow(
 
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -112,7 +106,7 @@ fun SwipeActionRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -131,7 +125,7 @@ fun SwipeActionRow(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -143,7 +137,7 @@ fun SwipeActionRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
