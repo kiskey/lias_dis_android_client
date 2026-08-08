@@ -1,18 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 11.0.0
+// Version: 16.0.0
 //
 // Purpose:
-//   Authoritative device/tag access-management screen.
+//   Device + tag management.
 //
-// Batch 11 corrections:
-//   - Zero pol_pause_* inference.
-//   - Device buttons use EffectiveStatus availability.
-//   - Active Pause and Extend countdowns are authoritative.
-//   - Tag-level Extend All is implemented.
-//   - Tag extension cancellation is implemented.
-//   - Infrastructure remains immutable.
-//   - Search/loading/stale/empty behavior retained from Batch 6.
+// Batch 16 additions:
+//   - Existing tag headers expose Edit.
+//   - Tag editor receives exact dependency impact.
+//   - Delete remains blocked until devices/rules are detached.
+//   - Built-in tags can be inspected but not changed/deleted.
+//   - Batch 11 authoritative EffectiveStatus behavior retained.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -49,6 +47,7 @@ import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.models.TemporaryAccessKind
 import com.lias.remote.core.models.temporaryAccessKind
+import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.core.util.EffectiveAccessFormatter
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
@@ -79,8 +78,7 @@ fun DevicesScreen(
 ) {
 
     val state by
-        viewModel.state
-            .collectAsState()
+        viewModel.state.collectAsState()
 
     val scrollState =
         rememberLazyListState()
@@ -97,37 +95,27 @@ fun DevicesScreen(
 
     var editingTag by
         remember {
-            mutableStateOf<Tag?>(
-                null
-            )
+            mutableStateOf<Tag?>(null)
         }
 
     var activeDeviceForExtend by
         remember {
-            mutableStateOf<Device?>(
-                null
-            )
+            mutableStateOf<Device?>(null)
         }
 
     var activeDeviceForPause by
         remember {
-            mutableStateOf<Device?>(
-                null
-            )
+            mutableStateOf<Device?>(null)
         }
 
     var activeDeviceForRename by
         remember {
-            mutableStateOf<Device?>(
-                null
-            )
+            mutableStateOf<Device?>(null)
         }
 
     var activeTagForExtend by
         remember {
-            mutableStateOf<Tag?>(
-                null
-            )
+            mutableStateOf<Tag?>(null)
         }
 
     val filteredDevices =
@@ -145,40 +133,33 @@ fun DevicesScreen(
                 state.devices
             } else {
 
-                state.devices
-                    .filter { device ->
+                state.devices.filter { device ->
 
-                        device.displayName
-                            .contains(
-                                query,
-                                true
-                            ) ||
-                            device.currentMAC
-                                .contains(
-                                    query,
-                                    true
-                                ) ||
-                            device.currentIP
-                                .contains(
-                                    query,
-                                    true
-                                ) ||
-                            device.hostname
-                                .contains(
-                                    query,
-                                    true
-                                ) ||
-                            device.vendor
-                                .contains(
-                                    query,
-                                    true
-                                ) ||
-                            device.manufacturer
-                                .contains(
-                                    query,
-                                    true
-                                )
-                    }
+                    device.displayName.contains(
+                        query,
+                        true
+                    ) ||
+                        device.currentMAC.contains(
+                            query,
+                            true
+                        ) ||
+                        device.currentIP.contains(
+                            query,
+                            true
+                        ) ||
+                        device.hostname.contains(
+                            query,
+                            true
+                        ) ||
+                        device.vendor.contains(
+                            query,
+                            true
+                        ) ||
+                        device.manufacturer.contains(
+                            query,
+                            true
+                        )
+                }
             }
         }
 
@@ -187,6 +168,7 @@ fun DevicesScreen(
             filteredDevices,
             state.tags
         ) {
+
             buildDeviceGroups(
                 filteredDevices,
                 state.tags
@@ -194,10 +176,8 @@ fun DevicesScreen(
         }
 
     HigLargeTitleScaffold(
-        title =
-            "Devices",
-        scrollState =
-            scrollState,
+        title = "Devices",
+        scrollState = scrollState,
         searchPlaceholder =
             "Search name, IP, MAC, or vendor",
         searchQuery =
@@ -209,26 +189,19 @@ fun DevicesScreen(
         navTrailing = {
 
             HigTextButton(
-                text =
-                    "＋ Tag",
+                text = "＋ Tag",
                 onClick = {
-                    editingTag =
-                        null
-
-                    showTagEditor =
-                        true
+                    editingTag = null
+                    showTagEditor = true
                 }
             )
         }
     ) { padding ->
 
         LazyColumn(
-            state =
-                scrollState,
-            modifier =
-                Modifier.fillMaxSize(),
-            contentPadding =
-                padding
+            state = scrollState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = padding
         ) {
 
             when (
@@ -244,9 +217,9 @@ fun DevicesScreen(
                     ) {
 
                         item {
+
                             ScreenStateView(
-                                title =
-                                    "Loading Devices",
+                                title = "Loading Devices",
                                 message =
                                     "Synchronizing device and access state from LIAS."
                             )
@@ -259,6 +232,7 @@ fun DevicesScreen(
                 is SyncState.Failed -> {
 
                     item {
+
                         ScreenStateView(
                             title =
                                 "Unable to Load Devices",
@@ -279,6 +253,7 @@ fun DevicesScreen(
                 is SyncState.Stale -> {
 
                     item {
+
                         StaleDataNotice(
                             message =
                                 sync.message,
@@ -293,11 +268,11 @@ fun DevicesScreen(
             }
 
             if (
-                state.devices
-                    .isEmpty()
+                state.devices.isEmpty()
             ) {
 
                 item {
+
                     ScreenStateView(
                         title =
                             "No Devices Found",
@@ -314,11 +289,11 @@ fun DevicesScreen(
             }
 
             if (
-                filteredDevices
-                    .isEmpty()
+                filteredDevices.isEmpty()
             ) {
 
                 item {
+
                     ScreenStateView(
                         title =
                             "No Matches",
@@ -327,8 +302,7 @@ fun DevicesScreen(
                         actionText =
                             "Clear Search",
                         onAction = {
-                            searchQuery =
-                                ""
+                            searchQuery = ""
                         }
                     )
                 }
@@ -337,11 +311,11 @@ fun DevicesScreen(
             }
 
             item {
+
                 ListSectionHeader(
                     "${filteredDevices.size} ${
                         if (
-                            filteredDevices.size ==
-                            1
+                            filteredDevices.size == 1
                         ) {
                             "Device"
                         } else {
@@ -392,7 +366,20 @@ fun DevicesScreen(
                             tag,
                         status =
                             tagStatus,
+                        onEditTag = {
+
+                            if (
+                                tag != null
+                            ) {
+                                editingTag =
+                                    tag
+
+                                showTagEditor =
+                                    true
+                            }
+                        },
                         onExtend = {
+
                             if (
                                 tag != null
                             ) {
@@ -401,6 +388,7 @@ fun DevicesScreen(
                             }
                         },
                         onCancelExtension = {
+
                             viewModel
                                 .cancelTagExtension(
                                     group.id
@@ -434,12 +422,14 @@ fun DevicesScreen(
                                 device
                         },
                         onResume = {
+
                             viewModel
                                 .unpauseDeviceInternet(
                                     device.pdid
                                 )
                         },
                         onCancelExtension = {
+
                             viewModel
                                 .cancelDeviceExtension(
                                     device.pdid
@@ -450,6 +440,7 @@ fun DevicesScreen(
                                 device
                         },
                         onDetail = {
+
                             onNavigateToDeviceDetail(
                                 device.pdid
                             )
@@ -464,33 +455,70 @@ fun DevicesScreen(
         showTagEditor
     ) {
 
+        val impact =
+            editingTag?.let { tag ->
+
+                ConfigurationSafety
+                    .tagImpact(
+                        tag =
+                            tag,
+                        devices =
+                            state.devices,
+                        policies =
+                            state.policies
+                    )
+            }
+
         TagEditorSheet(
             initialTag =
                 editingTag,
+            dependencyImpact =
+                impact,
             onDismiss = {
                 showTagEditor =
                     false
+
+                editingTag =
+                    null
             },
             onSave = { tag ->
 
                 if (
-                    editingTag ==
-                    null
+                    editingTag == null
                 ) {
-                    viewModel
-                        .createTag(
-                            tag
-                        )
+
+                    viewModel.createTag(
+                        tag
+                    )
+
                 } else {
-                    viewModel
-                        .updateTag(
-                            tag
-                        )
+
+                    viewModel.updateTag(
+                        tag
+                    )
                 }
 
                 showTagEditor =
                     false
-            }
+
+                editingTag =
+                    null
+            },
+            onDelete =
+                editingTag?.let { tag ->
+
+                    {
+                        viewModel.deleteTag(
+                            tag.id
+                        )
+
+                        showTagEditor =
+                            false
+
+                        editingTag =
+                            null
+                    }
+                }
         )
     }
 
@@ -507,10 +535,9 @@ fun DevicesScreen(
                 targetLabel =
                     device.displayName,
                 targetSubtitle =
-                    device.currentIP
-                        .ifBlank {
-                            device.pdid
-                        },
+                    device.currentIP.ifBlank {
+                        device.pdid
+                    },
                 currentExtension =
                     status
                         ?.activeExtension
@@ -539,6 +566,7 @@ fun DevicesScreen(
                         TemporaryAccessKind.EXTEND
                     ) {
                         {
+
                             viewModel
                                 .cancelDeviceExtension(
                                     device.pdid
@@ -627,12 +655,11 @@ fun DevicesScreen(
                 },
                 onConfirm = { minutes ->
 
-                    viewModel
-                        .extendTagAccess(
-                            tag.id,
-                            tag.name,
-                            minutes
-                        )
+                    viewModel.extendTagAccess(
+                        tag.id,
+                        tag.name,
+                        minutes
+                    )
 
                     activeTagForExtend =
                         null
@@ -643,6 +670,7 @@ fun DevicesScreen(
                         TemporaryAccessKind.EXTEND
                     ) {
                         {
+
                             viewModel
                                 .cancelTagExtension(
                                     tag.id
@@ -699,14 +727,16 @@ private fun buildDeviceGroups(
                 tagId
             ) {
                 mutableListOf()
-            }.add(
-                device
-            )
+            }
+                .add(
+                    device
+                )
         }
     }
 
     return grouped
-        .map { (tagId, members) ->
+        .map {
+                (tagId, members) ->
 
             DeviceGroup(
                 id =
@@ -728,10 +758,9 @@ private fun buildDeviceGroups(
                                 tagId
                         },
                 devices =
-                    members
-                        .distinctBy {
-                            it.pdid
-                        }
+                    members.distinctBy {
+                        it.pdid
+                    }
             )
         }
 }
@@ -741,11 +770,12 @@ private fun DeviceGroupHeader(
     group: DeviceGroup,
     tag: Tag?,
     status: EffectiveStatus?,
+    onEditTag: () -> Unit,
     onExtend: () -> Unit,
     onCancelExtension: () -> Unit
 ) {
 
-    val isInfrastructure =
+    val infrastructure =
         group.id ==
             "infrastructure"
 
@@ -764,64 +794,87 @@ private fun DeviceGroupHeader(
             "${group.name} · ${group.devices.size}",
         trailingAction = {
 
-            when {
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        6.dp
+                    ),
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
 
-                isInfrastructure -> {
-
-                    CupertinoText(
-                        text =
-                            "IMMUNE",
-                        style =
-                            HigTypography.caption,
-                        fontWeight =
-                            FontWeight.Bold,
-                        color =
-                            LiasThemeColors.secondaryLabel
-                    )
-                }
-
-                temporaryKind ==
-                    TemporaryAccessKind.EXTEND -> {
+                if (
+                    tag != null
+                ) {
 
                     HigTextButton(
                         text =
                             if (
-                                minutesLeft !=
-                                    null &&
-                                minutesLeft > 0
+                                tag.builtin
                             ) {
-                                "Cancel · ${
-                                    formatTemporaryDuration(
-                                        minutesLeft
-                                    )
-                                }"
+                                "Info"
                             } else {
-                                "Cancel Extension"
+                                "Edit"
                             },
                         onClick =
-                            onCancelExtension,
-                        isDestructive =
+                            onEditTag
+                    )
+                }
+
+                when {
+
+                    infrastructure -> {
+
+                        CupertinoText(
+                            text = "IMMUNE",
+                            style =
+                                HigTypography.caption,
+                            fontWeight =
+                                FontWeight.Bold,
+                            color =
+                                LiasThemeColors.secondaryLabel
+                        )
+                    }
+
+                    temporaryKind ==
+                        TemporaryAccessKind.EXTEND -> {
+
+                        HigTextButton(
+                            text =
+                                if (
+                                    minutesLeft != null &&
+                                    minutesLeft > 0
+                                ) {
+                                    "Cancel · ${
+                                        formatTemporaryDuration(
+                                            minutesLeft
+                                        )
+                                    }"
+                                } else {
+                                    "Cancel"
+                                },
+                            onClick =
+                                onCancelExtension,
+                            isDestructive =
+                                true
+                        )
+                    }
+
+                    status?.action
+                        ?.equals(
+                            "block",
                             true
-                    )
+                        ) == true &&
+                        status.extendAvailable -> {
+
+                        HigTextButton(
+                            text =
+                                "Extend All",
+                            onClick =
+                                onExtend
+                        )
+                    }
                 }
-
-                status?.action
-                    ?.equals(
-                        "block",
-                        true
-                    ) == true &&
-                    status.extendAvailable -> {
-
-                    HigTextButton(
-                        text =
-                            "Extend All",
-                        onClick =
-                            onExtend
-                    )
-                }
-
-                else ->
-                    Unit
             }
         }
     )
@@ -839,17 +892,15 @@ private fun DeviceCardItem(
     onDetail: () -> Unit
 ) {
 
-    val isInfrastructure =
-        device.safeTags
-            .contains(
-                "infrastructure"
-            )
+    val infrastructure =
+        device.safeTags.contains(
+            "infrastructure"
+        )
 
     val presentation =
-        EffectiveAccessFormatter
-            .present(
-                effectiveStatus
-            )
+        EffectiveAccessFormatter.present(
+            effectiveStatus
+        )
 
     val temporaryKind =
         effectiveStatus
@@ -858,8 +909,7 @@ private fun DeviceCardItem(
 
     val minutesLeft =
         rememberTemporaryMinutesLeft(
-            effectiveStatus
-                ?.activeExtension
+            effectiveStatus?.activeExtension
         )
 
     Box(
@@ -876,15 +926,16 @@ private fun DeviceCardItem(
                     )
                 )
                 .background(
-                    LiasThemeColors
-                        .secondaryBackground
+                    LiasThemeColors.secondaryBackground
                 )
                 .border(
-                    0.5.dp,
-                    LiasThemeColors.separator,
-                    RoundedCornerShape(
-                        14.dp
-                    )
+                    width = 0.5.dp,
+                    color =
+                        LiasThemeColors.separator,
+                    shape =
+                        RoundedCornerShape(
+                            14.dp
+                        )
                 )
                 .clickable {
                     onDetail()
@@ -951,56 +1002,81 @@ private fun DeviceCardItem(
 
                     CupertinoText(
                         text =
-                            buildDeviceSubtitle(
-                                device
-                            ),
+                            buildString {
+
+                                append(
+                                    device.currentIP.ifBlank {
+                                        if (
+                                            device.online
+                                        ) {
+                                            "IP unavailable"
+                                        } else {
+                                            "Offline"
+                                        }
+                                    }
+                                )
+
+                                append(" · ")
+
+                                append(
+                                    device.vendor.ifBlank {
+                                        device.manufacturer
+                                    }.ifBlank {
+                                        "Unclassified"
+                                    }
+                                )
+                            },
                         style =
                             HigTypography.caption,
                         color =
-                            LiasThemeColors
-                                .tertiaryLabel
+                            LiasThemeColors.tertiaryLabel
                     )
-
-                    if (
-                        presentation.detail !=
-                        null
-                    ) {
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(
-                                    2.dp
-                                )
-                        )
-
-                        CupertinoText(
-                            text =
-                                presentation.detail,
-                            style =
-                                HigTypography.caption,
-                            color =
-                                LiasThemeColors
-                                    .secondaryLabel
-                        )
-                    }
                 }
 
                 StatusPill(
                     text =
-                        statusText(
-                            isInfrastructure =
-                                isInfrastructure,
-                            presentationTitle =
-                                presentation.title,
-                            minutesLeft =
-                                minutesLeft,
-                            temporaryKind =
-                                temporaryKind
-                        ),
+                        when {
+
+                            infrastructure ->
+                                "Immune"
+
+                            temporaryKind ==
+                                TemporaryAccessKind.PAUSE ->
+                                if (
+                                    minutesLeft != null &&
+                                    minutesLeft > 0
+                                ) {
+                                    "Paused · ${
+                                        formatTemporaryDuration(
+                                            minutesLeft
+                                        )
+                                    }"
+                                } else {
+                                    "Paused"
+                                }
+
+                            temporaryKind ==
+                                TemporaryAccessKind.EXTEND ->
+                                if (
+                                    minutesLeft != null &&
+                                    minutesLeft > 0
+                                ) {
+                                    "Extended · ${
+                                        formatTemporaryDuration(
+                                            minutesLeft
+                                        )
+                                    }"
+                                } else {
+                                    "Extended"
+                                }
+
+                            else ->
+                                presentation.title
+                        },
                     tone =
                         when {
 
-                            isInfrastructure ->
+                            infrastructure ->
                                 PillTone.INFO
 
                             temporaryKind ==
@@ -1041,7 +1117,7 @@ private fun DeviceCardItem(
 
                 when {
 
-                    isInfrastructure -> {
+                    infrastructure -> {
 
                         HigButton(
                             text =
@@ -1074,8 +1150,7 @@ private fun DeviceCardItem(
                         )
 
                         if (
-                            presentation
-                                .canExtend
+                            presentation.canExtend
                         ) {
 
                             HigButton(
@@ -1110,8 +1185,7 @@ private fun DeviceCardItem(
                         )
                     }
 
-                    presentation
-                        .canExtend -> {
+                    presentation.canExtend -> {
 
                         HigButton(
                             text =
@@ -1127,8 +1201,7 @@ private fun DeviceCardItem(
                         )
                     }
 
-                    presentation
-                        .canPause -> {
+                    presentation.canPause -> {
 
                         HigButton(
                             text =
@@ -1176,81 +1249,4 @@ private fun DeviceCardItem(
             }
         }
     }
-}
-
-private fun statusText(
-    isInfrastructure: Boolean,
-    presentationTitle: String,
-    minutesLeft: Int?,
-    temporaryKind: TemporaryAccessKind
-): String {
-
-    if (
-        isInfrastructure
-    ) {
-        return "Immune"
-    }
-
-    if (
-        temporaryKind ==
-        TemporaryAccessKind.PAUSE
-    ) {
-        return if (
-            minutesLeft !=
-                null &&
-            minutesLeft > 0
-        ) {
-            "Paused · ${formatTemporaryDuration(minutesLeft)}"
-        } else {
-            "Paused"
-        }
-    }
-
-    if (
-        temporaryKind ==
-        TemporaryAccessKind.EXTEND
-    ) {
-        return if (
-            minutesLeft !=
-                null &&
-            minutesLeft > 0
-        ) {
-            "Extended · ${formatTemporaryDuration(minutesLeft)}"
-        } else {
-            "Extended"
-        }
-    }
-
-    return presentationTitle
-}
-
-private fun buildDeviceSubtitle(
-    device: Device
-): String {
-
-    val network =
-        device.currentIP
-            .ifBlank {
-                if (
-                    device.online
-                ) {
-                    "IP unavailable"
-                } else {
-                    "Offline"
-                }
-            }
-
-    val vendor =
-        device.vendor
-            .ifBlank {
-                device.manufacturer
-            }
-            .ifBlank {
-                device.deviceType
-            }
-            .ifBlank {
-                "Unclassified"
-            }
-
-    return "$network · $vendor"
 }
