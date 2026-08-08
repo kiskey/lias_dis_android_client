@@ -1,10 +1,3 @@
-// ====================================================================
-// File: SegmentedControl.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Native iOS segmented control with spring-sliding thumb.
-//          Adapts to width constraints without truncating text.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
@@ -23,8 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -38,7 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun SegmentedControl(
@@ -56,7 +49,7 @@ fun SegmentedControl(
             .fillMaxWidth()
             .height(HigSpec.SegmentedControlHeight)
             .clip(RoundedCornerShape(HigSpec.SegmentedControlCorner))
-            .background(LiasThemeColors.fill)
+            .background(LiasThemeColors.fill2)
             .padding(2.dp)
     ) {
         val segmentWidth = maxWidth / options.size
@@ -67,27 +60,30 @@ fun SegmentedControl(
             label = "segmentThumb"
         )
 
-        // Sliding Thumb
+        // Sliding Spring Thumb Container
         Box(
             modifier = Modifier
                 .offset(x = animatedOffset)
                 .width(segmentWidth)
                 .fillMaxHeight()
-                .shadow(elevation = 1.dp, shape = RoundedCornerShape(HigSpec.SegmentedControlCorner))
+                .shadow(
+                    elevation = if (isDestructive && selectedIndex == options.lastIndex) 2.dp else 1.dp,
+                    shape = RoundedCornerShape(HigSpec.SegmentedControlCorner - 2.dp)
+                )
                 .background(
-                    color = if (isDestructive && selectedIndex == options.lastIndex) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(HigSpec.SegmentedControlCorner)
+                    color = if (isDestructive && selectedIndex == options.lastIndex) LiasThemeColors.red else LiasThemeColors.secondaryBackground,
+                    shape = RoundedCornerShape(HigSpec.SegmentedControlCorner - 2.dp)
                 )
         )
 
-        // Options Text
+        // Segment Options Row
         Row(modifier = Modifier.fillMaxSize()) {
             options.forEachIndexed { index, option ->
                 val isSelected = index == selectedIndex
                 val textColor = when {
                     isDestructive && isSelected && index == options.lastIndex -> Color.White
-                    isSelected -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    isSelected -> LiasThemeColors.label
+                    else -> LiasThemeColors.secondaryLabel
                 }
 
                 Box(
@@ -100,11 +96,11 @@ fun SegmentedControl(
                         ) { onOptionSelected(option) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    CupertinoText(
                         text = option,
                         color = textColor,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.W600 else FontWeight.W400,
+                        style = HigTypography.subheadline,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
