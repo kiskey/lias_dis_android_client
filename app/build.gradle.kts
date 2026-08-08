@@ -1,12 +1,17 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 23.0.0
+// Version: 27.0.0
 //
-// Batch 23:
-//   - Adds deterministic REST/SSE contract testing.
-//   - Adds coroutine-test support.
-//   - Adds Robolectric for Android URI/deep-link unit tests.
-//   - Keeps production dependency footprint unchanged.
+// Purpose:
+//   Final application build configuration.
+//
+// Batch 27:
+//   - compileSdk 36 now paired with AGP 8.9.3.
+//   - JDK/JVM 17.
+//   - Batch-23 MockWebServer tests restored.
+//   - Coroutine tests restored.
+//   - Robolectric navigation/deep-link tests restored.
+//   - Android resources enabled for local Robolectric tests.
 // ====================================================================
 
 plugins {
@@ -17,30 +22,48 @@ plugins {
 }
 
 android {
-    namespace = "com.lias.remote"
-    compileSdk = 36
+
+    namespace =
+        "com.lias.remote"
+
+    compileSdk =
+        36
 
     defaultConfig {
-        applicationId = "com.lias.remote"
-        minSdk = 26
-        targetSdk = 35
 
-        versionCode = 6
-        versionName = "2.0.0"
+        applicationId =
+            "com.lias.remote"
+
+        minSdk =
+            26
+
+        targetSdk =
+            35
+
+        versionCode =
+            6
+
+        versionName =
+            "2.0.0"
 
         testInstrumentationRunner =
             "androidx.test.runner.AndroidJUnitRunner"
 
         vectorDrawables {
-            useSupportLibrary = true
+            useSupportLibrary =
+                true
         }
     }
 
     buildTypes {
 
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+
+            isMinifyEnabled =
+                true
+
+            isShrinkResources =
+                true
 
             proguardFiles(
                 getDefaultProguardFile(
@@ -51,11 +74,14 @@ android {
         }
 
         debug {
-            isMinifyEnabled = false
+
+            isMinifyEnabled =
+                false
         }
     }
 
     compileOptions {
+
         sourceCompatibility =
             JavaVersion.VERSION_17
 
@@ -64,27 +90,37 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "17"
+
+        jvmTarget =
+            "17"
     }
 
     buildFeatures {
-        compose = true
-        buildConfig = true
+
+        compose =
+            true
+
+        buildConfig =
+            true
     }
 
     packaging {
+
         resources {
+
             excludes +=
                 "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 
     /*
-     * Required by Robolectric tests that exercise Android URI parsing
-     * and other framework-level behavior without an emulator.
+     * NavigationRoutesTest and other Android-framework unit tests use
+     * Robolectric.
      */
     testOptions {
+
         unitTests {
+
             isIncludeAndroidResources =
                 true
         }
@@ -93,9 +129,9 @@ android {
 
 dependencies {
 
-    // ---------------------------------------------------------------
-    // Android / Lifecycle
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
+    // Android / lifecycle
+    // ----------------------------------------------------------------
 
     implementation(
         libs.androidx.core.ktx
@@ -117,9 +153,10 @@ dependencies {
         libs.androidx.activity.compose
     )
 
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
     // Compose
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
 
     implementation(
         platform(
@@ -128,15 +165,15 @@ dependencies {
     )
 
     implementation(
-        "androidx.compose.ui:ui"
+        libs.androidx.ui
     )
 
     implementation(
-        "androidx.compose.ui:ui-graphics"
+        libs.androidx.ui.graphics
     )
 
     implementation(
-        "androidx.compose.ui:ui-tooling-preview"
+        libs.androidx.ui.tooling.preview
     )
 
     implementation(
@@ -147,17 +184,19 @@ dependencies {
         "androidx.compose.foundation:foundation-layout"
     )
 
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
     // Navigation
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
 
     implementation(
         libs.androidx.navigation.compose
     )
 
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
     // Networking
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
 
     implementation(
         libs.okhttp
@@ -167,6 +206,11 @@ dependencies {
         libs.okhttp.sse
     )
 
+
+    // ----------------------------------------------------------------
+    // Kotlin
+    // ----------------------------------------------------------------
+
     implementation(
         libs.kotlinx.serialization.json
     )
@@ -175,17 +219,19 @@ dependencies {
         libs.kotlinx.coroutines.android
     )
 
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
     // Persistence
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
 
     implementation(
         libs.androidx.datastore.preferences
     )
 
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
     // Cupertino
-    // ---------------------------------------------------------------
+    // ----------------------------------------------------------------
 
     implementation(
         libs.cupertino
@@ -195,43 +241,35 @@ dependencies {
         libs.cupertino.icons.extended
     )
 
-    // ---------------------------------------------------------------
-    // Unit / contract tests
-    // ---------------------------------------------------------------
+
+    // ----------------------------------------------------------------
+    // Local unit / contract tests
+    // ----------------------------------------------------------------
 
     testImplementation(
         libs.junit
     )
 
-    /*
-     * Same OkHttp generation as production.
-     *
-     * Used for exact request/response contract testing without touching
-     * a real LIAS installation.
-     */
     testImplementation(
-        "com.squareup.okhttp3:mockwebserver:4.12.0"
+        libs.mockwebserver
     )
 
     testImplementation(
-        "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1"
-    )
-
-    /*
-     * Needed for NavigationRoutes/LiasDeepLinks because android.net.Uri
-     * is an Android framework type.
-     */
-    testImplementation(
-        "org.robolectric:robolectric:4.13.2"
+        libs.kotlinx.coroutines.test
     )
 
     testImplementation(
-        "androidx.arch.core:core-testing:2.2.0"
+        libs.robolectric
     )
 
-    // ---------------------------------------------------------------
-    // Debug-only
-    // ---------------------------------------------------------------
+    testImplementation(
+        libs.androidx.arch.core.testing
+    )
+
+
+    // ----------------------------------------------------------------
+    // Debug
+    // ----------------------------------------------------------------
 
     debugImplementation(
         libs.androidx.ui.tooling
