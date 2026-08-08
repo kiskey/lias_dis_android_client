@@ -1,8 +1,7 @@
 // ====================================================================
 // File: HigSheets.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: iOS Modal Bottom Sheet with 14dp corners, drag handle,
-// and safe-area padding. Prevents layout clipping in landscape.
+// Version: 3.0.1 (HIG Redesign Fix)
+// Purpose: Fixed content lambda type inference for ModalBottomSheet.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -14,10 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -29,7 +26,7 @@ fun HigModalSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     skipPartiallyExpanded: Boolean = true,
-    content: @Composable (PaddingValues) -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded)
 
@@ -48,15 +45,14 @@ fun HigModalSheet(
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
             )
         }
-    ) { paddingValues ->
-        Box(
-            modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(paddingValues)
                 .windowInsetsPadding(WindowInsets.ime)
                 .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
-            content(PaddingValues(0.dp))
+            content()
         }
     }
 }
@@ -71,7 +67,7 @@ fun HigSheetHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         HigTextButton(text = "Cancel", onClick = onCancel)
