@@ -52,18 +52,30 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
-            settings.authToken.collect { token -> _uiState.value = _uiState.value.copy(authToken = token ?: "") }
+            settings.authToken.collect { token ->
+                _uiState.value = _uiState.value.copy(authToken = token ?: "")
+            }
         }
         viewModelScope.launch {
-            settings.themeMode.collect { mode -> _uiState.value = _uiState.value.copy(themeMode = mode) }
+            settings.themeMode.collect { mode ->
+                _uiState.value = _uiState.value.copy(themeMode = mode)
+            }
         }
         viewModelScope.launch {
-            settings.isOnboarded.collect { onboarded -> _uiState.value = _uiState.value.copy(isOnboarded = onboarded) }
+            settings.isOnboarded.collect { onboarded ->
+                _uiState.value = _uiState.value.copy(isOnboarded = onboarded)
+            }
         }
     }
 
-    fun updateServerUrl(url: String) { _uiState.value = _uiState.value.copy(serverUrl = url) }
-    fun updateAuthToken(token: String) { _uiState.value = _uiState.value.copy(authToken = token) }
+    fun updateServerUrl(url: String) {
+        _uiState.value = _uiState.value.copy(serverUrl = url)
+    }
+
+    fun updateAuthToken(token: String) {
+        _uiState.value = _uiState.value.copy(authToken = token)
+    }
+
     fun updateThemeMode(mode: String) {
         viewModelScope.launch { settings.saveThemeMode(mode) }
     }
@@ -95,7 +107,10 @@ class SettingsViewModel(
             val urlToSave = _uiState.value.serverUrl.trim()
             settings.saveServerUrl(urlToSave)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
-            _uiState.value = _uiState.value.copy(savedServerUrl = urlToSave, testResult = "Settings saved successfully.")
+            _uiState.value = _uiState.value.copy(
+                savedServerUrl = urlToSave,
+                testResult = "Settings saved successfully."
+            )
         }
     }
 
