@@ -13,20 +13,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
-import com.lias.remote.repositories.assignDeviceTags
-import com.lias.remote.repositories.assignDeviceUser
-import com.lias.remote.repositories.createUser
-import com.lias.remote.repositories.deletePolicy
-import com.lias.remote.repositories.deleteSchedule
-import com.lias.remote.repositories.deleteTag
-import com.lias.remote.repositories.exportPolicies
-import com.lias.remote.repositories.extendDeviceAccess
-import com.lias.remote.repositories.getDeviceLogs
-import com.lias.remote.repositories.renameDevice
-import com.lias.remote.repositories.savePolicy
-import com.lias.remote.repositories.saveSchedule
-import com.lias.remote.repositories.unpauseDeviceInternet
-import com.lias.remote.repositories.updateTag
+import com.lias.remote.repositories.* // Wildcard import resolves all extension methods on EventRepository
 import com.lias.remote.ui.components.UndoState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
