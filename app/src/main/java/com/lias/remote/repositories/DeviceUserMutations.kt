@@ -1,16 +1,15 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/DeviceUserMutations.kt
-// Version: 14.0.0
+// Version: 15.0.0
 //
 // Purpose:
-//   Race-safe device metadata and user mutations.
+//   Server-confirmed device/user mutations.
 //
-// Rules:
-//   - No speculative rename.
-//   - No speculative user assignment.
-//   - Server returns 204 for rename/assignment, so success is followed
-//     by GET /devices/{pdid} to obtain authoritative current state.
-//   - Multiple edits of one device are serialized.
+// Batch 15:
+//   - infrastructure cannot be added/removed through ordinary tagging.
+//   - unknown tags cannot be assigned.
+//   - empty tag list normalizes to generic.
+//   - authoritative device is fetched after mutation.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -22,6 +21,7 @@ import com.lias.remote.core.network.DeviceTagRequest
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.RenameDeviceRequest
 import com.lias.remote.core.network.UserDeviceRequest
+import com.lias.remote.core.util.ConfigurationSafety
 
 suspend fun EventRepository.assignDeviceTags(
     pdid: String,
@@ -32,12 +32,66 @@ suspend fun EventRepository.assignDeviceTags(
             "device:$pdid"
     ) {
 
-        val normalized =
-            tagIds
-                .filter {
-                    it.isNotBlank()
+        val device =
+            _state.value
+                .devices
+                .find {
+                    it.pdid ==
+                        pdid
                 }
-                .distinct()
+                ?: return@mutate ApiResult.HttpError(
+                    code =
+                        404,
+                    message =
+                        "Device is no longer available."
+                )
+
+        val validation =
+            ConfigurationSafety
+                .validateNormalDeviceTagAssignment(
+                    device =
+                        device,
+                    requestedTagIds =
+                        tagIds
+                )
+
+        if (
+            !validation.isValid
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    validation.error
+                        ?: "Invalid tag assignment."
+            )
+        }
+
+        val knownTagIds =
+            _state.value
+                .tags
+                .map {
+                    it.id
+                }
+                .toSet()
+
+        val unknownTags =
+            validation
+                .normalizedTagIds
+                .filterNot {
+                    it in knownTagIds
+                }
+
+        if (
+            unknownTags.isNotEmpty()
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    400,
+                message =
+                    "One or more selected tags no longer exist."
+            )
+        }
 
         val result =
             api.post<
@@ -49,7 +103,8 @@ suspend fun EventRepository.assignDeviceTags(
                 ),
                 DeviceTagRequest(
                     tagIds =
-                        normalized
+                        validation
+                            .normalizedTagIds
                 )
             )
 
@@ -58,13 +113,11 @@ suspend fun EventRepository.assignDeviceTags(
             ApiResult.Success
         ) {
 
-            /*
-             * Do not locally copy(tags=normalized).
-             *
-             * LIAS/DIS correlation may normalize, preserve or augment
-             * device metadata. Re-fetch the canonical object.
-             */
             refreshSingleDevice(
+                pdid
+            )
+
+            refreshSingleDeviceStatus(
                 pdid
             )
         }
@@ -94,11 +147,11 @@ suspend fun EventRepository.renameDevice(
             "device:$pdid"
     ) {
 
-        val normalizedName =
+        val normalized =
             name.trim()
 
         if (
-            normalizedName.isBlank()
+            normalized.isBlank()
         ) {
             return@mutate ApiResult.HttpError(
                 code =
@@ -117,7 +170,7 @@ suspend fun EventRepository.renameDevice(
                     pdid
                 ),
                 RenameDeviceRequest(
-                    normalizedName
+                    normalized
                 )
             )
 
@@ -125,13 +178,6 @@ suspend fun EventRepository.renameDevice(
             result is
             ApiResult.Success
         ) {
-
-            /*
-             * Rename endpoint returns 204.
-             *
-             * Fetch the device after the server has persisted and
-             * applied the override.
-             */
             refreshSingleDevice(
                 pdid
             )
@@ -148,6 +194,22 @@ suspend fun EventRepository.assignDeviceUser(
         resourceKey =
             "device:$pdid"
     ) {
+
+        if (
+            userId.isNotBlank() &&
+            _state.value.users
+                .none {
+                    it.id ==
+                        userId
+                }
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    400,
+                message =
+                    "The selected user no longer exists."
+            )
+        }
 
         val result =
             api.post<
@@ -167,13 +229,6 @@ suspend fun EventRepository.assignDeviceUser(
             result is
             ApiResult.Success
         ) {
-
-            /*
-             * Backend responds 204.
-             *
-             * Re-fetch rather than assuming the local Device copy is
-             * now identical to LIAS.
-             */
             refreshSingleDevice(
                 pdid
             )
@@ -187,7 +242,7 @@ suspend fun EventRepository.createUser(
 ): ApiResult<User> =
     mutations.mutate(
         resourceKey =
-            "users"
+            "users:create"
     ) {
 
         val result =
@@ -203,11 +258,6 @@ suspend fun EventRepository.createUser(
             result is
             ApiResult.Success
         ) {
-
-            /*
-             * LIAS may generate user_<id>.
-             * Always commit the returned canonical user.
-             */
             upsertUser(
                 result.data
             )
