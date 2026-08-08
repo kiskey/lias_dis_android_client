@@ -1,57 +1,45 @@
-// ====================================================================
-// File: SchedulesScreen.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Schedule list with FAB. Integrated ScheduleEditorSheet.
-// ====================================================================
-
-package com.lias.remote.ui.schedules
+package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
-import com.lias.remote.ui.components.GroupedListRow
-import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
-import com.lias.remote.ui.components.HigSwipeRow
+import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.MiniWeekStrip
 import com.lias.remote.ui.components.PillTone
-import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.components.SegmentedControl
-import com.lias.remote.ui.components.SwipeAction
-import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun SchedulesScreen(viewModel: LiasViewModel) {
@@ -60,37 +48,44 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
     
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
-    var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
 
     HigLargeTitleScaffold(
         title = "Schedules",
         scrollState = scrollState,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { editingSchedule = null; showEditor = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(HigSpec.FabSize)
-            ) { Icon(Icons.Filled.Add, "New Schedule", tint = Color.White) }
+        navTrailing = {
+            HigTextButton(text = "＋", onClick = { editingSchedule = null; showEditor = true })
         }
     ) { padding ->
         LazyColumn(state = scrollState, modifier = Modifier.fillMaxSize(), contentPadding = padding) {
-            item { ListSectionHeader("Configured Schedules (${state.schedules.size})") }
+            item { ListSectionHeader("${state.schedules.size} Configured") }
             
-            if (state.schedules.isEmpty()) {
-                item { GroupedListCard { GroupedListRow(primaryText = "No schedules configured", secondaryText = "Tap + to create a time window.") } }
-            } else {
-                items(state.schedules, key = { it.id }) { schedule ->
-                    GroupedListCard {
-                        HigSwipeRow(
-                            leadingAction = SwipeAction(Icons.Filled.Edit, MaterialTheme.colorScheme.primary, { editingSchedule = schedule; showEditor = true }),
-                            trailingAction = SwipeAction(Icons.Filled.Delete, MaterialTheme.colorScheme.error, { scheduleToDelete = schedule })
+            items(state.schedules, key = { it.id }) { schedule ->
+                GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            GroupedListRow(
-                                primaryText = schedule.name,
-                                secondaryText = "${schedule.mode.uppercase()} · ${schedule.timezone}",
-                                trailingContent = { StatusPill(text = schedule.mode, tone = if (schedule.mode == "downtime") PillTone.BLOCKED else PillTone.ALLOWED) }
+                            Column {
+                                CupertinoText(schedule.name, style = HigTypography.headline, fontWeight = FontWeight.Bold)
+                                CupertinoText("${schedule.mode.uppercase()} · ${schedule.timezone}", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel)
+                            }
+                            StatusPill(
+                                text = schedule.mode,
+                                tone = if (schedule.mode == "downtime") PillTone.BLOCKED else PillTone.ALLOWED
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        MiniWeekStrip(schedules = listOf(schedule))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        CupertinoText(
+                            text = "Used by policies · Weekly recurring window",
+                            style = HigTypography.caption,
+                            color = LiasThemeColors.tertiaryLabel
+                        )
                     }
                 }
             }
@@ -102,17 +97,6 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             initialSchedule = editingSchedule,
             onDismiss = { showEditor = false },
             onSave = { viewModel.saveSchedule(it); showEditor = false }
-        )
-    }
-
-    scheduleToDelete?.let { schedule ->
-        HigAlertDialog(
-            onDismissRequest = { scheduleToDelete = null },
-            title = "Delete Schedule",
-            message = "Are you sure you want to delete the schedule '${schedule.name}'? Policies using this schedule will default to ALLOW ALL.",
-            confirmText = "Delete",
-            onConfirm = { viewModel.deleteSchedule(schedule.id) },
-            isDestructive = true
         )
     }
 }
@@ -144,7 +128,7 @@ fun ScheduleEditorSheet(initialSchedule: Schedule?, onDismiss: () -> Unit, onSav
             HigField(value = name, onValueChange = { name = it }, label = "Schedule Name", placeholder = "e.g. Bedtime")
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text("MODE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CupertinoText("MODE", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel)
                 SegmentedControl(
                     options = listOf("Downtime", "Whitelist"),
                     selectedOption = if (mode == "downtime") "Downtime" else "Whitelist",
