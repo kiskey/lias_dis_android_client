@@ -1,22 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 13.0.0
+// Version: 14.0.0
 //
 // Purpose:
-//   Single source of truth for LIAS REST + SSE state.
+//   Authoritative LIAS REST + SSE repository.
 //
-// Transport corrections:
-//   - start() is idempotent.
-//   - Repository configuration no longer opens SSE twice.
-//   - URL and token are combined before configuring SSE.
-//   - Token changes restart the authenticated stream.
-//   - Server changes reset SSE replay state in LiasSseClient.
-//   - Background state intentionally closes SSE.
-//   - Foreground resumes SSE and performs authoritative REST reconcile.
-//   - Network loss pauses reconnect loop.
-//   - Network restoration immediately reconnects + reconciles.
-//   - effective.status_changed refreshes only the indicated target when
-//     possible instead of blindly refreshing the entire application.
+// Batch 14 additions:
+//   - MutationCoordinator guards bulk refresh snapshots.
+//   - A REST snapshot cannot overwrite a mutation or SSE change that
+//     occurred after the snapshot began.
+//   - Exposes package-internal targeted reconciliation helpers to
+//     mutation extension files.
+//   - Server-confirmed mutations remain source of truth.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -25,6 +20,7 @@ import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.DeviceEventPayload
 import com.lias.remote.core.models.DeviceReidentifiedPayload
 import com.lias.remote.core.models.EffectiveStatus
+import com.lias.remote.core.models.LiasEvent
 import com.lias.remote.core.models.NetworkStats
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
@@ -62,14 +58,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class EventRepository(
-    internal val api:
-        LiasApiClient,
-    private val sse:
-        LiasSseClient,
-    private val settings:
-        SettingsRepository,
-    private val networkMonitor:
-        NetworkMonitor
+    internal val api: LiasApiClient,
+    private val sse: LiasSseClient,
+    private val settings: SettingsRepository,
+    private val networkMonitor: NetworkMonitor
 ) {
 
     internal val _state =
@@ -91,6 +83,9 @@ class EventRepository(
         SharedFlow<UiEvent> =
         _uiEvents.asSharedFlow()
 
+    internal val mutations =
+        MutationCoordinator()
+
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -103,26 +98,24 @@ class EventRepository(
         )
 
     private val started =
-        AtomicBoolean(
-            false
-        )
+        AtomicBoolean(false)
 
     private val refreshInProgress =
-        AtomicBoolean(
-            false
-        )
+        AtomicBoolean(false)
+
+    @Volatile
+    private var refreshAgainRequested =
+        false
 
     @Volatile
     private var lastSseConnectedTime =
         0L
 
     private val recentToastMap =
-        ConcurrentHashMap<
-            String,
-            Long
-        >()
+        ConcurrentHashMap<String, Long>()
 
     fun start() {
+
         if (
             !started.compareAndSet(
                 false,
@@ -155,22 +148,12 @@ class EventRepository(
         }
     }
 
-    /**
-     * Called by MainActivity lifecycle.
-     *
-     * The SSE socket is foreground-only. On resume, Last-Event-ID
-     * replays buffered events and REST reconciliation closes any gap
-     * larger than the server's replay history.
-     */
     fun setAppForeground(
         foreground: Boolean
     ) {
-        val previous =
-            _state.value
-                .isAppForeground
 
         if (
-            previous ==
+            _state.value.isAppForeground ==
             foreground
         ) {
             return
@@ -195,13 +178,10 @@ class EventRepository(
         }
 
         if (
-            _state.value
-                .isNetworkAvailable
+            _state.value.isNetworkAvailable
         ) {
 
-            sse.connect(
-                scope
-            )
+            sse.connect(scope)
 
             scope.launch {
                 refreshAll()
@@ -218,14 +198,10 @@ class EventRepository(
                 serverUrl,
                 token ->
 
-            serverUrl to
-                token
+            serverUrl to token
         }
             .collect {
-                    (
-                        serverUrl,
-                        token
-                    ) ->
+                    (serverUrl, token) ->
 
                 api.baseUrl =
                     serverUrl
@@ -233,17 +209,18 @@ class EventRepository(
                 api.authToken =
                     token
 
-                /*
-                 * LiasSseClient determines whether the server or only
-                 * credentials changed and applies the correct replay
-                 * policy.
-                 */
                 sse.configure(
                     baseUrl =
                         serverUrl,
                     authToken =
                         token
                 )
+
+                /*
+                 * New server configuration invalidates an old REST
+                 * snapshot even before the new synchronization starts.
+                 */
+                mutations.markExternalChange()
 
                 if (
                     serverUrl.isBlank()
@@ -267,22 +244,12 @@ class EventRepository(
                     return@collect
                 }
 
-                /*
-                 * A saved connection mutation is authoritative.
-                 *
-                 * If foregrounded, restart immediately with the new
-                 * credentials. If backgrounded, connect on next resume.
-                 */
                 if (
-                    _state.value
-                        .isAppForeground &&
-                    _state.value
-                        .isNetworkAvailable
+                    _state.value.isAppForeground &&
+                    _state.value.isNetworkAvailable
                 ) {
 
-                    sse.connect(
-                        scope
-                    )
+                    sse.connect(scope)
 
                     refreshAll()
                 }
@@ -294,9 +261,8 @@ class EventRepository(
         networkMonitor.available
             .collect { available ->
 
-                val previous =
-                    _state.value
-                        .isNetworkAvailable
+                val previouslyAvailable =
+                    _state.value.isNetworkAvailable
 
                 _state.value =
                     _state.value.copy(
@@ -336,18 +302,11 @@ class EventRepository(
                 }
 
                 if (
-                    !previous &&
-                    _state.value
-                        .isAppForeground &&
-                    api.baseUrl
-                        .isNotBlank()
+                    !previouslyAvailable &&
+                    _state.value.isAppForeground &&
+                    api.baseUrl.isNotBlank()
                 ) {
 
-                    /*
-                     * Connectivity transition: reconnect immediately
-                     * rather than waiting for an old exponential
-                     * backoff delay.
-                     */
                     sse.reconnect(
                         scope =
                             scope,
@@ -366,14 +325,12 @@ class EventRepository(
             .collect { connection ->
 
                 val previous =
-                    _state.value
-                        .connectionState
+                    _state.value.connectionState
 
                 if (
                     connection ==
                     ConnectionState.CONNECTED
                 ) {
-
                     lastSseConnectedTime =
                         System.currentTimeMillis()
                 }
@@ -389,24 +346,16 @@ class EventRepository(
                             ) {
                                 null
                             } else {
-                                _state.value
-                                    .transportError
+                                _state.value.transportError
                             }
                     )
 
-                /*
-                 * Every genuine reconnection gets a REST reconciliation.
-                 *
-                 * SSE replay handles buffered events; REST handles cases
-                 * where background/network loss exceeded broker history.
-                 */
                 if (
                     connection ==
                         ConnectionState.CONNECTED &&
                     previous !=
                         ConnectionState.CONNECTED &&
-                    _state.value
-                        .isAppForeground
+                    _state.value.isAppForeground
                 ) {
 
                     scope.launch {
@@ -422,74 +371,69 @@ class EventRepository(
             .collect { error ->
 
                 if (
-                    error != null
+                    error == null
                 ) {
-
-                    val current =
-                        _state.value
-
-                    _state.value =
-                        current.copy(
-                            transportError =
-                                error,
-                            syncState =
-                                if (
-                                    current.isInitialLoaded
-                                ) {
-                                    SyncState.Stale(
-                                        message =
-                                            "Live updates interrupted · showing last known data.",
-                                        lastSuccessfulSyncMs =
-                                            current.lastSuccessfulSyncMs
-                                    )
-                                } else {
-                                    current.syncState
-                                }
-                        )
+                    return@collect
                 }
+
+                val current =
+                    _state.value
+
+                _state.value =
+                    current.copy(
+                        transportError =
+                            error,
+                        syncState =
+                            if (
+                                current.isInitialLoaded
+                            ) {
+                                SyncState.Stale(
+                                    message =
+                                        "Live updates interrupted · showing last known data.",
+                                    lastSuccessfulSyncMs =
+                                        current.lastSuccessfulSyncMs
+                                )
+                            } else {
+                                current.syncState
+                            }
+                    )
             }
     }
 
     internal suspend fun refreshAll() {
 
         if (
-            api.baseUrl
-                .isBlank()
+            api.baseUrl.isBlank() ||
+            !_state.value.isNetworkAvailable
         ) {
             return
         }
 
         if (
-            !_state.value
-                .isNetworkAvailable
+            !refreshInProgress.compareAndSet(
+                false,
+                true
+            )
         ) {
+            refreshAgainRequested =
+                true
+
             return
         }
 
-        if (
-            !refreshInProgress
-                .compareAndSet(
-                    false,
-                    true
-                )
-        ) {
-            return
-        }
+        val revisionAtStart =
+            mutations.revision()
 
-        val hadUsableData =
-            _state.value
-                .isInitialLoaded
+        val hadData =
+            _state.value.isInitialLoaded
 
         _state.value =
             _state.value.copy(
                 isRefreshing =
                     true,
                 syncState =
-                    if (
-                        hadUsableData
-                    ) {
-                        _state.value
-                            .syncState
+                    if (hadData) {
+                        _state.value.syncState
                     } else {
                         SyncState.Loading
                     }
@@ -572,94 +516,68 @@ class EventRepository(
                         }
 
                 if (
-                    primaryFailure !=
-                    null
+                    primaryFailure != null
                 ) {
 
-                    val message =
+                    applyRefreshFailure(
                         resultMessage(
                             primaryFailure,
                             "Unable to synchronize LIAS."
                         )
-
-                    val current =
-                        _state.value
-
-                    _state.value =
-                        current.copy(
-                            isRefreshing =
-                                false,
-                            errorMessage =
-                                message,
-                            syncState =
-                                if (
-                                    current.isInitialLoaded
-                                ) {
-                                    SyncState.Stale(
-                                        message =
-                                            message,
-                                        lastSuccessfulSyncMs =
-                                            current.lastSuccessfulSyncMs
-                                    )
-                                } else {
-                                    SyncState.Failed(
-                                        message
-                                    )
-                                }
-                        )
+                    )
 
                     return@coroutineScope
                 }
 
+                @Suppress("UNCHECKED_CAST")
                 val devices =
                     (
                         devicesResult
-                            as ApiResult.Success
+                            as ApiResult.Success<DeviceListResponse>
                         )
                         .data
                         .devices
 
+                @Suppress("UNCHECKED_CAST")
                 val tags =
                     (
                         tagsResult
-                            as ApiResult.Success
+                            as ApiResult.Success<List<Tag>>
                         )
                         .data
 
+                @Suppress("UNCHECKED_CAST")
                 val policies =
                     (
                         policiesResult
-                            as ApiResult.Success
+                            as ApiResult.Success<List<Policy>>
                         )
                         .data
 
+                @Suppress("UNCHECKED_CAST")
                 val schedules =
                     (
                         schedulesResult
-                            as ApiResult.Success
+                            as ApiResult.Success<List<Schedule>>
                         )
                         .data
 
                 val stats =
                     (
                         statsResult
-                            as? ApiResult.Success
+                            as? ApiResult.Success<NetworkStats>
                         )
                         ?.data
 
                 val users =
                     (
                         usersResult
-                            as? ApiResult.Success
+                            as? ApiResult.Success<List<User>>
                         )
                         ?.data
-                        ?: _state.value
-                            .users
+                        ?: _state.value.users
 
-                /*
-                 * Fetch effective statuses concurrently.
-                 */
-                val deviceStatusDeferred =
+                val deviceStatusRequests =
                     devices.associate {
                             device ->
 
@@ -671,7 +589,7 @@ class EventRepository(
                             }
                     }
 
-                val tagStatusDeferred =
+                val tagStatusRequests =
                     tags.associate {
                             tag ->
 
@@ -686,7 +604,7 @@ class EventRepository(
                 val deviceStatuses =
                     buildMap {
 
-                        deviceStatusDeferred
+                        deviceStatusRequests
                             .forEach {
                                     (
                                         pdid,
@@ -711,7 +629,7 @@ class EventRepository(
                 val tagStatuses =
                     buildMap {
 
-                        tagStatusDeferred
+                        tagStatusRequests
                             .forEach {
                                     (
                                         tagId,
@@ -732,6 +650,26 @@ class EventRepository(
                                 }
                             }
                     }
+
+                /*
+                 * Critical race boundary.
+                 *
+                 * If any mutation or SSE authoritative change occurred
+                 * while these requests were running, this aggregate
+                 * snapshot is no longer allowed to replace current
+                 * state.
+                 */
+                if (
+                    !mutations.snapshotIsCurrent(
+                        revisionAtStart
+                    )
+                ) {
+
+                    refreshAgainRequested =
+                        true
+
+                    return@coroutineScope
+                }
 
                 val now =
                     System.currentTimeMillis()
@@ -777,8 +715,7 @@ class EventRepository(
             )
 
             if (
-                _state.value
-                    .isRefreshing
+                _state.value.isRefreshing
             ) {
                 _state.value =
                     _state.value.copy(
@@ -786,319 +723,314 @@ class EventRepository(
                             false
                     )
             }
+
+            if (
+                refreshAgainRequested &&
+                api.baseUrl.isNotBlank() &&
+                _state.value.isNetworkAvailable
+            ) {
+
+                refreshAgainRequested =
+                    false
+
+                scope.launch {
+                    refreshAll()
+                }
+            }
         }
     }
 
     private suspend fun collectSseEvents() {
 
-        sse.events
-            .collect { event ->
+        sse.events.collect { event ->
 
-                if (
-                    event.type ==
-                    EventConstants.PING
-                ) {
-                    return@collect
-                }
+            if (
+                event.type ==
+                EventConstants.PING
+            ) {
+                return@collect
+            }
 
-                val now =
-                    System.currentTimeMillis()
+            /*
+             * Prevent any older aggregate REST snapshot from replacing
+             * state after this event has been observed.
+             */
+            mutations.markExternalChange()
 
-                /*
-                 * Suppress user-facing replay noise immediately after
-                 * reconnect. State reconciliation still occurs.
-                 */
-                val isReplayPhase =
-                    (
-                        now -
-                            lastSseConnectedTime
-                        ) <
-                        REPLAY_TOAST_SUPPRESSION_MS
+            val now =
+                System.currentTimeMillis()
 
-                val toastKey =
-                    "${event.type}:${event.deviceID}"
+            val replayPhase =
+                (
+                    now -
+                        lastSseConnectedTime
+                    ) <
+                    REPLAY_TOAST_SUPPRESSION_MS
 
-                val lastToastTime =
-                    recentToastMap[
-                        toastKey
-                    ] ?: 0L
+            val toastKey =
+                "${event.type}:${event.deviceID}"
 
-                val duplicateToast =
-                    (
-                        now -
-                            lastToastTime
-                        ) <
-                        DUPLICATE_TOAST_WINDOW_MS
+            val duplicateToast =
+                (
+                    now -
+                        (
+                            recentToastMap[
+                                toastKey
+                            ] ?: 0L
+                            )
+                    ) <
+                    DUPLICATE_TOAST_WINDOW_MS
 
-                val showToast =
-                    !isReplayPhase &&
-                        !duplicateToast
+            val showToast =
+                !replayPhase &&
+                    !duplicateToast
 
-                when (
-                    event.type
-                ) {
+            when (
+                event.type
+            ) {
 
-                    EventConstants.DEVICE_ADDED -> {
+                EventConstants.DEVICE_ADDED -> {
 
-                        refreshSingleDevice(
-                            event.deviceID
+                    refreshSingleDevice(
+                        event.deviceID
+                    )
+
+                    if (showToast) {
+                        rememberToast(
+                            toastKey,
+                            now
                         )
-
-                        if (
-                            showToast
-                        ) {
-
-                            rememberToast(
-                                toastKey,
-                                now
-                            )
-
-                            _uiEvents.emit(
-                                UiEvent.ShowSnackbar(
-                                    "New device discovered"
-                                )
-                            )
-                        }
-                    }
-
-                    EventConstants.DEVICE_ONLINE -> {
-
-                        refreshSingleDevice(
-                            event.deviceID
-                        )
-
-                        if (
-                            showToast
-                        ) {
-
-                            rememberToast(
-                                toastKey,
-                                now
-                            )
-
-                            val payload =
-                                event.payload
-                                    ?.let {
-                                        try {
-                                            json.decodeFromJsonElement<
-                                                DeviceEventPayload
-                                            >(
-                                                it
-                                            )
-                                        } catch (
-                                            _: Exception
-                                        ) {
-                                            null
-                                        }
-                                    }
-
-                            val verified =
-                                payload
-                                    ?.safeConfirmedBy
-                                    .orEmpty()
-
-                            _uiEvents.emit(
-                                UiEvent.ShowSnackbar(
-                                    if (
-                                        verified.isNotEmpty()
-                                    ) {
-                                        "Device online · ${verified.size} discovery sources"
-                                    } else {
-                                        "Device online"
-                                    }
-                                )
-                            )
-                        }
-                    }
-
-                    EventConstants.DEVICE_OFFLINE -> {
-
-                        refreshSingleDevice(
-                            event.deviceID
-                        )
-
-                        if (
-                            showToast
-                        ) {
-
-                            rememberToast(
-                                toastKey,
-                                now
-                            )
-
-                            _uiEvents.emit(
-                                UiEvent.ShowSnackbar(
-                                    "Device offline"
-                                )
-                            )
-                        }
-                    }
-
-                    EventConstants.HOSTNAME_CHANGED,
-                    EventConstants.FINGERPRINT_UPDATED,
-                    EventConstants.IP_CHANGED,
-                    EventConstants.MAC_CHANGED -> {
-
-                        refreshSingleDevice(
-                            event.deviceID
-                        )
-                    }
-
-                    EventConstants.DEVICE_REMOVED -> {
-
-                        val pdid =
-                            event.deviceID
-
-                        if (
-                            pdid.isNotBlank()
-                        ) {
-
-                            _state.value =
-                                _state.value.copy(
-                                    devices =
-                                        _state.value
-                                            .devices
-                                            .filterNot {
-                                                it.pdid ==
-                                                    pdid
-                                            },
-                                    deviceEffectiveStatuses =
-                                        _state.value
-                                            .deviceEffectiveStatuses -
-                                            pdid
-                                )
-                        }
-                    }
-
-                    EventConstants.DEVICE_REIDENTIFIED -> {
-
-                        val payload =
-                            event.payload
-                                ?.let {
-                                    try {
-                                        json.decodeFromJsonElement<
-                                            DeviceReidentifiedPayload
-                                        >(
-                                            it
-                                        )
-                                    } catch (
-                                        _: Exception
-                                    ) {
-                                        null
-                                    }
-                                }
-
-                        if (
-                            payload != null
-                        ) {
-
-                            _state.value =
-                                _state.value.copy(
-                                    devices =
-                                        _state.value
-                                            .devices
-                                            .filterNot {
-                                                it.pdid ==
-                                                    payload.oldPdid
-                                            },
-                                    deviceEffectiveStatuses =
-                                        _state.value
-                                            .deviceEffectiveStatuses -
-                                            payload.oldPdid
-                                )
-
-                            refreshSingleDevice(
-                                payload.newPdid
-                            )
-
-                            if (
-                                showToast
-                            ) {
-
-                                rememberToast(
-                                    toastKey,
-                                    now
-                                )
-
-                                _uiEvents.emit(
-                                    UiEvent.ShowSnackbar(
-                                        "Device identity updated"
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    EventConstants.EFFECTIVE_STATUS_CHANGED -> {
-
-                        refreshEffectiveStatusForEvent(
-                            event
-                        )
-                    }
-
-                    EventConstants.SECURITY_ALERT -> {
-
-                        val payload =
-                            event.payload
-                                ?.let {
-                                    try {
-                                        json.decodeFromJsonElement<
-                                            SecurityAlertPayload
-                                        >(
-                                            it
-                                        )
-                                    } catch (
-                                        _: Exception
-                                    ) {
-                                        null
-                                    }
-                                }
-
-                        val details =
-                            payload
-                                ?.details
-                                ?.takeIf {
-                                    it.isNotBlank()
-                                }
-                                ?: "Network identity anomaly detected."
 
                         _uiEvents.emit(
-                            UiEvent.ShowSecurityAlert(
-                                details =
-                                    details,
-                                pdid =
-                                    payload
-                                        ?.pdid
-                                        .orEmpty()
+                            UiEvent.ShowSnackbar(
+                                "New device discovered"
                             )
                         )
+                    }
+                }
 
-                        if (
-                            showToast
-                        ) {
+                EventConstants.DEVICE_ONLINE -> {
 
+                    refreshSingleDevice(
+                        event.deviceID
+                    )
+
+                    if (showToast) {
+
+                        rememberToast(
+                            toastKey,
+                            now
+                        )
+
+                        val payload =
+                            event.payload
+                                ?.let {
+                                    try {
+                                        json.decodeFromJsonElement<
+                                            DeviceEventPayload
+                                        >(it)
+                                    } catch (
+                                        _: Exception
+                                    ) {
+                                        null
+                                    }
+                                }
+
+                        val sources =
+                            payload
+                                ?.safeConfirmedBy
+                                .orEmpty()
+
+                        _uiEvents.emit(
+                            UiEvent.ShowSnackbar(
+                                if (
+                                    sources.isNotEmpty()
+                                ) {
+                                    "Device online · ${sources.size} discovery sources"
+                                } else {
+                                    "Device online"
+                                }
+                            )
+                        )
+                    }
+                }
+
+                EventConstants.DEVICE_OFFLINE -> {
+
+                    refreshSingleDevice(
+                        event.deviceID
+                    )
+
+                    if (showToast) {
+
+                        rememberToast(
+                            toastKey,
+                            now
+                        )
+
+                        _uiEvents.emit(
+                            UiEvent.ShowSnackbar(
+                                "Device offline"
+                            )
+                        )
+                    }
+                }
+
+                EventConstants.HOSTNAME_CHANGED,
+                EventConstants.FINGERPRINT_UPDATED,
+                EventConstants.IP_CHANGED,
+                EventConstants.MAC_CHANGED -> {
+
+                    refreshSingleDevice(
+                        event.deviceID
+                    )
+                }
+
+                EventConstants.DEVICE_REMOVED -> {
+
+                    val pdid =
+                        event.deviceID
+
+                    if (
+                        pdid.isNotBlank()
+                    ) {
+
+                        _state.value =
+                            _state.value.copy(
+                                devices =
+                                    _state.value
+                                        .devices
+                                        .filterNot {
+                                            it.pdid ==
+                                                pdid
+                                        },
+                                deviceEffectiveStatuses =
+                                    _state.value
+                                        .deviceEffectiveStatuses -
+                                        pdid
+                            )
+                    }
+                }
+
+                EventConstants.DEVICE_REIDENTIFIED -> {
+
+                    val payload =
+                        event.payload
+                            ?.let {
+                                try {
+                                    json.decodeFromJsonElement<
+                                        DeviceReidentifiedPayload
+                                    >(it)
+                                } catch (
+                                    _: Exception
+                                ) {
+                                    null
+                                }
+                            }
+
+                    if (
+                        payload != null
+                    ) {
+
+                        _state.value =
+                            _state.value.copy(
+                                devices =
+                                    _state.value
+                                        .devices
+                                        .filterNot {
+                                            it.pdid ==
+                                                payload.oldPdid
+                                        },
+                                deviceEffectiveStatuses =
+                                    _state.value
+                                        .deviceEffectiveStatuses -
+                                        payload.oldPdid
+                            )
+
+                        refreshSingleDevice(
+                            payload.newPdid
+                        )
+
+                        if (showToast) {
                             rememberToast(
                                 toastKey,
                                 now
                             )
 
                             _uiEvents.emit(
-                                UiEvent.ShowSnackbarError(
-                                    "Security alert · $details"
+                                UiEvent.ShowSnackbar(
+                                    "Device identity updated"
                                 )
                             )
                         }
+                    }
+                }
+
+                EventConstants.EFFECTIVE_STATUS_CHANGED -> {
+
+                    refreshEffectiveStatusForEvent(
+                        event
+                    )
+                }
+
+                EventConstants.SECURITY_ALERT -> {
+
+                    val payload =
+                        event.payload
+                            ?.let {
+                                try {
+                                    json.decodeFromJsonElement<
+                                        SecurityAlertPayload
+                                    >(it)
+                                } catch (
+                                    _: Exception
+                                ) {
+                                    null
+                                }
+                            }
+
+                    val details =
+                        payload
+                            ?.details
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?: "Network identity anomaly detected."
+
+                    _uiEvents.emit(
+                        UiEvent.ShowSecurityAlert(
+                            details =
+                                details,
+                            pdid =
+                                payload
+                                    ?.pdid
+                                    .orEmpty()
+                        )
+                    )
+
+                    if (showToast) {
+
+                        rememberToast(
+                            toastKey,
+                            now
+                        )
+
+                        _uiEvents.emit(
+                            UiEvent.ShowSnackbarError(
+                                "Security alert · $details"
+                            )
+                        )
                     }
                 }
             }
+        }
     }
 
     private suspend fun refreshEffectiveStatusForEvent(
-        event:
-            com.lias.remote.core.models.LiasEvent
+        event: LiasEvent
     ) {
 
-        val objectPayload =
+        val payload =
             event.payload
                 ?.runCatching {
                     jsonObject
@@ -1106,7 +1038,7 @@ class EventRepository(
                 ?.getOrNull()
 
         val targetType =
-            objectPayload
+            payload
                 ?.get(
                     "target_type"
                 )
@@ -1114,7 +1046,7 @@ class EventRepository(
                 ?.contentOrNull
 
         val targetId =
-            objectPayload
+            payload
                 ?.get(
                     "target_id"
                 )
@@ -1142,36 +1074,29 @@ class EventRepository(
                 ?.lowercase()
         ) {
 
-            "tag" ->
-                refreshSingleTagStatus(
-                    targetId
-                )
-
             "device" ->
                 refreshSingleDeviceStatus(
                     targetId
                 )
 
+            "tag" ->
+                refreshSingleTagStatus(
+                    targetId
+                )
+
             else -> {
 
-                /*
-                 * Older server payload: infer from current inventory.
-                 */
                 if (
-                    _state.value
-                        .tags
+                    _state.value.tags
                         .any {
                             it.id ==
                                 targetId
                         }
                 ) {
-
                     refreshSingleTagStatus(
                         targetId
                     )
-
                 } else {
-
                     refreshSingleDeviceStatus(
                         targetId
                     )
@@ -1180,16 +1105,17 @@ class EventRepository(
         }
     }
 
-    private suspend fun refreshSingleDevice(
+    internal suspend fun refreshSingleDevice(
         pdid: String
-    ) {
+    ): Device? {
+
         if (
             pdid.isBlank()
         ) {
-            return
+            return null
         }
 
-        when (
+        return when (
             val result =
                 api.get<Device>(
                     Endpoints.device(
@@ -1200,59 +1126,36 @@ class EventRepository(
 
             is ApiResult.Success -> {
 
-                val updated =
+                val authoritative =
                     result.data
 
-                val devices =
-                    _state.value
-                        .devices
-                        .toMutableList()
-
-                val index =
-                    devices.indexOfFirst {
-                        it.pdid ==
-                            pdid
-                    }
-
-                if (
-                    index >= 0
-                ) {
-                    devices[
-                        index
-                    ] =
-                        updated
-                } else {
-                    devices.add(
-                        updated
-                    )
-                }
-
-                _state.value =
-                    _state.value.copy(
-                        devices =
-                            devices
-                    )
+                upsertDevice(
+                    authoritative
+                )
 
                 refreshSingleDeviceStatus(
                     pdid
                 )
+
+                authoritative
             }
 
             else ->
-                Unit
+                null
         }
     }
 
-    private suspend fun refreshSingleDeviceStatus(
+    internal suspend fun refreshSingleDeviceStatus(
         pdid: String
-    ) {
+    ): EffectiveStatus? {
+
         if (
             pdid.isBlank()
         ) {
-            return
+            return null
         }
 
-        when (
+        return when (
             val result =
                 api.getDeviceEffectiveStatus(
                     pdid
@@ -1271,23 +1174,26 @@ class EventRepository(
                                         result.data
                                     )
                     )
+
+                result.data
             }
 
             else ->
-                Unit
+                null
         }
     }
 
-    private suspend fun refreshSingleTagStatus(
+    internal suspend fun refreshSingleTagStatus(
         tagId: String
-    ) {
+    ): EffectiveStatus? {
+
         if (
             tagId.isBlank()
         ) {
-            return
+            return null
         }
 
-        when (
+        return when (
             val result =
                 api.getTagEffectiveStatus(
                     tagId
@@ -1306,11 +1212,194 @@ class EventRepository(
                                         result.data
                                     )
                     )
+
+                result.data
             }
 
             else ->
-                Unit
+                null
         }
+    }
+
+    internal fun upsertDevice(
+        device: Device
+    ) {
+
+        val current =
+            _state.value.devices
+
+        val existingIndex =
+            current.indexOfFirst {
+                it.pdid ==
+                    device.pdid
+            }
+
+        val updated =
+            if (
+                existingIndex >=
+                0
+            ) {
+                current.toMutableList()
+                    .apply {
+                        set(
+                            existingIndex,
+                            device
+                        )
+                    }
+            } else {
+                current +
+                    device
+            }
+
+        _state.value =
+            _state.value.copy(
+                devices =
+                    updated
+            )
+    }
+
+    internal fun upsertTag(
+        tag: Tag
+    ) {
+
+        val current =
+            _state.value.tags
+
+        val index =
+            current.indexOfFirst {
+                it.id ==
+                    tag.id
+            }
+
+        val updated =
+            if (
+                index >= 0
+            ) {
+                current.toMutableList()
+                    .apply {
+                        set(
+                            index,
+                            tag
+                        )
+                    }
+            } else {
+                current +
+                    tag
+            }
+
+        _state.value =
+            _state.value.copy(
+                tags =
+                    updated
+            )
+    }
+
+    internal fun upsertPolicy(
+        policy: Policy
+    ) {
+
+        val current =
+            _state.value.policies
+
+        val index =
+            current.indexOfFirst {
+                it.id ==
+                    policy.id
+            }
+
+        val updated =
+            if (
+                index >= 0
+            ) {
+                current.toMutableList()
+                    .apply {
+                        set(
+                            index,
+                            policy
+                        )
+                    }
+            } else {
+                current +
+                    policy
+            }
+
+        _state.value =
+            _state.value.copy(
+                policies =
+                    updated
+            )
+    }
+
+    internal fun upsertSchedule(
+        schedule: Schedule
+    ) {
+
+        val current =
+            _state.value.schedules
+
+        val index =
+            current.indexOfFirst {
+                it.id ==
+                    schedule.id
+            }
+
+        val updated =
+            if (
+                index >= 0
+            ) {
+                current.toMutableList()
+                    .apply {
+                        set(
+                            index,
+                            schedule
+                        )
+                    }
+            } else {
+                current +
+                    schedule
+            }
+
+        _state.value =
+            _state.value.copy(
+                schedules =
+                    updated
+            )
+    }
+
+    internal fun upsertUser(
+        user: User
+    ) {
+
+        val current =
+            _state.value.users
+
+        val index =
+            current.indexOfFirst {
+                it.id ==
+                    user.id
+            }
+
+        val updated =
+            if (
+                index >= 0
+            ) {
+                current.toMutableList()
+                    .apply {
+                        set(
+                            index,
+                            user
+                        )
+                    }
+            } else {
+                current +
+                    user
+            }
+
+        _state.value =
+            _state.value.copy(
+                users =
+                    updated
+            )
     }
 
     fun clearError() {
@@ -1331,6 +1420,37 @@ class EventRepository(
         )
     }
 
+    private fun applyRefreshFailure(
+        message: String
+    ) {
+
+        val current =
+            _state.value
+
+        _state.value =
+            current.copy(
+                isRefreshing =
+                    false,
+                errorMessage =
+                    message,
+                syncState =
+                    if (
+                        current.isInitialLoaded
+                    ) {
+                        SyncState.Stale(
+                            message =
+                                message,
+                            lastSuccessfulSyncMs =
+                                current.lastSuccessfulSyncMs
+                        )
+                    } else {
+                        SyncState.Failed(
+                            message
+                        )
+                    }
+            )
+    }
+
     private fun rememberToast(
         key: String,
         now: Long
@@ -1341,9 +1461,6 @@ class EventRepository(
         ] =
             now
 
-        /*
-         * Prevent unbounded growth after long-running sessions.
-         */
         if (
             recentToastMap.size >
             256
