@@ -1,8 +1,7 @@
 // ====================================================================
 // File: HigAlertDialog.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: iOS-style alert dialog with blur backdrop and strict HIG
-//          typography. Used for destructive confirmations.
+// Version: 3.0.1 (HIG Redesign Fix)
+// Purpose: Fixed Alignment import and Spacer height modifier.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -66,7 +67,6 @@ fun HigAlertDialog(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                 )
                 
-                // iOS style separator
                 androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                 
                 Row(
@@ -79,7 +79,6 @@ fun HigAlertDialog(
                         modifier = Modifier.weight(1f).padding(vertical = 12.dp)
                     )
                     
-                    // Vertical separator
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier
                         .width(0.5.dp)
                         .height(36.dp)
@@ -97,4 +96,4 @@ fun HigAlertDialog(
     }
 }
 
-private val androidx.compose.ui.Alignment.Companion.CenterHorizontally get() = androidx.compose.ui.Alignment.CenterHorizontally
+private fun background(color: androidx.compose.ui.graphics.Color) = androidx.compose.foundation.background(color)
