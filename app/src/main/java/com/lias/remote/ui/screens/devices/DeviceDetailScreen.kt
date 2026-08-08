@@ -64,9 +64,13 @@ fun DeviceDetailScreen(
     var showExtendSheet by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
     var showUserAssignmentSheet by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
     val assignedUser = state.users.find { it.id == device.userID }
+    val isInfra = device.safeTags.contains("infrastructure")
+    val status = viewModel.effectiveStatusFor(device.pdid)
+    val isBlockedOrPaused = isPaused || status.action == "block"
 
     LaunchedEffect(pdid) {
         val result = viewModel.getDeviceLogs(pdid)
@@ -111,28 +115,37 @@ fun DeviceDetailScreen(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     
-                    // Sticky Action Bar
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (isPaused) {
-                            HigButton(
-                                text = "▶ Resume",
-                                onClick = { viewModel.unpauseDeviceInternet(device.pdid) },
-                                style = HigButtonStyle.Primary,
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            HigButton(
-                                text = "⏱ Extend",
-                                onClick = { showExtendSheet = true },
-                                style = HigButtonStyle.Secondary,
-                                modifier = Modifier.weight(1f)
-                            )
+                    // Sticky Action Bar (Infrastructure devices hide extend/pause)
+                    if (!isInfra) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isPaused) {
+                                HigButton(
+                                    text = "▶ Resume",
+                                    onClick = { viewModel.unpauseDeviceInternet(device.pdid) },
+                                    style = HigButtonStyle.Primary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else if (isBlockedOrPaused) {
+                                HigButton(
+                                    text = "⏱ Extend",
+                                    onClick = { showExtendSheet = true },
+                                    style = HigButtonStyle.Secondary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                HigButton(
+                                    text = "⏸ Pause",
+                                    onClick = { showPauseSheet = true },
+                                    style = HigButtonStyle.Gray,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                             HigButton(
                                 text = "✏ Rename",
-                                onClick = { /* Prompt rename */ },
+                                onClick = { showRenameDialog = true },
                                 style = HigButtonStyle.Gray,
                                 modifier = Modifier.weight(1f)
                             )
@@ -156,21 +169,6 @@ fun DeviceDetailScreen(
                         trailingContent = { CupertinoText("›", style = HigTypography.headline, color = LiasThemeColors.tertiaryLabel) },
                         onClick = { showUserAssignmentSheet = true }
                     )
-                }
-            }
-
-            // Discovered Services Section
-            if (device.safeServices.isNotEmpty()) {
-                item { ListSectionHeader("Discovered Services") }
-                item {
-                    GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        device.safeServices.forEachIndexed { index, service ->
-                            GroupedListRow(
-                                primaryText = service,
-                                showDivider = index < device.safeServices.size - 1
-                            )
-                        }
-                    }
                 }
             }
 
@@ -201,7 +199,6 @@ fun DeviceDetailScreen(
     }
 
     if (showExtendSheet) {
-        val status = viewModel.effectiveStatusFor(device.pdid)
         val cancelAction: (() -> Unit)? = if (status.activeExtension != null) {
             {
                 viewModel.cancelDeviceExtension(device.pdid)
@@ -233,6 +230,17 @@ fun DeviceDetailScreen(
         )
     }
 
+    if (showRenameDialog) {
+        RenameDeviceDialog(
+            currentName = device.displayName,
+            onDismiss = { showRenameDialog = false },
+            onConfirm = { newName ->
+                viewModel.renameDevice(device.pdid, newName)
+                showRenameDialog = false
+            }
+        )
+    }
+
     if (showUserAssignmentSheet) {
         UserAssignmentSheet(
             users = state.users,
@@ -246,64 +254,5 @@ fun DeviceDetailScreen(
                 viewModel.createUser(User(id = "user_${System.currentTimeMillis()}", name = userName))
             }
         )
-    }
-}
-
-@Composable
-fun UserAssignmentSheet(
-    users: List<User>,
-    assignedUserId: String?,
-    onDismiss: () -> Unit,
-    onSelectUser: (userId: String) -> Unit,
-    onCreateUser: (name: String) -> Unit
-) {
-    var newUserName by remember { mutableStateOf("") }
-
-    HigModalSheet(onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            HigSheetHeader(title = "Assign User", onCancel = onDismiss)
-
-            if (users.isNotEmpty()) {
-                GroupedListCard {
-                    users.forEachIndexed { index, user ->
-                        val isSelected = user.id == assignedUserId
-                        GroupedListRow(
-                            primaryText = user.name,
-                            trailingContent = {
-                                if (isSelected) {
-                                    CupertinoText("✓", color = LiasThemeColors.blue, fontWeight = FontWeight.Bold)
-                                }
-                            },
-                            showDivider = index < users.size - 1,
-                            onClick = { onSelectUser(user.id) }
-                        )
-                    }
-                }
-            }
-
-            HigField(
-                value = newUserName,
-                onValueChange = { newUserName = it },
-                label = "New User Profile",
-                placeholder = "e.g. John Doe"
-            )
-
-            HigButton(
-                text = "Create & Assign User",
-                onClick = {
-                    if (newUserName.isNotBlank()) {
-                        onCreateUser(newUserName)
-                        newUserName = ""
-                    }
-                },
-                style = HigButtonStyle.Primary,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
     }
 }
