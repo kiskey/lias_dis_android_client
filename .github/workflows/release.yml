@@ -1,8 +1,22 @@
 # ====================================================================
 # File: .github/workflows/release.yml
-# Version: 1.1.0
-# Audit Fixes:
-#   1. Updated Gradle wrapper generation to 8.10.2 for AGP 8.8.0 compatibility.
+# Version: 2.0.0
+#
+# Purpose:
+#   Manually build, verify, and publish an installable LIAS Remote
+#   debug APK as a GitHub prerelease.
+#
+# Build contract:
+#   - JDK 17
+#   - repository Gradle wrapper
+#   - Gradle 8.11.1 from Batch 27
+#   - AGP 8.9.3 from Batch 27
+#   - compile/test/lint before publishing
+#
+# Important:
+#   This produces a DEBUG-SIGNED APK.
+#   It is intended for testing and direct installation, not Play Store
+#   or production distribution.
 # ====================================================================
 
 name: Release Debug APK
@@ -13,42 +27,112 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: lias-debug-release
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build and Publish Debug APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.10.2
-
-      - name: Make gradlew Executable
+      - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Show Build Toolchain
+        run: |
+          java -version
+          ./gradlew --version
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Compile Debug Kotlin
+        run: |
+          ./gradlew \
+            :app:compileDebugKotlin \
+            --stacktrace
+
+      - name: Run Debug Unit Tests
+        run: |
+          ./gradlew \
+            :app:testDebugUnitTest \
+            --stacktrace
+
+      - name: Run Debug Lint
+        run: |
+          ./gradlew \
+            :app:lintDebug \
+            --stacktrace
+
+      - name: Assemble Debug APK
+        run: |
+          ./gradlew \
+            :app:assembleDebug \
+            --stacktrace
+
+      - name: Verify APK Exists
+        run: |
+          set -e
+
+          APK="$(find app/build/outputs/apk/debug \
+            -maxdepth 1 \
+            -type f \
+            -name '*.apk' \
+            -print \
+            -quit)"
+
+          if [ -z "$APK" ]; then
+            echo "Debug APK was not generated."
+            exit 1
+          fi
+
+          echo "Generated APK:"
+          ls -lh "$APK"
+
+      - name: Publish GitHub Debug Prerelease
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: latest
-          name: "Latest Debug Build"
+          tag_name: debug-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+
+          name: LIAS Remote Debug Build #${{ github.run_number }}
+
           body: |
             ## LIAS Remote Debug Build
-            Automated debug build generated from commit `${{ github.sha }}`.
-            
-     #       **Note:** This is an unsigned debug build for testing purposes.
-          prerelease: false
-          make_latest: "true"
-          files: app/build/outputs/apk/debug/*.apk
+
+            Automated debug build from commit `${{ github.sha }}`.
+
+            ### Verification performed
+
+            - Debug Kotlin compilation
+            - Debug unit tests
+            - Android lint
+            - Debug APK assembly
+
+            ### Installation
+
+            Download the APK attached to this release and install it on
+            a compatible Android device.
+
+            **Important:** This APK is signed using Android's standard
+            debug signing key. It is intended for testing only and must
+            not be used as a production or Google Play release.
+
+          prerelease: true
+          make_latest: "false"
+          fail_on_unmatched_files: true
+
+          files: |
+            app/build/outputs/apk/debug/*.apk
