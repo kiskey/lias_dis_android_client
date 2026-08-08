@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Native Apple HIG Layout & Geometry Token Specifications.
+ * Optimized for Pixel 6a (429 dpi) & Modern Devices.
  */
 object HigSpec {
     val SpacingXS = 4.dp
@@ -15,32 +16,32 @@ object HigSpec {
 
     // Inset Grouped Section
     val GroupedCardCorner = 12.dp
-    val RowMinHeight = 44.dp
+    val RowMinHeight = 48.dp
     val RowHorizontalPadding = 16.dp
-    val RowVerticalPadding = 11.dp
+    val RowVerticalPadding = 12.dp
 
     // Modal Sheet
     val SheetCorner = 14.dp
     val SheetHandleWidth = 36.dp
     val SheetHandleHeight = 5.dp
 
-    // HIG Tab Bar standard height
-    val TabBarHeight = 49.dp
-    val BottomNavPadding = 83.dp
+    // Tab Bar (Optimized for 6.1" Pixel 6a)
+    val TabBarHeight = 60.dp
+    val BottomNavPadding = 94.dp
 
     // Control Elements
-    val IconSizeS = 15.dp
-    val IconSizeM = 22.dp
-    val IconSizeL = 28.dp
-    val IconBubbleSize = 29.dp
-    val IconBubbleCorner = 7.dp
+    val IconSizeS = 16.dp
+    val IconSizeM = 26.dp
+    val IconSizeL = 30.dp
+    val IconBubbleSize = 32.dp
+    val IconBubbleCorner = 8.dp
 
     val ButtonCorner = 10.dp
-    val ButtonHeight = 44.dp
-    val ButtonHeightLarge = 50.dp
+    val ButtonHeight = 46.dp
+    val ButtonHeightLarge = 52.dp
 
-    val SegmentedControlHeight = 32.dp
+    val SegmentedControlHeight = 34.dp
     val SegmentedControlCorner = 9.dp
 
-    val SectionHeaderPadding = PaddingValues(start = 32.dp, end = 16.dp, top = 18.dp, bottom = 6.dp)
+    val SectionHeaderPadding = PaddingValues(start = 32.dp, end = 16.dp, top = 20.dp, bottom = 6.dp)
 }
