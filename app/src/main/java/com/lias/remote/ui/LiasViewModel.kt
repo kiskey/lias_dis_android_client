@@ -1,21 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 9.0.0
+// Version: 10.0.0
 //
 // Purpose:
-//   Complete UI-facing façade for EventRepository.
+//   Complete UI-facing façade for LIAS Remote.
 //
-// Batch 9 addition:
-//   - Exposes suspend validatePolicy() so policy editors can use the
-//     authoritative LIAS /policies/validate endpoint before saving.
-//
-// Previous behavior retained:
-//   - repository remains source of truth
-//   - nullable effective status
-//   - refresh
-//   - devices/users/tags/schedules/policies
-//   - undo
-//   - security alerts
+// Batch 10:
+//   - Pause goes through LIAS /pause endpoint.
+//   - Android no longer fabricates pause Policy/Schedule objects.
+//   - Pause duration is fixed to the server-supported 60 minutes.
+//   - Extend returns/uses authoritative server duration.
+//   - Temporary status is re-fetched through EventRepository.
+//   - Existing policy/schedule/device/tag/user functionality retained.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -31,27 +27,28 @@ import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.network.FIXED_PAUSE_MINUTES
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
-import com.lias.remote.repositories.cancelDeviceExtension
+import com.lias.remote.repositories.cancelDeviceExtensionAuthoritatively
 import com.lias.remote.repositories.createTag
 import com.lias.remote.repositories.createUser
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
-import com.lias.remote.repositories.extendDeviceAccess
+import com.lias.remote.repositories.extendDeviceAuthoritatively
 import com.lias.remote.repositories.exportPolicies
 import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.importPolicies
-import com.lias.remote.repositories.pauseDeviceInternet
+import com.lias.remote.repositories.pauseDeviceAuthoritatively
 import com.lias.remote.repositories.renameDevice
+import com.lias.remote.repositories.resumeDeviceAuthoritatively
 import com.lias.remote.repositories.savePolicy
 import com.lias.remote.repositories.saveSchedule
 import com.lias.remote.repositories.toggleVacationMode
-import com.lias.remote.repositories.unpauseDeviceInternet
 import com.lias.remote.repositories.updateTag
 import com.lias.remote.repositories.validatePolicy
 import com.lias.remote.ui.components.UndoState
@@ -105,7 +102,7 @@ class LiasViewModel(
 
                     if (
                         event is
-                            UiEvent.ShowSecurityAlert
+                        UiEvent.ShowSecurityAlert
                     ) {
 
                         _pendingSecurityAlert.value =
@@ -206,7 +203,7 @@ class LiasViewModel(
             ]
 
     // ----------------------------------------------------------------
-    // Device actions
+    // Extend Access
     // ----------------------------------------------------------------
 
     fun extendDeviceAccess(
@@ -218,29 +215,39 @@ class LiasViewModel(
 
             val result =
                 eventRepository
-                    .extendDeviceAccess(
-                        pdid,
-                        minutes
+                    .extendDeviceAuthoritatively(
+                        pdid =
+                            pdid,
+                        minutes =
+                            minutes
                     )
 
-            if (
-                result is
-                    ApiResult.Success
-            ) {
+            when (result) {
 
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Access extended by $minutes minutes"
+                is ApiResult.Success -> {
+
+                    val actualMinutes =
+                        result.data
+                            .minutes
+                            .takeIf {
+                                it > 0
+                            }
+                            ?: minutes
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Access extended for $actualMinutes minutes"
+                            )
                         )
+                }
+
+                else -> {
+                    emitFailure(
+                        result,
+                        "Unable to extend access."
                     )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to extend access."
-                )
+                }
             }
         }
     }
@@ -253,14 +260,23 @@ class LiasViewModel(
 
             val result =
                 eventRepository
-                    .cancelDeviceExtension(
+                    .cancelDeviceExtensionAuthoritatively(
                         pdid
                     )
 
             if (
-                result !is
-                    ApiResult.Success
+                result is
+                ApiResult.Success
             ) {
+
+                eventRepository
+                    .emitUiEvent(
+                        UiEvent.ShowSnackbar(
+                            "Access extension cancelled"
+                        )
+                    )
+
+            } else {
 
                 emitFailure(
                     result,
@@ -269,6 +285,158 @@ class LiasViewModel(
             }
         }
     }
+
+    // ----------------------------------------------------------------
+    // Pause / Resume
+    // ----------------------------------------------------------------
+
+    fun pauseDeviceInternet(
+        pdid: String,
+        minutes: Int =
+            FIXED_PAUSE_MINUTES
+    ) {
+
+        /*
+         * Keep the argument for source compatibility with older UI
+         * call sites, but refuse to imply unsupported durations.
+         */
+        if (
+            minutes !=
+            FIXED_PAUSE_MINUTES
+        ) {
+
+            viewModelScope.launch {
+
+                eventRepository
+                    .emitUiEvent(
+                        UiEvent.ShowSnackbarError(
+                            "LIAS Pause Internet is fixed to 1 hour."
+                        )
+                    )
+            }
+
+            return
+        }
+
+        val currentStatus =
+            effectiveStatusFor(
+                pdid
+            )
+
+        if (
+            currentStatus != null &&
+            !currentStatus.pauseAvailable
+        ) {
+
+            viewModelScope.launch {
+
+                eventRepository
+                    .emitUiEvent(
+                        UiEvent.ShowSnackbarError(
+                            pauseUnavailableMessage(
+                                currentStatus
+                            )
+                        )
+                    )
+            }
+
+            return
+        }
+
+        viewModelScope.launch {
+
+            when (
+                val result =
+                    eventRepository
+                        .pauseDeviceAuthoritatively(
+                            pdid
+                        )
+            ) {
+
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Internet paused for 1 hour"
+                            )
+                        )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to pause internet."
+                    )
+                }
+            }
+        }
+    }
+
+    fun unpauseDeviceInternet(
+        pdid: String
+    ) {
+
+        viewModelScope.launch {
+
+            when (
+                val result =
+                    eventRepository
+                        .resumeDeviceAuthoritatively(
+                            pdid
+                        )
+            ) {
+
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Internet access resumed"
+                            )
+                        )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to resume internet."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun pauseUnavailableMessage(
+        status: EffectiveStatus
+    ): String =
+        when (
+            status.source
+                .lowercase()
+        ) {
+
+            "infrastructure" ->
+                "Infrastructure devices are always online."
+
+            "global" ->
+                if (
+                    status.action ==
+                    "block"
+                ) {
+                    "Global Access is already blocking this device."
+                } else {
+                    "Pause is not available for the current global state."
+                }
+
+            else ->
+                "Pause is not available for the current device state."
+        }
+
+    // ----------------------------------------------------------------
+    // Tags assigned to devices
+    // ----------------------------------------------------------------
 
     fun assignTags(
         pdid: String,
@@ -296,7 +464,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 _undoState.value =
@@ -324,92 +492,9 @@ class LiasViewModel(
         }
     }
 
-    fun pauseDeviceInternet(
-        pdid: String,
-        minutes: Int
-    ) {
-
-        if (
-            minutes <=
-            0
-        ) {
-
-            viewModelScope.launch {
-
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbarError(
-                            "Choose a valid pause duration."
-                        )
-                    )
-            }
-
-            return
-        }
-
-        viewModelScope.launch {
-
-            val result =
-                eventRepository
-                    .pauseDeviceInternet(
-                        pdid
-                    )
-
-            if (
-                result is
-                    ApiResult.Success
-            ) {
-
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Internet paused"
-                        )
-                    )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to pause internet."
-                )
-            }
-        }
-    }
-
-    fun unpauseDeviceInternet(
-        pdid: String
-    ) {
-
-        viewModelScope.launch {
-
-            val result =
-                eventRepository
-                    .unpauseDeviceInternet(
-                        pdid
-                    )
-
-            if (
-                result is
-                    ApiResult.Success
-            ) {
-
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Internet access restored"
-                        )
-                    )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to restore internet."
-                )
-            }
-        }
-    }
+    // ----------------------------------------------------------------
+    // Rename
+    // ----------------------------------------------------------------
 
     fun renameDevice(
         pdid: String,
@@ -437,7 +522,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 _undoState.value =
@@ -499,7 +584,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
@@ -524,7 +609,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
@@ -553,7 +638,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
@@ -581,7 +666,7 @@ class LiasViewModel(
             )
 
     // ----------------------------------------------------------------
-    // Policies
+    // Policy import/export
     // ----------------------------------------------------------------
 
     fun exportPolicies() {
@@ -594,14 +679,9 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
-                /*
-                 * Actual Android document sharing/export will be wired
-                 * through Activity Result APIs in the file-I/O pass.
-                 * Do not pretend the raw payload has already been saved.
-                 */
                 eventRepository
                     .emitUiEvent(
                         UiEvent.ShowSnackbar(
@@ -633,7 +713,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 eventRepository
@@ -653,6 +733,10 @@ class LiasViewModel(
         }
     }
 
+    // ----------------------------------------------------------------
+    // Policies
+    // ----------------------------------------------------------------
+
     fun savePolicy(
         policy: Policy
     ) {
@@ -667,7 +751,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 eventRepository
@@ -710,7 +794,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 _undoState.value =
@@ -755,7 +839,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 eventRepository
@@ -789,7 +873,7 @@ class LiasViewModel(
 
             if (
                 result is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 eventRepository
@@ -827,7 +911,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
@@ -852,7 +936,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
@@ -877,7 +961,7 @@ class LiasViewModel(
 
             if (
                 result !is
-                    ApiResult.Success
+                ApiResult.Success
             ) {
 
                 emitFailure(
