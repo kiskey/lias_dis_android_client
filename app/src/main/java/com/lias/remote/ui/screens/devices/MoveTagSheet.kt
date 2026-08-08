@@ -1,19 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt
-// Version: 15.0.0
+// Version: 19.0.0
 //
 // Purpose:
-//   Safe multi-tag assignment sheet.
+//   Safe multi-tag classification editor.
 //
-// Critical fix:
-//   The previous UI visually showed a lock beside infrastructure but
-//   its row remained clickable and could actually toggle the tag.
-//
-// New behavior:
-//   - Existing infrastructure assignment is displayed but immutable.
-//   - A normal device cannot grant itself infrastructure immunity.
-//   - generic is mutually exclusive with meaningful tags.
-//   - Empty normal selection becomes generic.
+// Batch 19:
+//   - Clear multi-tag semantics.
+//   - generic disappears when meaningful tags exist.
+//   - infrastructure cannot be granted or removed here.
+//   - Explicitly explains that all selected tags affect policies even
+//     though Devices screen groups each device only once.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -39,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.device.DevicePresentation
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.util.ConfigurationSafety
@@ -66,21 +64,18 @@ fun MoveTagSheet(
         remember(
             device
         ) {
-            device.safeTags
-                .ifEmpty {
-                    listOf(
-                        ConfigurationSafety
-                            .GENERIC_TAG_ID
-                    )
-                }
+            DevicePresentation
+                .normalizedTagIds(
+                    device
+                )
         }
 
-    val isInfrastructureDevice =
+    val infrastructureDevice =
         ConfigurationSafety
             .INFRASTRUCTURE_TAG_ID in
             originalTags
 
-    val selectedTagIds =
+    val selected =
         remember(
             device
         ) {
@@ -100,14 +95,11 @@ fun MoveTagSheet(
 
             allTags.sortedWith(
                 compareByDescending<Tag> {
-                    it.id ==
-                        ConfigurationSafety
-                            .INFRASTRUCTURE_TAG_ID
-                }.thenByDescending {
-                    it.builtin
-                }.thenBy {
-                    it.name.lowercase()
+                    it.precedence
                 }
+                    .thenBy {
+                        it.name.lowercase()
+                    }
             )
         }
 
@@ -121,10 +113,8 @@ fun MoveTagSheet(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        horizontal =
-                            24.dp,
-                        vertical =
-                            16.dp
+                        horizontal = 24.dp,
+                        vertical = 16.dp
                     )
                     .verticalScroll(
                         rememberScrollState()
@@ -171,8 +161,7 @@ fun MoveTagSheet(
                         style =
                             HigTypography.caption,
                         color =
-                            LiasThemeColors
-                                .tertiaryLabel
+                            LiasThemeColors.tertiaryLabel
                     )
                 }
 
@@ -181,87 +170,74 @@ fun MoveTagSheet(
                         "Done",
                     onClick = {
 
-                        val mutable =
-                            selectedTagIds
+                        val finalTags =
+                            selected
+                                .filter {
+                                    it.isNotBlank()
+                                }
+                                .distinct()
                                 .toMutableList()
 
                         if (
-                            isInfrastructureDevice &&
+                            infrastructureDevice &&
                             ConfigurationSafety
                                 .INFRASTRUCTURE_TAG_ID !in
-                            mutable
+                            finalTags
                         ) {
-                            /*
-                             * Defensive final preservation even though
-                             * the row itself cannot be toggled.
-                             */
-                            mutable.add(
+                            finalTags.add(
                                 ConfigurationSafety
                                     .INFRASTRUCTURE_TAG_ID
                             )
                         }
 
                         if (
-                            mutable.isEmpty()
+                            finalTags.size >
+                            1
                         ) {
-                            mutable.add(
+                            finalTags.remove(
                                 ConfigurationSafety
                                     .GENERIC_TAG_ID
                             )
                         }
 
                         if (
-                            mutable.size >
-                                1
+                            finalTags.isEmpty()
                         ) {
-                            mutable.remove(
+                            finalTags.add(
                                 ConfigurationSafety
                                     .GENERIC_TAG_ID
                             )
                         }
 
                         onConfirm(
-                            mutable.distinct()
+                            finalTags
                         )
                     }
                 )
             }
 
-            if (
-                isInfrastructureDevice
-            ) {
-
-                CupertinoText(
-                    text =
-                        "This device is protected infrastructure. Infrastructure immunity cannot be removed here.",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors
-                            .secondaryLabel
-                )
-
-            } else {
-
-                CupertinoText(
-                    text =
-                        "Choose one or more groups. Infrastructure immunity is managed separately from normal device classification.",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors
-                            .secondaryLabel
-                )
-            }
+            CupertinoText(
+                text =
+                    if (
+                        infrastructureDevice
+                    ) {
+                        "Infrastructure protection is locked. You may change other classifications, but this device remains always online."
+                    } else {
+                        "A device can belong to several groups. Every selected tag can participate in LIAS policy evaluation."
+                    },
+                style =
+                    HigTypography.subheadline,
+                color =
+                    LiasThemeColors.secondaryLabel
+            )
 
             CupertinoText(
                 text =
-                    "TAG GROUPS",
+                    "The Devices screen displays a multi-tag device once under its highest-precedence group; its other tags are still active.",
                 style =
                     HigTypography.caption,
                 color =
-                    LiasThemeColors
-                        .tertiaryLabel
+                    LiasThemeColors.tertiaryLabel
             )
 
             GroupedListCard {
@@ -271,21 +247,16 @@ fun MoveTagSheet(
                             index,
                             tag ->
 
-                        val infrastructure =
+                        val isInfrastructure =
                             tag.id ==
                                 ConfigurationSafety
                                     .INFRASTRUCTURE_TAG_ID
 
-                        val selected =
-                            selectedTagIds
-                                .contains(
-                                    tag.id
-                                )
+                        val checked =
+                            tag.id in
+                                selected
 
-                        val selectable =
-                            !infrastructure
-
-                        val tagColor =
+                        val color =
                             try {
 
                                 Color(
@@ -307,18 +278,18 @@ fun MoveTagSheet(
                             secondaryText =
                                 when {
 
-                                    infrastructure &&
-                                        isInfrastructureDevice ->
+                                    isInfrastructure &&
+                                        infrastructureDevice ->
                                         "Protected · Always online"
 
-                                    infrastructure ->
+                                    isInfrastructure ->
                                         "Protected system classification"
 
                                     tag.builtin ->
-                                        "Built-in system tag"
+                                        "Built-in classification"
 
                                     else ->
-                                        "Custom tag"
+                                        "Custom classification"
                                 },
                             leadingContent = {
 
@@ -332,7 +303,7 @@ fun MoveTagSheet(
                                                 CircleShape
                                             )
                                             .background(
-                                                tagColor
+                                                color
                                             )
                                 )
                             },
@@ -344,7 +315,7 @@ fun MoveTagSheet(
                                 ) {
 
                                     if (
-                                        infrastructure
+                                        isInfrastructure
                                     ) {
 
                                         CupertinoIcon(
@@ -353,7 +324,7 @@ fun MoveTagSheet(
                                                     .Outlined
                                                     .Lock,
                                             contentDescription =
-                                                "Protected",
+                                                "Protected infrastructure",
                                             tint =
                                                 LiasThemeColors
                                                     .tertiaryLabel,
@@ -366,13 +337,13 @@ fun MoveTagSheet(
                                         Spacer(
                                             modifier =
                                                 Modifier.size(
-                                                    7.dp
+                                                    6.dp
                                                 )
                                         )
                                     }
 
                                     if (
-                                        selected
+                                        checked
                                     ) {
 
                                         CupertinoIcon(
@@ -384,7 +355,7 @@ fun MoveTagSheet(
                                                 "Selected",
                                             tint =
                                                 if (
-                                                    infrastructure
+                                                    isInfrastructure
                                                 ) {
                                                     LiasThemeColors
                                                         .secondaryLabel
@@ -397,12 +368,13 @@ fun MoveTagSheet(
                             },
                             showDivider =
                                 index <
-                                    sortedTags
-                                        .lastIndex,
+                                    sortedTags.lastIndex,
                             onClick =
                                 if (
-                                    selectable
+                                    isInfrastructure
                                 ) {
+                                    null
+                                } else {
                                     {
 
                                         if (
@@ -411,83 +383,56 @@ fun MoveTagSheet(
                                                 .GENERIC_TAG_ID
                                         ) {
 
-                                            selectedTagIds
-                                                .clear()
+                                            selected.clear()
 
-                                            selectedTagIds
-                                                .add(
+                                            if (
+                                                infrastructureDevice
+                                            ) {
+                                                selected.add(
+                                                    ConfigurationSafety
+                                                        .INFRASTRUCTURE_TAG_ID
+                                                )
+                                            } else {
+                                                selected.add(
                                                     ConfigurationSafety
                                                         .GENERIC_TAG_ID
                                                 )
+                                            }
 
                                         } else {
 
-                                            selectedTagIds
-                                                .remove(
+                                            selected.remove(
+                                                ConfigurationSafety
+                                                    .GENERIC_TAG_ID
+                                            )
+
+                                            if (
+                                                tag.id in
+                                                selected
+                                            ) {
+                                                selected.remove(
+                                                    tag.id
+                                                )
+                                            } else {
+                                                selected.add(
+                                                    tag.id
+                                                )
+                                            }
+
+                                            if (
+                                                selected.isEmpty()
+                                            ) {
+                                                selected.add(
                                                     ConfigurationSafety
                                                         .GENERIC_TAG_ID
                                                 )
-
-                                            if (
-                                                selected
-                                            ) {
-                                                selectedTagIds
-                                                    .remove(
-                                                        tag.id
-                                                    )
-                                            } else {
-                                                selectedTagIds
-                                                    .add(
-                                                        tag.id
-                                                    )
-                                            }
-
-                                            if (
-                                                selectedTagIds
-                                                    .isEmpty()
-                                            ) {
-                                                selectedTagIds
-                                                    .add(
-                                                        ConfigurationSafety
-                                                            .GENERIC_TAG_ID
-                                                    )
-                                            }
-
-                                            /*
-                                             * Infrastructure remains
-                                             * untouched for existing
-                                             * infrastructure devices.
-                                             */
-                                            if (
-                                                isInfrastructureDevice &&
-                                                ConfigurationSafety
-                                                    .INFRASTRUCTURE_TAG_ID !in
-                                                selectedTagIds
-                                            ) {
-                                                selectedTagIds
-                                                    .add(
-                                                        ConfigurationSafety
-                                                            .INFRASTRUCTURE_TAG_ID
-                                                    )
                                             }
                                         }
                                     }
-                                } else {
-                                    null
                                 }
                         )
                     }
             }
-
-            CupertinoText(
-                text =
-                    "Tags can affect multiple LIAS rules. Effective access is recalculated by the server after changes.",
-                style =
-                    HigTypography.caption,
-                color =
-                    LiasThemeColors
-                        .tertiaryLabel
-            )
         }
     }
 }
