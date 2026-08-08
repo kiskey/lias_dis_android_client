@@ -1,38 +1,35 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/StatusPill.kt
-// Version: 2.1.0
-// Audit Fixes:
-//   1. Added PillTone enum (`Allowed`, `Blocked`, `Scheduled`, `Info`).
-//   2. Derived semantic foreground/background colors automatically via theme.
-//   3. Retained raw color/backgroundColor overload for full backward compatibility.
+// File: StatusPills.kt
+// Version: 3.0.0 (HIG Redesign)
+// Purpose: WCAG 1.4.1 compliant status pills (color + text + glyph).
+//          Replaces color-only indicators.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.lias.remote.ui.theme.LiasThemeColors
-import com.lias.remote.ui.theme.SystemBlueDark
-import com.lias.remote.ui.theme.SystemGreenDark
-import com.lias.remote.ui.theme.SystemOrangeDark
-import com.lias.remote.ui.theme.SystemRedDark
 
 enum class PillTone {
-    Allowed,
-    Blocked,
-    Scheduled,
-    Info
+    ALLOWED, BLOCKED, SCHEDULED, PAUSED, INFO, WARN
 }
 
 @Composable
@@ -41,43 +38,28 @@ fun StatusPill(
     tone: PillTone,
     modifier: Modifier = Modifier
 ) {
-    val (fgColor, bgColor) = when (tone) {
-        PillTone.Allowed -> MaterialTheme.colorScheme.primary to LiasThemeColors.pillGreenBg
-        PillTone.Blocked -> MaterialTheme.colorScheme.error to LiasThemeColors.pillRedBg
-        PillTone.Scheduled -> SystemOrangeDark to LiasThemeColors.pillOrangeBg
-        PillTone.Info -> SystemBlueDark to LiasThemeColors.pillBlueBg
+    val (bgColor, fgColor, icon) = when (tone) {
+        PillTone.ALLOWED -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), MaterialTheme.colorScheme.primary, Icons.Filled.Check)
+        PillTone.BLOCKED -> Triple(MaterialTheme.colorScheme.error.copy(alpha = 0.15f), MaterialTheme.colorScheme.error, Icons.Filled.Close)
+        PillTone.SCHEDULED -> Triple(Color(0xFFFF9500).copy(alpha = 0.15f), Color(0xFFFF9500), Icons.Filled.Schedule)
+        PillTone.PAUSED -> Triple(Color(0xFFFF9500).copy(alpha = 0.15f), Color(0xFFFF9500), Icons.Filled.Pause)
+        PillTone.INFO -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), MaterialTheme.colorScheme.primary, Icons.Filled.Check)
+        PillTone.WARN -> Triple(Color(0xFFFFCC00).copy(alpha = 0.15f), Color(0xFFFFCC00), Icons.Filled.Schedule)
     }
 
-    StatusPill(
-        text = text,
-        color = fgColor,
-        backgroundColor = bgColor,
+    Row(
         modifier = modifier
-    )
-}
-
-@Composable
-fun StatusPill(
-    text: String,
-    color: Color,
-    backgroundColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        color = backgroundColor,
-        shape = CircleShape,
-        modifier = modifier.height(20.dp)
+            .background(bgColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-        ) {
-            Text(
-                text = text.uppercase(),
-                color = color,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Icon(imageVector = icon, contentDescription = null, tint = fgColor, modifier = Modifier.size(12.dp))
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = fgColor,
+            fontWeight = FontWeight.W700
+        )
     }
 }
