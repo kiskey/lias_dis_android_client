@@ -40,20 +40,30 @@ class SettingsRepository(private val context: Context) {
         .map { preferences -> preferences[ONBOARDED] ?: false }
 
     suspend fun saveServerUrl(url: String) {
-        context.dataStore.edit { preferences -> preferences[SERVER_URL] = url }
+        context.dataStore.edit { preferences ->
+            preferences[SERVER_URL] = url
+        }
     }
 
     suspend fun saveAuthToken(token: String?) {
         context.dataStore.edit { preferences ->
-            if (token.isNullOrBlank()) preferences.remove(AUTH_TOKEN) else preferences[AUTH_TOKEN] = token
+            if (token.isNullOrBlank()) {
+                preferences.remove(AUTH_TOKEN)
+            } else {
+                preferences[AUTH_TOKEN] = token
+            }
         }
     }
 
     suspend fun saveThemeMode(mode: String) {
-        context.dataStore.edit { preferences -> preferences[THEME_MODE] = mode }
+        context.dataStore.edit { preferences ->
+            preferences[THEME_MODE] = mode
+        }
     }
 
     suspend fun setOnboarded(value: Boolean) {
-        context.dataStore.edit { preferences -> preferences[ONBOARDED] = value }
+        context.dataStore.edit { preferences ->
+            preferences[ONBOARDED] = value
+        }
     }
 }
