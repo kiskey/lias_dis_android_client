@@ -6,7 +6,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Strict 6-level Apple HIG Typography Scale replacing granulating scales.
+ * Strict 6-level Apple HIG Typography Scale.
  */
 object HigTypography {
     val largeTitle = TextStyle(
