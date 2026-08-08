@@ -174,7 +174,7 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Activity Log Section
+            // Timeline Activity Log Section
             item { ListSectionHeader("Activity · Last 24h") }
             item {
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
