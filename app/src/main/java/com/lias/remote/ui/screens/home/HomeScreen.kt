@@ -238,4 +238,117 @@ fun HomeScreen(
                     ) {
                         MetricColumn(value = "$totalDevices", label = "Total", color = LiasThemeColors.label)
                         Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
-                        MetricColumn(value = "$onlineDevices", label = "Online", color = LiasThemeC
+                        MetricColumn(value = "$onlineDevices", label = "Online", color = LiasThemeColors.green)
+                        Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
+                        MetricColumn(value = "$offlineDevices", label = "Offline", color = LiasThemeColors.tertiaryLabel)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showGlobalSheet) {
+        GlobalSwitchSheet(
+            currentPolicy = globalPolicy,
+            onDismiss = { showGlobalSheet = false },
+            onSave = { policy ->
+                viewModel.savePolicy(policy)
+                showGlobalSheet = false
+            }
+        )
+    }
+
+    activeDeviceForExtend?.let { device ->
+        val status = viewModel.effectiveStatusFor(device.pdid)
+        ExtendAccessSheet(
+            targetLabel = device.displayName,
+            targetSubtitle = device.currentIP.ifBlank { device.pdid },
+            currentExtension = status.activeExtension,
+            onDismiss = { activeDeviceForExtend = null },
+            onConfirm = { mins ->
+                viewModel.extendDeviceAccess(device.pdid, mins)
+                activeDeviceForExtend = null
+            }
+        )
+    }
+
+    activeDeviceForPause?.let { device ->
+        PauseSheet(
+            targetLabel = device.displayName,
+            onDismiss = { activeDeviceForPause = null },
+            onConfirm = { mins ->
+                viewModel.pauseDeviceInternet(device.pdid, mins)
+                activeDeviceForPause = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun QuickTile(icon: String, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(LiasThemeColors.secondaryBackground)
+            .border(0.5.dp, LiasThemeColors.separator, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            CupertinoText(icon, style = HigTypography.headline, color = Color.White)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        CupertinoText(
+            text = label,
+            style = HigTypography.caption,
+            color = LiasThemeColors.label,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun LiveRow(icon: String, iconBg: Color, title: String, subtitle: String, tone: PillTone, isLast: Boolean) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) { CupertinoText(icon, color = Color.White) }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                CupertinoText(title, style = HigTypography.headline, color = LiasThemeColors.label)
+                CupertinoText(subtitle, style = HigTypography.subheadline, color = LiasThemeColors.tertiaryLabel)
+            }
+            StatusPill(text = tone.name, tone = tone)
+        }
+        if (!isLast) {
+            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).padding(start = 16.dp).background(LiasThemeColors.separator))
+        }
+    }
+}
+
+@Composable
+private fun MetricColumn(value: String, label: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        CupertinoText(value, style = HigTypography.title1, fontWeight = FontWeight.ExtraBold, color = color)
+        CupertinoText(label.uppercase(), style = HigTypography.caption, color = color, fontWeight = FontWeight.Bold)
+    }
+}
