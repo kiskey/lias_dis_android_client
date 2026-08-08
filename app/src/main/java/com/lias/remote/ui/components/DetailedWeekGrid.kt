@@ -19,7 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawRect // Explicit extension import required for Canvas drawing
+// NOTE: drawRect is a DrawScope interface member and is in scope automatically inside Canvas { ... }.
+// Top-level import removed to fix 'Unresolved reference drawRect'.
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
@@ -99,6 +100,7 @@ fun DetailedWeekGrid(
                                 val width = (durationMinutes.toFloat() / 1440f) * canvasWidth
 
                                 if (width > 0f) {
+                                    // drawRect called as DrawScope member method
                                     drawRect(
                                         color = color,
                                         topLeft = Offset(left, 2f),
@@ -123,6 +125,7 @@ fun DetailedWeekGrid(
                             val width = (durationMinutes.toFloat() / 1440f) * canvasWidth
 
                             if (width > 0f) {
+                                // drawRect called as DrawScope member method
                                 drawRect(
                                     color = Color.Red.copy(alpha = 0.6f),
                                     topLeft = Offset(left, 0f),
