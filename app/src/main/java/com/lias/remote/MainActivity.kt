@@ -1,26 +1,32 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 13.0.0
+// Version: 20.0.0
 //
 // Purpose:
-//   LIAS Remote activity + application foreground lifecycle boundary.
+//   Single-activity entry point.
 //
-// Batch 13:
-//   - Marks repository foreground in onStart().
-//   - Disconnects foreground-only SSE in onStop().
-//   - ViewModels no longer own transport lifetime.
-//   - Configuration changes remain safe because EventRepository is
-//     application-scoped through AppContainer.
+// Batch 20:
+//   - Handles cold-start external deep links.
+//   - Handles deep links delivered while Activity is already alive.
+//   - Preserves an unconsumed URI through Activity recreation.
+//   - ViewModels remain Activity scoped.
+//   - Navigation state itself remains owned by Navigation Compose.
+//
+// Lifecycle rule:
+//   MainActivity transports an Intent URI.
+//   LiasNavHost decides WHEN it is safe to consume it.
 // ====================================================================
 
 package com.lias.remote
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.lias.remote.ui.LiasViewModel
@@ -31,18 +37,19 @@ import com.lias.remote.ui.theme.LiasTheme
 class MainActivity :
     ComponentActivity() {
 
-    private val container:
-        com.lias.remote.core.AppContainer
-        get() =
-            (
-                application
-                    as LiasApplication
-                )
-                .container
+    companion object {
+
+        private const val STATE_PENDING_DEEP_LINK =
+            "lias.pending_deep_link"
+    }
+
+    private val pendingDeepLink =
+        mutableStateOf<String?>(
+            null
+        )
 
     override fun onCreate(
-        savedInstanceState:
-            Bundle?
+        savedInstanceState: Bundle?
     ) {
 
         super.onCreate(
@@ -51,12 +58,21 @@ class MainActivity :
 
         enableEdgeToEdge()
 
-        /*
-         * Ensure application-scoped EventRepository exists before the
-         * activity reaches onStart().
-         */
-        val repository =
-            container.eventRepository
+        pendingDeepLink.value =
+            savedInstanceState
+                ?.getString(
+                    STATE_PENDING_DEEP_LINK
+                )
+                ?: intent
+                    ?.data
+                    ?.toString()
+
+        val container =
+            (
+                application as
+                    LiasApplication
+                )
+                .container
 
         val viewModelFactory =
             object :
@@ -68,8 +84,7 @@ class MainActivity :
                 override fun <
                     T : ViewModel
                 > create(
-                    modelClass:
-                        Class<T>
+                    modelClass: Class<T>
                 ): T {
 
                     return when {
@@ -80,7 +95,7 @@ class MainActivity :
                             ) ->
 
                             LiasViewModel(
-                                repository
+                                container.eventRepository
                             ) as T
 
                         modelClass
@@ -96,10 +111,12 @@ class MainActivity :
                                     container
                                         .liasApiClient,
                                 eventRepository =
-                                    repository
+                                    container
+                                        .eventRepository
                             ) as T
 
                         else ->
+
                             throw IllegalArgumentException(
                                 "Unknown ViewModel class: ${modelClass.name}"
                             )
@@ -132,39 +149,59 @@ class MainActivity :
 
             LiasTheme(
                 themeMode =
-                    settingsState
-                        .themeMode
+                    settingsState.themeMode
             ) {
 
                 LiasNavHost(
                     liasViewModel =
                         liasViewModel,
                     settingsViewModel =
-                        settingsViewModel
+                        settingsViewModel,
+                    externalDeepLink =
+                        pendingDeepLink.value,
+                    onExternalDeepLinkConsumed = {
+
+                        pendingDeepLink.value =
+                            null
+                    }
                 )
             }
         }
     }
 
-    override fun onStart() {
+    override fun onNewIntent(
+        intent: Intent
+    ) {
 
-        super.onStart()
+        super.onNewIntent(
+            intent
+        )
 
-        container
-            .eventRepository
-            .setAppForeground(
-                true
-            )
+        setIntent(
+            intent
+        )
+
+        pendingDeepLink.value =
+            intent.data
+                ?.toString()
     }
 
-    override fun onStop() {
+    override fun onSaveInstanceState(
+        outState: Bundle
+    ) {
 
-        container
-            .eventRepository
-            .setAppForeground(
-                false
-            )
+        pendingDeepLink.value
+            ?.let {
+                uri ->
 
-        super.onStop()
+                outState.putString(
+                    STATE_PENDING_DEEP_LINK,
+                    uri
+                )
+            }
+
+        super.onSaveInstanceState(
+            outState
+        )
     }
 }
