@@ -1,22 +1,24 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/AppContainer.kt
-// Version: 13.0.0
+// Version: 24.0.0
 //
 // Purpose:
-//   Lightweight manual dependency container.
+//   Manual dependency-injection root for LIAS Remote.
 //
-// Batch 13:
-//   - Adds NetworkMonitor.
-//   - Keeps dedicated infinite-read-timeout SSE OkHttpClient.
-//   - EventRepository owns transport coordination.
+// Batch 24:
+//   - Integrates Batch 22 isolated LiasConnectionProbe.
+//   - Retains independent long-lived SSE OkHttp client.
+//   - REST and connection probes share connection pooling but NOT
+//     mutable LiasApiClient endpoint state.
+//   - EventRepository remains the single live application repository.
 // ====================================================================
 
 package com.lias.remote.core
 
 import android.content.Context
 import com.lias.remote.core.network.LiasApiClient
+import com.lias.remote.core.network.LiasConnectionProbe
 import com.lias.remote.core.network.LiasSseClient
-import com.lias.remote.core.network.NetworkMonitor
 import com.lias.remote.core.store.SettingsRepository
 import com.lias.remote.repositories.EventRepository
 import java.util.concurrent.TimeUnit
@@ -26,15 +28,14 @@ class AppContainer(
     context: Context
 ) {
 
-    private val applicationContext =
-        context.applicationContext
-
+    /**
+     * Ordinary finite REST requests.
+     */
     val okHttpClient:
-        OkHttpClient
-        by lazy {
+        OkHttpClient by
+        lazy {
 
-            OkHttpClient
-                .Builder()
+            OkHttpClient.Builder()
                 .connectTimeout(
                     10,
                     TimeUnit.SECONDS
@@ -54,15 +55,14 @@ class AppContainer(
         }
 
     /**
-     * SSE must not have a finite read timeout.
+     * SSE must not inherit the ordinary 10-second read timeout.
      *
-     * LIAS emits heartbeat events every 15 seconds, but network or
-     * scheduling jitter should not make OkHttp itself kill an otherwise
-     * valid persistent response.
+     * LIAS sends periodic heartbeat traffic, but an event stream is
+     * intentionally long-lived.
      */
     val sseOkHttpClient:
-        OkHttpClient
-        by lazy {
+        OkHttpClient by
+        lazy {
 
             okHttpClient
                 .newBuilder()
@@ -74,35 +74,48 @@ class AppContainer(
         }
 
     val settingsRepository:
-        SettingsRepository
-        by lazy {
+        SettingsRepository by
+        lazy {
 
             SettingsRepository(
-                applicationContext
+                context.applicationContext
             )
         }
 
-    val networkMonitor:
-        NetworkMonitor
-        by lazy {
-
-            NetworkMonitor(
-                applicationContext
-            )
-        }
-
+    /**
+     * Live REST client.
+     *
+     * EventRepository owns its active endpoint through persisted
+     * SettingsRepository values.
+     */
     val liasApiClient:
-        LiasApiClient
-        by lazy {
+        LiasApiClient by
+        lazy {
 
             LiasApiClient(
                 okHttpClient
             )
         }
 
+    /**
+     * Batch 22 isolated candidate-server verifier.
+     *
+     * A connection test creates its own temporary LiasApiClient and can
+     * therefore never redirect liasApiClient away from the currently
+     * active server.
+     */
+    val liasConnectionProbe:
+        LiasConnectionProbe by
+        lazy {
+
+            LiasConnectionProbe(
+                okHttpClient
+            )
+        }
+
     val liasSseClient:
-        LiasSseClient
-        by lazy {
+        LiasSseClient by
+        lazy {
 
             LiasSseClient(
                 sseOkHttpClient
@@ -110,8 +123,8 @@ class AppContainer(
         }
 
     val eventRepository:
-        EventRepository
-        by lazy {
+        EventRepository by
+        lazy {
 
             EventRepository(
                 api =
@@ -119,18 +132,7 @@ class AppContainer(
                 sse =
                     liasSseClient,
                 settings =
-                    settingsRepository,
-                networkMonitor =
-                    networkMonitor
+                    settingsRepository
             )
-                .also {
-                    /*
-                     * Repository startup belongs to the application
-                     * dependency graph, not to a ViewModel constructor.
-                     *
-                     * start() is idempotent regardless.
-                     */
-                    it.start()
-                }
         }
 }
