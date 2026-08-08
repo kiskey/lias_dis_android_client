@@ -181,7 +181,7 @@ fun HomeScreen(
                 }
             }
 
-            // Metrics Bar
+            // Metrics Snapshot
             item {
                 ListSectionHeader("Network Snapshot")
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
