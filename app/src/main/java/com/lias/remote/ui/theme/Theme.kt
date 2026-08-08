@@ -3,6 +3,7 @@ package com.lias.remote.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -56,8 +57,10 @@ fun LiasTheme(
         }
     }
 
-    CupertinoTheme(
-        colorScheme = cupertinoColorScheme,
-        content = content
-    )
+    CompositionLocalProvider(LocalLiasDarkTheme provides darkTheme) {
+        CupertinoTheme(
+            colorScheme = cupertinoColorScheme,
+            content = content
+        )
+    }
 }
