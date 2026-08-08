@@ -1,8 +1,7 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 1.7.0
-// Audit Fixes:
-//   1. Added themeMode state and updateThemeMode action.
+// File: SettingsViewModel.kt
+// Version: 3.1.0 (HIG Redesign)
+// Purpose: Exposed Onboarding state to trigger OnboardingSheet.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -23,14 +22,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val serverUrl: String = "",        // Transient editing draft
-    val savedServerUrl: String = "",   // Committed URL from DataStore
+    val serverUrl: String = "",
+    val savedServerUrl: String = "",
     val authToken: String = "",
-    val themeMode: String = "system",  // "system", "light", "dark"
+    val themeMode: String = "system",
     val vacationMode: Boolean = false,
     val isTesting: Boolean = false,
     val testResult: String? = null,
-    val isFlushing: Boolean = false 
+    val isFlushing: Boolean = false,
+    val isOnboarded: Boolean = true
 )
 
 class SettingsViewModel(
@@ -52,44 +52,32 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
-            settings.authToken.collect { token ->
-                _uiState.value = _uiState.value.copy(authToken = token ?: "")
-            }
+            settings.authToken.collect { token -> _uiState.value = _uiState.value.copy(authToken = token ?: "") }
         }
         viewModelScope.launch {
-            settings.themeMode.collect { mode ->
-                _uiState.value = _uiState.value.copy(themeMode = mode)
-            }
+            settings.themeMode.collect { mode -> _uiState.value = _uiState.value.copy(themeMode = mode) }
+        }
+        viewModelScope.launch {
+            settings.isOnboarded.collect { onboarded -> _uiState.value = _uiState.value.copy(isOnboarded = onboarded) }
         }
     }
 
-    fun updateServerUrl(url: String) {
-        _uiState.value = _uiState.value.copy(serverUrl = url)
-    }
-
-    fun updateAuthToken(token: String) {
-        _uiState.value = _uiState.value.copy(authToken = token)
-    }
-
+    fun updateServerUrl(url: String) { _uiState.value = _uiState.value.copy(serverUrl = url) }
+    fun updateAuthToken(token: String) { _uiState.value = _uiState.value.copy(authToken = token) }
     fun updateThemeMode(mode: String) {
-        viewModelScope.launch {
-            settings.saveThemeMode(mode)
-            _uiState.value = _uiState.value.copy(themeMode = mode)
-        }
+        viewModelScope.launch { settings.saveThemeMode(mode) }
+    }
+
+    fun completeOnboarding() {
+        viewModelScope.launch { settings.setOnboarded(true) }
     }
 
     fun testConnection() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isTesting = true, testResult = null)
-            
-            val tempUrl = _uiState.value.serverUrl
-            val tempToken = _uiState.value.authToken.ifBlank { null }
-            
-            api.baseUrl = tempUrl
-            api.authToken = tempToken
-
+            api.baseUrl = _uiState.value.serverUrl
+            api.authToken = _uiState.value.authToken.ifBlank { null }
             val result = api.get<HealthResponse>(Endpoints.HEALTH)
-            
             _uiState.value = _uiState.value.copy(
                 isTesting = false,
                 testResult = when (result) {
@@ -107,10 +95,7 @@ class SettingsViewModel(
             val urlToSave = _uiState.value.serverUrl.trim()
             settings.saveServerUrl(urlToSave)
             settings.saveAuthToken(_uiState.value.authToken.ifBlank { null })
-            _uiState.value = _uiState.value.copy(
-                savedServerUrl = urlToSave,
-                testResult = "Settings saved successfully."
-            )
+            _uiState.value = _uiState.value.copy(savedServerUrl = urlToSave, testResult = "Settings saved successfully.")
         }
     }
 
@@ -118,13 +103,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val result = eventRepository.toggleVacationMode(enabled)
             if (result is ApiResult.Success) {
-                val stateText = if (result.data.vacationMode) "enabled" else "disabled"
-                _uiState.value = _uiState.value.copy(
-                    vacationMode = result.data.vacationMode,
-                    testResult = "Vacation Mode $stateText successfully."
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(testResult = "Failed to toggle Vacation Mode.")
+                _uiState.value = _uiState.value.copy(vacationMode = result.data.vacationMode)
             }
         }
     }
@@ -133,15 +112,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isFlushing = true)
             val result = eventRepository.flushNftables()
-            _uiState.value = _uiState.value.copy(
-                isFlushing = false,
-                testResult = when (result) {
-                    is ApiResult.Success -> "Nftables table flushed successfully."
-                    is ApiResult.HttpError -> "Flush failed: HTTP ${result.code}"
-                    is ApiResult.NetworkError -> "Flush failed: ${result.cause.message}"
-                    is ApiResult.ConflictError -> "Conflict"
-                }
-            )
+            _uiState.value = _uiState.value.copy(isFlushing = false)
         }
     }
 }
