@@ -1,18 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 6.0.0
+// Version: 11.0.0
 //
 // Purpose:
-//   LIAS overview dashboard.
+//   LIAS network overview.
 //
-// UX corrections:
-//   - No fabricated enforcement examples.
+// Batch 11:
+//   - Dashboard access metrics derive from EffectiveStatus.
+//   - Pause quick action only chooses pause_available device.
+//   - Extend quick action only chooses extend_available device.
+//   - Temporary override count/status is server-derived.
+//   - No pol_pause_* lookup.
 //   - No fabricated countdowns.
-//   - Loading, failed, empty and stale states are distinct.
-//   - All visible metrics derive from actual UiState.
-//   - Quick actions requiring a device are disabled naturally when
-//     there is no eligible device.
-//   - Uses the typed LiasTab navigation contract from Batch 3.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
@@ -50,9 +49,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.models.TemporaryAccessKind
+import com.lias.remote.core.models.temporaryAccessKind
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigLargeTitleScaffold
@@ -81,28 +83,38 @@ import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 @Composable
 fun HomeScreen(
     viewModel: LiasViewModel,
-    onNavigateToDeviceDetail: (String) -> Unit,
-    onNavigateToTab: (LiasTab) -> Unit
+    onNavigateToDeviceDetail:
+        (String) -> Unit,
+    onNavigateToTab:
+        (LiasTab) -> Unit
 ) {
+
     val state by
-        viewModel.state.collectAsState()
+        viewModel.state
+            .collectAsState()
 
     val scrollState =
         rememberLazyListState()
 
     var showGlobalSheet by
         remember {
-            mutableStateOf(false)
+            mutableStateOf(
+                false
+            )
         }
 
     var activeDeviceForExtend by
         remember {
-            mutableStateOf<Device?>(null)
+            mutableStateOf<Device?>(
+                null
+            )
         }
 
     var activeDeviceForPause by
         remember {
-            mutableStateOf<Device?>(null)
+            mutableStateOf<Device?>(
+                null
+            )
         }
 
     val globalPolicy =
@@ -138,35 +150,84 @@ fun HomeScreen(
         totalDevices -
             onlineDevices
 
+    val knownStatuses =
+        state.devices.mapNotNull { device ->
+            state.deviceEffectiveStatuses[
+                device.pdid
+            ]
+        }
+
     val blockedDevices =
-        state.devices.count { device ->
-            state
-                .deviceEffectiveStatuses[
-                    device.pdid
-                ]
-                ?.action ==
-                "block"
-        }
-
-    val activePolicies =
-        state.policies.filter {
-            it.enabled
-        }
-
-    val eligibleDevices =
-        state.devices.filterNot {
-            it.safeTags.contains(
-                "infrastructure"
+        knownStatuses.count {
+            it.action.equals(
+                "block",
+                true
             )
         }
 
+    val allowedDevices =
+        knownStatuses.count {
+            it.action.equals(
+                "allow",
+                true
+            )
+        }
+
+    val checkingDevices =
+        (
+            totalDevices -
+                knownStatuses.size
+            )
+            .coerceAtLeast(
+                0
+            )
+
+    val pausedDevices =
+        knownStatuses.count {
+            it.temporaryAccessKind ==
+                TemporaryAccessKind.PAUSE
+        }
+
+    val extendedDevices =
+        knownStatuses.count {
+            it.temporaryAccessKind ==
+                TemporaryAccessKind.EXTEND
+        }
+
+    val pauseCandidate =
+        state.devices
+            .firstOrNull { device ->
+
+                state
+                    .deviceEffectiveStatuses[
+                        device.pdid
+                    ]
+                    ?.pauseAvailable ==
+                    true
+            }
+
+    val extendCandidate =
+        state.devices
+            .firstOrNull { device ->
+
+                state
+                    .deviceEffectiveStatuses[
+                        device.pdid
+                    ]
+                    ?.extendAvailable ==
+                    true
+            }
+
     HigLargeTitleScaffold(
-        title = "Home",
+        title =
+            "Home",
         scrollState =
             scrollState,
         navTrailing = {
+
             HigTextButton(
-                text = "Refresh",
+                text =
+                    "Refresh",
                 onClick =
                     viewModel::refresh
             )
@@ -189,15 +250,18 @@ fun HomeScreen(
 
                 SyncState.Idle,
                 SyncState.Loading -> {
+
                     if (
                         !state.isInitialLoaded
                     ) {
+
                         item {
+
                             ScreenStateView(
                                 title =
                                     "Loading LIAS",
                                 message =
-                                    "Synchronizing devices, rules and schedules."
+                                    "Synchronizing devices, rules and effective access state."
                             )
                         }
 
@@ -206,7 +270,9 @@ fun HomeScreen(
                 }
 
                 is SyncState.Failed -> {
+
                     item {
+
                         ScreenStateView(
                             title =
                                 "Unable to Load LIAS",
@@ -225,7 +291,9 @@ fun HomeScreen(
                 }
 
                 is SyncState.Stale -> {
+
                     item {
+
                         StaleDataNotice(
                             message =
                                 sync.message,
@@ -240,13 +308,17 @@ fun HomeScreen(
             }
 
             item {
+
                 Column(
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp,
-                            vertical = 8.dp
+                            horizontal =
+                                16.dp,
+                            vertical =
+                                8.dp
                         )
                 ) {
+
                     Box(
                         modifier =
                             Modifier
@@ -272,36 +344,36 @@ fun HomeScreen(
                                     }
                                 )
                                 .border(
-                                    width =
-                                        0.5.dp,
-                                    color =
-                                        if (
-                                            isVacationActive
-                                        ) {
-                                            LiasThemeColors.orange
-                                                .copy(
-                                                    alpha = 0.35f
-                                                )
-                                        } else {
-                                            LiasThemeColors.green
-                                                .copy(
-                                                    alpha = 0.28f
-                                                )
-                                        },
-                                    shape =
-                                        RoundedCornerShape(
-                                            16.dp
-                                        )
+                                    0.5.dp,
+                                    if (
+                                        isVacationActive
+                                    ) {
+                                        LiasThemeColors.orange
+                                            .copy(
+                                                alpha = 0.35f
+                                            )
+                                    } else {
+                                        LiasThemeColors.green
+                                            .copy(
+                                                alpha = 0.28f
+                                            )
+                                    },
+                                    RoundedCornerShape(
+                                        16.dp
+                                    )
                                 )
                                 .padding(
                                     20.dp
                                 )
                     ) {
+
                         Column {
+
                             Row(
                                 verticalAlignment =
                                     Alignment.CenterVertically
                             ) {
+
                                 CupertinoIcon(
                                     imageVector =
                                         if (
@@ -352,30 +424,28 @@ fun HomeScreen(
                                     fontWeight =
                                         FontWeight.Bold,
                                     color =
-                                        if (
-                                            isVacationActive
-                                        ) {
-                                            LiasThemeColors.orange
-                                        } else {
-                                            LiasThemeColors.secondaryLabel
-                                        }
+                                        LiasThemeColors
+                                            .secondaryLabel
                                 )
                             }
 
                             Spacer(
                                 modifier =
                                     Modifier.height(
-                                        7.dp
+                                        8.dp
                                     )
                             )
 
                             CupertinoText(
                                 text =
                                     when {
-                                        totalDevices == 0 ->
+
+                                        totalDevices ==
+                                            0 ->
                                             "No devices discovered"
 
-                                        onlineDevices == 1 ->
+                                        onlineDevices ==
+                                            1 ->
                                             "1 device online"
 
                                         else ->
@@ -398,11 +468,34 @@ fun HomeScreen(
 
                             CupertinoText(
                                 text =
-                                    "${activePolicies.size} enabled rules · $blockedDevices blocked now",
+                                    buildString {
+                                        append(
+                                            "$blockedDevices blocked"
+                                        )
+
+                                        if (
+                                            pausedDevices >
+                                            0
+                                        ) {
+                                            append(
+                                                " · $pausedDevices paused"
+                                            )
+                                        }
+
+                                        if (
+                                            extendedDevices >
+                                            0
+                                        ) {
+                                            append(
+                                                " · $extendedDevices extended"
+                                            )
+                                        }
+                                    },
                                 style =
                                     HigTypography.subheadline,
                                 color =
-                                    LiasThemeColors.secondaryLabel
+                                    LiasThemeColors
+                                        .secondaryLabel
                             )
 
                             Spacer(
@@ -418,6 +511,7 @@ fun HomeScreen(
                                         8.dp
                                     )
                             ) {
+
                                 HigButton(
                                     text =
                                         "Global Switch",
@@ -443,6 +537,7 @@ fun HomeScreen(
                                             "Vacation"
                                         },
                                     onClick = {
+
                                         viewModel
                                             .toggleVacationMode(
                                                 !isVacationActive
@@ -468,9 +563,12 @@ fun HomeScreen(
             }
 
             if (
-                totalDevices == 0
+                totalDevices ==
+                0
             ) {
+
                 item {
+
                     ScreenStateView(
                         title =
                             "No Devices Yet",
@@ -482,9 +580,11 @@ fun HomeScreen(
                             viewModel::refresh
                     )
                 }
+
             } else {
 
                 item {
+
                     ListSectionHeader(
                         "Quick Actions"
                     )
@@ -502,6 +602,7 @@ fun HomeScreen(
                                 10.dp
                             )
                     ) {
+
                         QuickTile(
                             icon =
                                 CupertinoIcons
@@ -516,6 +617,7 @@ fun HomeScreen(
                                     1f
                                 )
                         ) {
+
                             onNavigateToTab(
                                 LiasTab.DEVICES
                             )
@@ -531,15 +633,16 @@ fun HomeScreen(
                             color =
                                 LiasThemeColors.green,
                             enabled =
-                                eligibleDevices.isNotEmpty(),
+                                extendCandidate !=
+                                    null,
                             modifier =
                                 Modifier.weight(
                                     1f
                                 )
                         ) {
+
                             activeDeviceForExtend =
-                                eligibleDevices
-                                    .firstOrNull()
+                                extendCandidate
                         }
 
                         QuickTile(
@@ -552,15 +655,16 @@ fun HomeScreen(
                             color =
                                 LiasThemeColors.orange,
                             enabled =
-                                eligibleDevices.isNotEmpty(),
+                                pauseCandidate !=
+                                    null,
                             modifier =
                                 Modifier.weight(
                                     1f
                                 )
                         ) {
+
                             activeDeviceForPause =
-                                eligibleDevices
-                                    .firstOrNull()
+                                pauseCandidate
                         }
 
                         QuickTile(
@@ -577,6 +681,7 @@ fun HomeScreen(
                                     1f
                                 )
                         ) {
+
                             onNavigateToTab(
                                 LiasTab.SCHEDULES
                             )
@@ -585,20 +690,9 @@ fun HomeScreen(
                 }
 
                 item {
+
                     ListSectionHeader(
-                        text =
-                            "Access Now",
-                        trailingAction = {
-                            HigTextButton(
-                                text =
-                                    "View Devices",
-                                onClick = {
-                                    onNavigateToTab(
-                                        LiasTab.DEVICES
-                                    )
-                                }
-                            )
-                        }
+                        "Effective Access"
                     )
 
                     GroupedListCard(
@@ -608,28 +702,146 @@ fun HomeScreen(
                                     16.dp
                             )
                     ) {
-                        AccessSummaryRow(
-                            title =
+
+                        GroupedListRow(
+                            primaryText =
                                 "Allowed",
-                            value =
-                                totalDevices -
-                                    blockedDevices,
-                            tone =
-                                PillTone.ALLOWED
+                            secondaryText =
+                                "$allowedDevices devices",
+                            trailingContent = {
+
+                                StatusPill(
+                                    text =
+                                        allowedDevices
+                                            .toString(),
+                                    tone =
+                                        PillTone.ALLOWED
+                                )
+                            },
+                            showDivider =
+                                true
                         )
 
-                        AccessSummaryRow(
-                            title =
+                        GroupedListRow(
+                            primaryText =
                                 "Blocked",
-                            value =
-                                blockedDevices,
-                            tone =
-                                PillTone.BLOCKED
+                            secondaryText =
+                                "$blockedDevices devices",
+                            trailingContent = {
+
+                                StatusPill(
+                                    text =
+                                        blockedDevices
+                                            .toString(),
+                                    tone =
+                                        PillTone.BLOCKED
+                                )
+                            },
+                            showDivider =
+                                checkingDevices >
+                                    0
                         )
+
+                        if (
+                            checkingDevices >
+                            0
+                        ) {
+
+                            GroupedListRow(
+                                primaryText =
+                                    "Checking",
+                                secondaryText =
+                                    "Waiting for authoritative status",
+                                trailingContent = {
+
+                                    StatusPill(
+                                        text =
+                                            checkingDevices
+                                                .toString(),
+                                        tone =
+                                            PillTone.INFO
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (
+                    pausedDevices >
+                        0 ||
+                    extendedDevices >
+                        0
+                ) {
+
+                    item {
+
+                        ListSectionHeader(
+                            "Temporary Overrides"
+                        )
+
+                        GroupedListCard(
+                            modifier =
+                                Modifier.padding(
+                                    horizontal =
+                                        16.dp
+                                )
+                        ) {
+
+                            if (
+                                pausedDevices >
+                                0
+                            ) {
+
+                                GroupedListRow(
+                                    primaryText =
+                                        "Paused",
+                                    secondaryText =
+                                        "$pausedDevices active",
+                                    trailingContent = {
+
+                                        StatusPill(
+                                            text =
+                                                pausedDevices
+                                                    .toString(),
+                                            tone =
+                                                PillTone.PAUSED
+                                        )
+                                    },
+                                    showDivider =
+                                        extendedDevices >
+                                            0
+                                )
+                            }
+
+                            if (
+                                extendedDevices >
+                                0
+                            ) {
+
+                                GroupedListRow(
+                                    primaryText =
+                                        "Extended Access",
+                                    secondaryText =
+                                        "$extendedDevices active",
+                                    trailingContent = {
+
+                                        StatusPill(
+                                            text =
+                                                extendedDevices
+                                                    .toString(),
+                                            tone =
+                                                PillTone.ALLOWED
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
                 item {
+
                     ListSectionHeader(
                         "Network Snapshot"
                     )
@@ -641,6 +853,7 @@ fun HomeScreen(
                                     16.dp
                             )
                     ) {
+
                         Row(
                             modifier =
                                 Modifier
@@ -650,39 +863,35 @@ fun HomeScreen(
                                             14.dp
                                     ),
                             horizontalArrangement =
-                                Arrangement.SpaceEvenly,
-                            verticalAlignment =
-                                Alignment.CenterVertically
+                                Arrangement.SpaceEvenly
                         ) {
+
                             MetricColumn(
                                 value =
-                                    "$totalDevices",
+                                    totalDevices.toString(),
                                 label =
                                     "Total",
                                 color =
                                     LiasThemeColors.label
                             )
 
-                            DividerMetric()
-
                             MetricColumn(
                                 value =
-                                    "$onlineDevices",
+                                    onlineDevices.toString(),
                                 label =
                                     "Online",
                                 color =
                                     LiasThemeColors.green
                             )
 
-                            DividerMetric()
-
                             MetricColumn(
                                 value =
-                                    "$offlineDevices",
+                                    offlineDevices.toString(),
                                 label =
                                     "Offline",
                                 color =
-                                    LiasThemeColors.tertiaryLabel
+                                    LiasThemeColors
+                                        .tertiaryLabel
                             )
                         }
                     }
@@ -694,6 +903,7 @@ fun HomeScreen(
     if (
         showGlobalSheet
     ) {
+
         GlobalSwitchSheet(
             currentPolicy =
                 globalPolicy,
@@ -702,6 +912,7 @@ fun HomeScreen(
                     false
             },
             onSave = { policy ->
+
                 viewModel.savePolicy(
                     policy
                 )
@@ -716,9 +927,10 @@ fun HomeScreen(
         ?.let { device ->
 
             val status =
-                viewModel.effectiveStatusFor(
-                    device.pdid
-                )
+                viewModel
+                    .effectiveStatusFor(
+                        device.pdid
+                    )
 
             ExtendAccessSheet(
                 targetLabel =
@@ -729,16 +941,23 @@ fun HomeScreen(
                             device.pdid
                         },
                 currentExtension =
-                    status?.activeExtension,
+                    status
+                        ?.activeExtension
+                        ?.takeIf {
+                            status.temporaryAccessKind ==
+                                TemporaryAccessKind.EXTEND
+                        },
                 onDismiss = {
                     activeDeviceForExtend =
                         null
                 },
                 onConfirm = { minutes ->
-                    viewModel.extendDeviceAccess(
-                        device.pdid,
-                        minutes
-                    )
+
+                    viewModel
+                        .extendDeviceAccess(
+                            device.pdid,
+                            minutes
+                        )
 
                     activeDeviceForExtend =
                         null
@@ -748,6 +967,7 @@ fun HomeScreen(
 
     activeDeviceForPause
         ?.let { device ->
+
             PauseSheet(
                 targetLabel =
                     device.displayName,
@@ -756,10 +976,12 @@ fun HomeScreen(
                         null
                 },
                 onConfirm = { minutes ->
-                    viewModel.pauseDeviceInternet(
-                        device.pdid,
-                        minutes
-                    )
+
+                    viewModel
+                        .pauseDeviceInternet(
+                            device.pdid,
+                            minutes
+                        )
 
                     activeDeviceForPause =
                         null
@@ -773,16 +995,12 @@ private fun QuickTile(
     icon: ImageVector,
     label: String,
     color: Color,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    modifier: Modifier =
+        Modifier,
+    enabled: Boolean =
+        true,
     onClick: () -> Unit
 ) {
-    val foreground =
-        if (enabled) {
-            LiasThemeColors.label
-        } else {
-            LiasThemeColors.tertiaryLabel
-        }
 
     Column(
         modifier =
@@ -793,17 +1011,15 @@ private fun QuickTile(
                     )
                 )
                 .background(
-                    LiasThemeColors.secondaryBackground
+                    LiasThemeColors
+                        .secondaryBackground
                 )
                 .border(
-                    width =
-                        0.5.dp,
-                    color =
-                        LiasThemeColors.separator,
-                    shape =
-                        RoundedCornerShape(
-                            14.dp
-                        )
+                    0.5.dp,
+                    LiasThemeColors.separator,
+                    RoundedCornerShape(
+                        14.dp
+                    )
                 )
                 .clickable(
                     enabled =
@@ -820,6 +1036,7 @@ private fun QuickTile(
         horizontalAlignment =
             Alignment.CenterHorizontally
     ) {
+
         Box(
             modifier =
                 Modifier
@@ -843,6 +1060,7 @@ private fun QuickTile(
             contentAlignment =
                 Alignment.Center
         ) {
+
             CupertinoIcon(
                 imageVector =
                     icon,
@@ -854,7 +1072,8 @@ private fun QuickTile(
                     ) {
                         Color.White
                     } else {
-                        LiasThemeColors.tertiaryLabel
+                        LiasThemeColors
+                            .tertiaryLabel
                     },
                 modifier =
                     Modifier.size(
@@ -876,67 +1095,18 @@ private fun QuickTile(
             style =
                 HigTypography.caption,
             color =
-                foreground,
+                if (
+                    enabled
+                ) {
+                    LiasThemeColors.label
+                } else {
+                    LiasThemeColors
+                        .tertiaryLabel
+                },
             textAlign =
-                TextAlign.Center,
-            maxLines =
-                1
+                TextAlign.Center
         )
     }
-}
-
-@Composable
-private fun AccessSummaryRow(
-    title: String,
-    value: Int,
-    tone: PillTone
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                ),
-        horizontalArrangement =
-            Arrangement.SpaceBetween,
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-        CupertinoText(
-            text =
-                title,
-            style =
-                HigTypography.body,
-            color =
-                LiasThemeColors.label
-        )
-
-        StatusPill(
-            text =
-                value.toString(),
-            tone =
-                tone
-        )
-    }
-}
-
-@Composable
-private fun DividerMetric() {
-    Box(
-        modifier =
-            Modifier
-                .width(
-                    0.5.dp
-                )
-                .height(
-                    30.dp
-                )
-                .background(
-                    LiasThemeColors.separator
-                )
-    )
 }
 
 @Composable
@@ -945,10 +1115,12 @@ private fun MetricColumn(
     label: String,
     color: Color
 ) {
+
     Column(
         horizontalAlignment =
             Alignment.CenterHorizontally
     ) {
+
         CupertinoText(
             text =
                 value,
