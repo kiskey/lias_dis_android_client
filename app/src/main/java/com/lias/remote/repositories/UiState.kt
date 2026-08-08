@@ -1,7 +1,17 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 1.3.0
-// Purpose: State container holding models and effective statuses.
+// Version: 2.0.0
+//
+// Purpose:
+//   Immutable application state consumed by Compose UI.
+//
+// Design:
+//   State explicitly distinguishes:
+//     - first-load state
+//     - refresh state
+//     - connection state
+//     - recoverable error state
+//     - effective access state
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -22,15 +32,37 @@ data class UiState(
     val schedules: List<Schedule> = emptyList(),
     val stats: NetworkStats? = null,
     val users: List<User> = emptyList(),
-    val deviceEffectiveStatuses: Map<String, EffectiveStatus> = emptyMap(),
-    val tagEffectiveStatuses: Map<String, EffectiveStatus> = emptyMap(),
-    val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
+
+    val deviceEffectiveStatuses:
+        Map<String, EffectiveStatus> = emptyMap(),
+
+    val tagEffectiveStatuses:
+        Map<String, EffectiveStatus> = emptyMap(),
+
+    val connectionState:
+        ConnectionState = ConnectionState.DISCONNECTED,
+
     val isInitialLoaded: Boolean = false,
-    val errorMessage: String? = null
+
+    val isRefreshing: Boolean = false,
+
+    val errorMessage: String? = null,
+
+    val lastConnectionError: String? = null
 )
 
 sealed class UiEvent {
-    data class ShowSnackbar(val message: String) : UiEvent()
-    data class ShowSnackbarError(val message: String) : UiEvent()
-    data class ShowSecurityAlert(val details: String) : UiEvent()
+
+    data class ShowSnackbar(
+        val message: String
+    ) : UiEvent()
+
+    data class ShowSnackbarError(
+        val message: String
+    ) : UiEvent()
+
+    data class ShowSecurityAlert(
+        val details: String,
+        val pdid: String = ""
+    ) : UiEvent()
 }
