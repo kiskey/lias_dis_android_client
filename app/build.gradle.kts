@@ -1,11 +1,3 @@
-// ====================================================================
-// File: app/build.gradle.kts
-// Version: 1.6.0
-// Audit Fixes:
-//   1. Incremented versionCode to 5 and versionName to 1.6.0.
-//   2. Retained compileSdk 36 and targetSdk 35 for Cupertino 3.3.1 compatibility.
-// ====================================================================
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -21,8 +13,8 @@ android {
         applicationId = "com.lias.remote"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.6.0"
+        versionCode = 6
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -38,16 +30,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
-            val keystoreFile = file("release.keystore")
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release").apply {
-                    storeFile = keystoreFile
-                    storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                    keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                    keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-                }
-            }
         }
         debug {
             isMinifyEnabled = false
@@ -83,8 +65,6 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     
     implementation(libs.okhttp)
@@ -94,7 +74,7 @@ dependencies {
     
     implementation(libs.androidx.datastore.preferences)
     
-    // Cupertino library (RobinPcrd fork - active maintenance)
+    // Strict Cupertino library (Zero Material Design)
     implementation(libs.cupertino)
     implementation(libs.cupertino.icons.extended)
     
