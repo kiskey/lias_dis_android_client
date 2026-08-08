@@ -3,30 +3,27 @@
 <!--
 ====================================================================
 File: app/src/main/AndroidManifest.xml
-Version: 20.0.0
+Version: 24.0.0
 
-Batch 20:
-  - Registers LIAS Remote navigation deep links.
-  - Does NOT allow configuration/auth data through URI parameters.
-  - Keeps normal launcher behavior unchanged.
-
-Supported:
-
-  liasremote://home
-  liasremote://devices
-  liasremote://device/<pdid>
-  liasremote://devices/<pdid>
-  liasremote://schedules
-  liasremote://rules
-  liasremote://settings
+Integrated contracts:
+  - Launcher Activity
+  - singleTop for onNewIntent()
+  - LIAS Remote navigation deep links
+  - no server/token deep-link configuration contract
+  - network permissions
+  - existing local-network HTTP compatibility
 ====================================================================
 -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission
+        android:name="android.permission.INTERNET" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".LiasApplication"
@@ -35,12 +32,12 @@ Supported:
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="LIAS Remote"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LiasRemote"
-        android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="true"
-        tools:targetApi="34">
+        tools:targetApi="35">
 
         <activity
             android:name=".MainActivity"
@@ -49,30 +46,50 @@ Supported:
             android:theme="@style/Theme.LiasRemote"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Normal launcher entry point. -->
+            <!-- Standard launcher. -->
             <intent-filter>
 
-                <action android:name="android.intent.action.MAIN" />
+                <action
+                    android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
 
             </intent-filter>
 
             <!--
-                LIAS Remote navigation links.
+                Navigation-only deep links.
 
-                We intentionally register only the custom scheme here.
-                There is no token, server-address, or credential-bearing
-                URI contract.
+                Supported examples:
+
+                  liasremote://home
+                  liasremote://devices
+                  liasremote://devices/<pdid>
+                  liasremote://device/<pdid>
+                  liasremote://schedules
+                  liasremote://rules
+                  liasremote://settings
+
+                LiasDeepLinks performs path validation.
+
+                No URI route is provided for:
+                  - changing server
+                  - setting auth token
+                  - importing credentials
             -->
             <intent-filter>
 
-                <action android:name="android.intent.action.VIEW" />
+                <action
+                    android:name="android.intent.action.VIEW" />
 
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
+                <category
+                    android:name="android.intent.category.DEFAULT" />
 
-                <data android:scheme="liasremote" />
+                <category
+                    android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="liasremote" />
 
             </intent-filter>
 
