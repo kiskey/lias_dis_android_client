@@ -1,10 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 1.4.0
-// Audit Fixes: 
-//   1. Passed settingsState.themeMode to LiasTheme for dynamic theme switching.
-// ====================================================================
-
 package com.lias.remote
 
 import android.os.Bundle
@@ -38,7 +31,7 @@ class MainActivity : ComponentActivity() {
                 if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
                     return SettingsViewModel(container.settingsRepository, container.liasApiClient, container.eventRepository) as T
                 }
-                throw IllegalArgumentException("Unknown ViewModel class")
+                throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }
         }
 
