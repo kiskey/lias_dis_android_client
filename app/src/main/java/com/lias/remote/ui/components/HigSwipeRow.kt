@@ -1,13 +1,17 @@
 // ====================================================================
 // File: HigSwipeRow.kt
-// Version: 3.0.1 (HIG Redesign Fix)
-// Purpose: Fixed GroupedListCorner reference.
+// Version: 3.1.0 (HIG Redesign)
+// Purpose: Full-bleed swipe-to-reveal actions matching iOS native tables.
+//          Respects GroupedListCard corner radius. Neutralizes legacy
+//          SwipeRow.kt conflicts.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.lias.remote.ui.theme.HigSpec
 
 data class SwipeAction(
@@ -55,7 +60,7 @@ fun HigSwipeRow(
 
     SwipeToDismissBox(
         state = state,
-        modifier = modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(HigSpec.GroupedCardCorner)),
+        modifier = modifier.clip(RoundedCornerShape(HigSpec.GroupedCardCorner)),
         backgroundContent = {
             val direction = state.dismissDirection
             val alignment = if (direction == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
