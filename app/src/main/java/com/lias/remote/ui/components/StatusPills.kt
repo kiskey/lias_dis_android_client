@@ -1,3 +1,19 @@
+// ====================================================================
+// File: app/src/main/java/com/lias/remote/ui/components/StatusPills.kt
+// Version: 21.0.0
+//
+// Purpose:
+//   Compact access/device status indicators.
+//
+// Batch 21:
+//   - Status text remains visible; color is supplementary only.
+//   - TalkBack receives explicit status semantics.
+//   - StatusDot exposes Online / Offline / Paused rather than relying
+//     solely on green/orange/gray.
+//   - Removes forced uppercase from visible status text to improve
+//     readability at larger text sizes.
+// ====================================================================
+
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
@@ -12,6 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigTypography
@@ -19,7 +38,12 @@ import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
 
 enum class PillTone {
-    ALLOWED, BLOCKED, SCHEDULED, PAUSED, INFO, WARN
+    ALLOWED,
+    BLOCKED,
+    SCHEDULED,
+    PAUSED,
+    INFO,
+    WARN
 }
 
 @Composable
@@ -28,28 +52,134 @@ fun StatusPill(
     tone: PillTone,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, fgColor) = when (tone) {
-        PillTone.ALLOWED -> LiasThemeColors.green.copy(alpha = 0.18f) to LiasThemeColors.green
-        PillTone.BLOCKED -> LiasThemeColors.red.copy(alpha = 0.18f) to LiasThemeColors.red
-        PillTone.SCHEDULED -> LiasThemeColors.orange.copy(alpha = 0.18f) to LiasThemeColors.orange
-        PillTone.PAUSED -> LiasThemeColors.orange.copy(alpha = 0.18f) to LiasThemeColors.orange
-        PillTone.INFO -> LiasThemeColors.blue.copy(alpha = 0.18f) to LiasThemeColors.blue
-        PillTone.WARN -> LiasThemeColors.orange.copy(alpha = 0.18f) to LiasThemeColors.orange
-    }
+
+    val backgroundColor =
+        when (
+            tone
+        ) {
+
+            PillTone.ALLOWED ->
+                LiasThemeColors.green
+                    .copy(
+                        alpha =
+                            0.16f
+                    )
+
+            PillTone.BLOCKED ->
+                LiasThemeColors.red
+                    .copy(
+                        alpha =
+                            0.16f
+                    )
+
+            PillTone.SCHEDULED,
+            PillTone.PAUSED,
+            PillTone.WARN ->
+                LiasThemeColors.orange
+                    .copy(
+                        alpha =
+                            0.16f
+                    )
+
+            PillTone.INFO ->
+                LiasThemeColors.blue
+                    .copy(
+                        alpha =
+                            0.16f
+                    )
+        }
+
+    val foregroundColor =
+        when (
+            tone
+        ) {
+
+            PillTone.ALLOWED ->
+                LiasThemeColors.green
+
+            PillTone.BLOCKED ->
+                LiasThemeColors.red
+
+            PillTone.SCHEDULED,
+            PillTone.PAUSED,
+            PillTone.WARN ->
+                LiasThemeColors.orange
+
+            PillTone.INFO ->
+                LiasThemeColors.blue
+        }
+
+    val semanticState =
+        when (
+            tone
+        ) {
+
+            PillTone.ALLOWED ->
+                "Allowed"
+
+            PillTone.BLOCKED ->
+                "Blocked"
+
+            PillTone.SCHEDULED ->
+                "Scheduled"
+
+            PillTone.PAUSED ->
+                "Paused"
+
+            PillTone.INFO ->
+                "Information"
+
+            PillTone.WARN ->
+                "Warning"
+        }
 
     Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(bgColor)
-            .padding(horizontal = 10.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        modifier =
+            modifier
+                .clip(
+                    RoundedCornerShape(
+                        999.dp
+                    )
+                )
+                .background(
+                    backgroundColor
+                )
+                .semantics(
+                    mergeDescendants =
+                        true
+                ) {
+
+                    stateDescription =
+                        semanticState
+
+                    contentDescription =
+                        text
+                }
+                .padding(
+                    horizontal =
+                        10.dp,
+                    vertical =
+                        5.dp
+                ),
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.spacedBy(
+                4.dp
+            )
     ) {
+
         CupertinoText(
-            text = text.uppercase(),
-            style = HigTypography.caption,
-            color = fgColor,
-            fontWeight = FontWeight.Bold
+            text =
+                text,
+            style =
+                HigTypography.caption,
+            color =
+                foregroundColor,
+            fontWeight =
+                FontWeight.SemiBold,
+            maxLines =
+                2
         )
     }
 }
@@ -60,16 +190,53 @@ fun StatusDot(
     isPaused: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val dotColor = when {
-        isPaused -> LiasThemeColors.orange
-        isOnline -> LiasThemeColors.green
-        else -> LiasThemeColors.tertiaryLabel
-    }
+
+    val state =
+        when {
+
+            isPaused ->
+                "Paused"
+
+            isOnline ->
+                "Online"
+
+            else ->
+                "Offline"
+        }
+
+    val color =
+        when {
+
+            isPaused ->
+                LiasThemeColors.orange
+
+            isOnline ->
+                LiasThemeColors.green
+
+            else ->
+                LiasThemeColors
+                    .tertiaryLabel
+        }
 
     Box(
-        modifier = modifier
-            .size(8.dp)
-            .clip(CircleShape)
-            .background(dotColor)
+        modifier =
+            modifier
+                .size(
+                    10.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .background(
+                    color
+                )
+                .semantics {
+
+                    contentDescription =
+                        "Device status"
+
+                    stateDescription =
+                        state
+                }
     )
 }
