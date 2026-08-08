@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,7 +78,7 @@ fun DeviceDetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding
         ) {
-            // Header Profile Block
+            // Profile Header
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -104,7 +103,7 @@ fun DeviceDetailScreen(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     
-                    // Sticky Action Bar
+                    // Sticky Action Bar (HTML: Extend / Rename buttons)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -145,7 +144,7 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Timeline Activity Log
+            // Timeline Activity Log (HTML: .log-row)
             item { ListSectionHeader("Activity · Last 24h") }
             item {
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
