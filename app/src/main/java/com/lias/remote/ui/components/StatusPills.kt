@@ -1,8 +1,8 @@
 // ====================================================================
 // File: StatusPills.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: WCAG 1.4.1 compliant status pills (color + text + glyph).
-//          Replaces color-only indicators.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Single source of truth for PillTone and StatusPill.
+//          Uses CupertinoText. Resolves redeclaration conflicts.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 enum class PillTone {
     ALLOWED, BLOCKED, SCHEDULED, PAUSED, INFO, WARN
@@ -56,7 +56,7 @@ fun StatusPill(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = fgColor, modifier = Modifier.size(12.dp))
-        Text(
+        CupertinoText(
             text = text.uppercase(),
             style = MaterialTheme.typography.labelSmall,
             color = fgColor,
