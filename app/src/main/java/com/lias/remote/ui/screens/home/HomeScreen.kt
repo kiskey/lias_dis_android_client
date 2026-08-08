@@ -71,7 +71,7 @@ fun HomeScreen(
                 text = "🚨",
                 style = HigTypography.headline,
                 modifier = Modifier.clickable {
-                    // Security alert sheet trigger
+                    // Security alert trigger
                 }
             )
         }
@@ -81,7 +81,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding
         ) {
-            // Hero Network Status Card (HTML: .hero-card.success)
+            // Hero Status Card
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Box(
@@ -122,7 +122,7 @@ fun HomeScreen(
                                 )
                                 HigButton(
                                     text = "✈️ Vacation",
-                                    onClick = { /* Toggle vacation */ },
+                                    onClick = { /* Vacation toggle */ },
                                     style = HigButtonStyle.Secondary,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -132,7 +132,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Actions 4-Tile Grid (HTML: .quick-grid)
+            // Quick Actions Grid
             item {
                 ListSectionHeader("Quick Actions")
                 Row(
@@ -148,7 +148,7 @@ fun HomeScreen(
                 }
             }
 
-            // Active Enforcements Grouped List (HTML: .live-row)
+            // Active Enforcements List
             item {
                 ListSectionHeader("Active Enforcements", trailingAction = {
                     HigTextButton(text = "View All", onClick = { /* Navigate to rules */ })
@@ -181,7 +181,7 @@ fun HomeScreen(
                 }
             }
 
-            // Network Snapshot Metrics Bar (HTML: Metrics flex card)
+            // Metrics Bar
             item {
                 ListSectionHeader("Network Snapshot")
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
