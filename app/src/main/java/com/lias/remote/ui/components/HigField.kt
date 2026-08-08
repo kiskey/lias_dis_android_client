@@ -26,7 +26,6 @@ fun HigField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     visualTransformation: VisualTransformation = VisualTransformation.None,
-    singleLine: Boolean = true,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
@@ -56,10 +55,8 @@ fun HigField(
                     )
                 }
             },
-            singleLine = singleLine,
             enabled = enabled && onClick == null,
             visualTransformation = visualTransformation,
-            textStyle = HigTypography.body.copy(color = LiasThemeColors.label),
             modifier = Modifier.fillMaxWidth()
         )
     }
