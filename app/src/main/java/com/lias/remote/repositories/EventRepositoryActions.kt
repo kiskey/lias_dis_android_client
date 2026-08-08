@@ -1,22 +1,22 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt
-// Version: 3.0.0
+// Version: 6.0.0
 //
 // Purpose:
-//   All user-initiated LIAS mutations.
+//   Complete mutation/action surface for EventRepository.
 //
-// Stability principles:
-//   - Mutations are performed through the repository.
-//   - Optimistic changes are rolled back on failure.
-//   - Successful server responses become authoritative state.
-//   - Full refresh is used only when local reconciliation cannot be
-//     trusted.
-//   - API result variants are handled exhaustively.
+// Fixes:
+//   - Mutates EventRepository._state rather than attempting update()
+//     on the public read-only StateFlow.
+//   - Maintains rollback for optimistic operations.
+//   - Preserves all action methods required by existing screens.
+//   - Handles Batch 1 ApiResult variants without narrowing them.
 // ====================================================================
 
 package com.lias.remote.repositories
 
 import com.lias.remote.core.models.Conflict
+import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.NetworkStats
@@ -39,10 +39,13 @@ suspend fun EventRepository.extendDeviceAccess(
     pdid: String,
     minutes: Int
 ): ApiResult<Unit> {
-    if (pdid.isBlank() || minutes <= 0) {
+    if (
+        pdid.isBlank() ||
+        minutes <= 0
+    ) {
         return ApiResult.HttpError(
-            code = 400,
-            message = "A valid device and positive duration are required."
+            400,
+            "Choose a valid device and duration."
         )
     }
 
@@ -52,7 +55,9 @@ suspend fun EventRepository.extendDeviceAccess(
             minutes
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -67,7 +72,9 @@ suspend fun EventRepository.cancelDeviceExtension(
             pdid
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -78,10 +85,13 @@ suspend fun EventRepository.extendTagAccess(
     tagId: String,
     minutes: Int
 ): ApiResult<Unit> {
-    if (tagId.isBlank() || minutes <= 0) {
+    if (
+        tagId.isBlank() ||
+        minutes <= 0
+    ) {
         return ApiResult.HttpError(
-            code = 400,
-            message = "A valid tag and positive duration are required."
+            400,
+            "Choose a valid tag and duration."
         )
     }
 
@@ -91,7 +101,9 @@ suspend fun EventRepository.extendTagAccess(
             minutes
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -106,7 +118,9 @@ suspend fun EventRepository.cancelTagExtension(
             tagId
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -116,34 +130,54 @@ suspend fun EventRepository.cancelTagExtension(
 suspend fun EventRepository.getDeviceEffectiveStatus(
     pdid: String
 ): ApiResult<EffectiveStatus> =
-    api.getDeviceEffectiveStatus(pdid)
+    api.getDeviceEffectiveStatus(
+        pdid
+    )
 
 suspend fun EventRepository.getTagEffectiveStatus(
     tagId: String
 ): ApiResult<EffectiveStatus> =
-    api.getTagEffectiveStatus(tagId)
+    api.getTagEffectiveStatus(
+        tagId
+    )
 
 suspend fun EventRepository.assignDeviceTags(
     pdid: String,
     tagIds: List<String>
 ): ApiResult<Unit> {
-
-    val previousTags =
-        state.value.devices
-            .find { it.pdid == pdid }
-            ?.tags
-
-    state.update { current ->
-        current.copy(
-            devices = current.devices.map { device ->
-                if (device.pdid == pdid) {
-                    device.copy(
-                        tags = tagIds.distinct()
-                    )
-                } else {
-                    device
-                }
+    val normalized =
+        tagIds
+            .filter {
+                it.isNotBlank()
             }
+            .distinct()
+            .ifEmpty {
+                listOf("generic")
+            }
+
+    val previous =
+        _state.value.devices
+            .find {
+                it.pdid == pdid
+            }
+            ?.safeTags
+            .orEmpty()
+
+    _state.update { current ->
+        current.copy(
+            devices =
+                current.devices.map { device ->
+                    if (
+                        device.pdid ==
+                        pdid
+                    ) {
+                        device.copy(
+                            tags = normalized
+                        )
+                    } else {
+                        device
+                    }
+                }
         )
     }
 
@@ -151,26 +185,31 @@ suspend fun EventRepository.assignDeviceTags(
         api.post<Unit, DeviceTagRequest>(
             Endpoints.deviceTags(pdid),
             DeviceTagRequest(
-                tagIds = tagIds.distinct()
+                tagIds = normalized
             )
         )
 
-    if (result is ApiResult.Success) {
-        refreshAll()
-    } else {
-        state.update { current ->
+    if (
+        result !is ApiResult.Success
+    ) {
+        _state.update { current ->
             current.copy(
-                devices = current.devices.map { device ->
-                    if (device.pdid == pdid) {
-                        device.copy(
-                            tags =
-                                previousTags
-                                    ?: listOf("generic")
-                        )
-                    } else {
-                        device
+                devices =
+                    current.devices.map { device ->
+                        if (
+                            device.pdid ==
+                            pdid
+                        ) {
+                            device.copy(
+                                tags =
+                                    previous.ifEmpty {
+                                        listOf("generic")
+                                    }
+                            )
+                        } else {
+                            device
+                        }
                     }
-                }
             )
         }
     }
@@ -190,7 +229,6 @@ suspend fun EventRepository.assignDeviceTag(
 suspend fun EventRepository.pauseDeviceInternet(
     pdid: String
 ): ApiResult<Unit> {
-
     if (pdid.isBlank()) {
         return ApiResult.HttpError(
             400,
@@ -199,8 +237,9 @@ suspend fun EventRepository.pauseDeviceInternet(
     }
 
     val alreadyPaused =
-        state.value.policies.any {
-            it.id == "pol_pause_$pdid" &&
+        _state.value.policies.any {
+            it.id ==
+                "pol_pause_$pdid" &&
                 it.enabled
         }
 
@@ -214,7 +253,9 @@ suspend fun EventRepository.pauseDeviceInternet(
             Unit
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -224,13 +265,14 @@ suspend fun EventRepository.pauseDeviceInternet(
 suspend fun EventRepository.unpauseDeviceInternet(
     pdid: String
 ): ApiResult<Unit> {
-
     val result =
         api.delete<Unit>(
             Endpoints.devicePause(pdid)
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -241,41 +283,40 @@ suspend fun EventRepository.renameDevice(
     pdid: String,
     name: String
 ): ApiResult<Unit> {
-
-    val normalizedName =
+    val normalized =
         name.trim()
 
-    if (pdid.isBlank()) {
-        return ApiResult.HttpError(
-            400,
-            "A valid device is required."
-        )
-    }
-
-    if (normalizedName.isBlank()) {
+    if (normalized.isBlank()) {
         return ApiResult.HttpError(
             400,
             "Device name cannot be empty."
         )
     }
 
-    val previousName =
-        state.value.devices
-            .find { it.pdid == pdid }
+    val previous =
+        _state.value.devices
+            .find {
+                it.pdid == pdid
+            }
             ?.friendlyName
             .orEmpty()
 
-    state.update { current ->
+    _state.update { current ->
         current.copy(
-            devices = current.devices.map { device ->
-                if (device.pdid == pdid) {
-                    device.copy(
-                        friendlyName = normalizedName
-                    )
-                } else {
-                    device
+            devices =
+                current.devices.map { device ->
+                    if (
+                        device.pdid ==
+                        pdid
+                    ) {
+                        device.copy(
+                            friendlyName =
+                                normalized
+                        )
+                    } else {
+                        device
+                    }
                 }
-            }
         )
     }
 
@@ -283,27 +324,33 @@ suspend fun EventRepository.renameDevice(
         api.post<Unit, RenameDeviceRequest>(
             Endpoints.deviceRename(pdid),
             RenameDeviceRequest(
-                normalizedName
+                normalized
             )
         )
 
-    if (result is ApiResult.Success) {
-        refreshSingleDeviceForAction(
+    if (
+        result is ApiResult.Success
+    ) {
+        refreshDeviceAfterAction(
             pdid
         )
     } else {
-        state.update { current ->
+        _state.update { current ->
             current.copy(
-                devices = current.devices.map { device ->
-                    if (device.pdid == pdid) {
-                        device.copy(
-                            friendlyName =
-                                previousName
-                        )
-                    } else {
-                        device
+                devices =
+                    current.devices.map { device ->
+                        if (
+                            device.pdid ==
+                            pdid
+                        ) {
+                            device.copy(
+                                friendlyName =
+                                    previous
+                            )
+                        } else {
+                            device
+                        }
                     }
-                }
             )
         }
     }
@@ -311,18 +358,21 @@ suspend fun EventRepository.renameDevice(
     return result
 }
 
-private suspend fun EventRepository.refreshSingleDeviceForAction(
+private suspend fun EventRepository.refreshDeviceAfterAction(
     pdid: String
 ) {
     val result =
-        api.get<com.lias.remote.core.models.Device>(
+        api.get<Device>(
             Endpoints.device(pdid)
         )
 
-    if (result is ApiResult.Success) {
-        state.update { current ->
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
             val devices =
-                current.devices.toMutableList()
+                current.devices
+                    .toMutableList()
 
             val index =
                 devices.indexOfFirst {
@@ -351,24 +401,29 @@ suspend fun EventRepository.getDeviceLogs(
 suspend fun EventRepository.toggleVacationMode(
     enabled: Boolean
 ): ApiResult<VacationResponse> {
-
     val result =
-        api.post<VacationResponse, VacationRequest>(
+        api.post<
+            VacationResponse,
+            VacationRequest
+        >(
             Endpoints.VACATION,
-            VacationRequest(enabled)
+            VacationRequest(
+                enabled
+            )
         )
 
-    if (result is ApiResult.Success) {
-        val status =
-            if (result.data.vacationMode) {
-                "enabled"
-            } else {
-                "disabled"
-            }
-
+    if (
+        result is ApiResult.Success
+    ) {
         emitUiEvent(
             UiEvent.ShowSnackbar(
-                "Vacation Mode $status"
+                if (
+                    result.data.vacationMode
+                ) {
+                    "Vacation Mode enabled"
+                } else {
+                    "Vacation Mode disabled"
+                }
             )
         )
 
@@ -378,17 +433,20 @@ suspend fun EventRepository.toggleVacationMode(
     return result
 }
 
-suspend fun EventRepository.flushNftables(): ApiResult<Unit> {
+suspend fun EventRepository.flushNftables():
+    ApiResult<Unit> {
     val result =
         api.post<Unit, Unit>(
             Endpoints.NFTABLES_FLUSH,
             Unit
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         emitUiEvent(
             UiEvent.ShowSnackbar(
-                "Firewall table flushed."
+                "Firewall table flushed"
             )
         )
 
@@ -398,7 +456,8 @@ suspend fun EventRepository.flushNftables(): ApiResult<Unit> {
     return result
 }
 
-suspend fun EventRepository.exportPolicies(): ApiResult<String> =
+suspend fun EventRepository.exportPolicies():
+    ApiResult<String> =
     api.getRaw(
         Endpoints.POLICIES_EXPORT
     )
@@ -406,11 +465,10 @@ suspend fun EventRepository.exportPolicies(): ApiResult<String> =
 suspend fun EventRepository.importPolicies(
     jsonPayload: String
 ): ApiResult<Unit> {
-
     if (jsonPayload.isBlank()) {
         return ApiResult.HttpError(
             400,
-            "Policy import payload is empty."
+            "Policy import is empty."
         )
     }
 
@@ -420,7 +478,9 @@ suspend fun EventRepository.importPolicies(
             jsonPayload
         )
 
-    if (result is ApiResult.Success) {
+    if (
+        result is ApiResult.Success
+    ) {
         refreshAll()
     }
 
@@ -429,16 +489,18 @@ suspend fun EventRepository.importPolicies(
 
 suspend fun EventRepository.getNetworkStats():
     ApiResult<NetworkStats> {
-
     val result =
         api.get<NetworkStats>(
             Endpoints.STATS
         )
 
-    if (result is ApiResult.Success) {
-        state.update {
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update {
             it.copy(
-                stats = result.data
+                stats =
+                    result.data
             )
         }
     }
@@ -449,18 +511,25 @@ suspend fun EventRepository.getNetworkStats():
 suspend fun EventRepository.createUser(
     user: User
 ): ApiResult<User> {
-
     val result =
         api.post<User, User>(
             Endpoints.USERS,
             user
         )
 
-    if (result is ApiResult.Success) {
-        state.update {
-            it.copy(
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
+            current.copy(
                 users =
-                    it.users + result.data
+                    (
+                        current.users +
+                            result.data
+                        )
+                        .distinctBy {
+                            it.id
+                        }
             )
         }
     }
@@ -472,25 +541,33 @@ suspend fun EventRepository.assignDeviceUser(
     pdid: String,
     userId: String
 ): ApiResult<Unit> {
-
     val result =
         api.post<Unit, UserDeviceRequest>(
             Endpoints.deviceUser(pdid),
-            UserDeviceRequest(userId)
+            UserDeviceRequest(
+                userId
+            )
         )
 
-    if (result is ApiResult.Success) {
-        state.update { current ->
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
             current.copy(
-                devices = current.devices.map { device ->
-                    if (device.pdid == pdid) {
-                        device.copy(
-                            userID = userId
-                        )
-                    } else {
-                        device
+                devices =
+                    current.devices.map { device ->
+                        if (
+                            device.pdid ==
+                            pdid
+                        ) {
+                            device.copy(
+                                userID =
+                                    userId
+                            )
+                        } else {
+                            device
+                        }
                     }
-                }
             )
         }
     }
@@ -501,13 +578,18 @@ suspend fun EventRepository.assignDeviceUser(
 suspend fun EventRepository.validatePolicy(
     scheduleIds: List<String>
 ): ApiResult<List<Conflict>> {
-
     val result =
-        api.post<ConflictResponse, PolicyValidateRequest>(
+        api.post<
+            ConflictResponse,
+            PolicyValidateRequest
+        >(
             Endpoints.POLICIES_VALIDATE,
             PolicyValidateRequest(
-                scheduleIds =
-                    scheduleIds.distinct()
+                scheduleIds
+                    .filter {
+                        it.isNotBlank()
+                    }
+                    .distinct()
             )
         )
 
@@ -539,18 +621,25 @@ suspend fun EventRepository.validatePolicy(
 suspend fun EventRepository.createTag(
     tag: Tag
 ): ApiResult<Tag> {
-
     val result =
         api.post<Tag, Tag>(
             Endpoints.TAGS,
             tag
         )
 
-    if (result is ApiResult.Success) {
-        state.update {
-            it.copy(
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
+            current.copy(
                 tags =
-                    it.tags + result.data
+                    (
+                        current.tags +
+                            result.data
+                        )
+                        .distinctBy {
+                            it.id
+                        }
             )
         }
     }
@@ -561,16 +650,20 @@ suspend fun EventRepository.createTag(
 suspend fun EventRepository.updateTag(
     tag: Tag
 ): ApiResult<Tag> {
-
     val previous =
-        state.value.tags
-            .find { it.id == tag.id }
+        _state.value.tags
+            .find {
+                it.id == tag.id
+            }
 
-    state.update { current ->
+    _state.update { current ->
         current.copy(
             tags =
                 current.tags.map {
-                    if (it.id == tag.id) {
+                    if (
+                        it.id ==
+                        tag.id
+                    ) {
                         tag
                     } else {
                         it
@@ -585,12 +678,17 @@ suspend fun EventRepository.updateTag(
             tag
         )
 
-    if (result is ApiResult.Success) {
-        state.update { current ->
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
             current.copy(
                 tags =
                     current.tags.map {
-                        if (it.id == result.data.id) {
+                        if (
+                            it.id ==
+                            result.data.id
+                        ) {
                             result.data
                         } else {
                             it
@@ -598,13 +696,16 @@ suspend fun EventRepository.updateTag(
                     }
             )
         }
-    } else {
-        state.update { current ->
+    } else if (
+        previous != null
+    ) {
+        _state.update { current ->
             current.copy(
                 tags =
                     current.tags.map {
-                        if (it.id == tag.id &&
-                            previous != null
+                        if (
+                            it.id ==
+                            tag.id
                         ) {
                             previous
                         } else {
@@ -621,17 +722,20 @@ suspend fun EventRepository.updateTag(
 suspend fun EventRepository.deleteTag(
     tagId: String
 ): ApiResult<Unit> {
+    val previous =
+        _state.value.tags
+            .find {
+                it.id == tagId
+            }
 
-    val deleted =
-        state.value.tags
-            .find { it.id == tagId }
-
-    state.update { current ->
+    _state.update { current ->
         current.copy(
             tags =
-                current.tags.filterNot {
-                    it.id == tagId
-                }
+                current.tags
+                    .filterNot {
+                        it.id ==
+                            tagId
+                    }
         )
     }
 
@@ -640,14 +744,20 @@ suspend fun EventRepository.deleteTag(
             Endpoints.tag(tagId)
         )
 
-    if (result !is ApiResult.Success &&
-        deleted != null
+    if (
+        result !is ApiResult.Success &&
+        previous != null
     ) {
-        state.update { current ->
+        _state.update { current ->
             current.copy(
                 tags =
-                    (current.tags + deleted)
-                        .distinctBy { it.id }
+                    (
+                        current.tags +
+                            previous
+                        )
+                        .distinctBy {
+                            it.id
+                        }
             )
         }
     }
@@ -658,31 +768,33 @@ suspend fun EventRepository.deleteTag(
 suspend fun EventRepository.savePolicy(
     policy: Policy
 ): ApiResult<Policy> {
-
     val previous =
-        state.value.policies
-            .find { it.id == policy.id }
+        _state.value.policies
+            .find {
+                it.id == policy.id
+            }
 
-    val existedBefore =
+    val existed =
         previous != null
 
-    state.update { current ->
-        val updated =
-            current.policies
-                .filterNot {
-                    it.id == policy.id
-                }
-
+    _state.update { current ->
         current.copy(
             policies =
-                updated + policy
+                current.policies
+                    .filterNot {
+                        it.id ==
+                            policy.id
+                    } +
+                    policy
         )
     }
 
     val result =
-        if (existedBefore) {
+        if (existed) {
             api.put<Policy, Policy>(
-                Endpoints.policy(policy.id),
+                Endpoints.policy(
+                    policy.id
+                ),
                 policy
             )
         } else {
@@ -692,12 +804,17 @@ suspend fun EventRepository.savePolicy(
             )
         }
 
-    if (result is ApiResult.Success) {
-        state.update { current ->
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
             current.copy(
                 policies =
                     current.policies.map {
-                        if (it.id == result.data.id) {
+                        if (
+                            it.id ==
+                            result.data.id
+                        ) {
                             result.data
                         } else {
                             it
@@ -706,19 +823,24 @@ suspend fun EventRepository.savePolicy(
             )
         }
     } else {
-        state.update { current ->
-            val restored =
+        _state.update { current ->
+
+            val withoutCandidate =
                 current.policies
                     .filterNot {
-                        it.id == policy.id
+                        it.id ==
+                            policy.id
                     }
 
             current.copy(
                 policies =
-                    if (previous != null) {
-                        restored + previous
+                    if (
+                        previous != null
+                    ) {
+                        withoutCandidate +
+                            previous
                     } else {
-                        restored
+                        withoutCandidate
                     }
             )
         }
@@ -730,33 +852,45 @@ suspend fun EventRepository.savePolicy(
 suspend fun EventRepository.deletePolicy(
     policyId: String
 ): ApiResult<Unit> {
+    val previous =
+        _state.value.policies
+            .find {
+                it.id ==
+                    policyId
+            }
 
-    val deleted =
-        state.value.policies
-            .find { it.id == policyId }
-
-    state.update { current ->
+    _state.update { current ->
         current.copy(
             policies =
-                current.policies.filterNot {
-                    it.id == policyId
-                }
+                current.policies
+                    .filterNot {
+                        it.id ==
+                            policyId
+                    }
         )
     }
 
     val result =
         api.delete<Unit>(
-            Endpoints.policy(policyId)
+            Endpoints.policy(
+                policyId
+            )
         )
 
-    if (result !is ApiResult.Success &&
-        deleted != null
+    if (
+        result !is ApiResult.Success &&
+        previous != null
     ) {
-        state.update { current ->
+        _state.update { current ->
             current.copy(
                 policies =
-                    (current.policies + deleted)
-                        .distinctBy { it.id }
+                    (
+                        current.policies +
+                            previous
+                        )
+                        .distinctBy {
+                            it.id
+                        }
             )
         }
     }
@@ -767,31 +901,34 @@ suspend fun EventRepository.deletePolicy(
 suspend fun EventRepository.saveSchedule(
     schedule: Schedule
 ): ApiResult<Schedule> {
-
     val previous =
-        state.value.schedules
-            .find { it.id == schedule.id }
+        _state.value.schedules
+            .find {
+                it.id ==
+                    schedule.id
+            }
 
-    val existedBefore =
+    val existed =
         previous != null
 
-    state.update { current ->
-        val updated =
-            current.schedules
-                .filterNot {
-                    it.id == schedule.id
-                }
-
+    _state.update { current ->
         current.copy(
             schedules =
-                updated + schedule
+                current.schedules
+                    .filterNot {
+                        it.id ==
+                            schedule.id
+                    } +
+                    schedule
         )
     }
 
     val result =
-        if (existedBefore) {
+        if (existed) {
             api.put<Schedule, Schedule>(
-                Endpoints.schedule(schedule.id),
+                Endpoints.schedule(
+                    schedule.id
+                ),
                 schedule
             )
         } else {
@@ -801,12 +938,17 @@ suspend fun EventRepository.saveSchedule(
             )
         }
 
-    if (result is ApiResult.Success) {
-        state.update { current ->
+    if (
+        result is ApiResult.Success
+    ) {
+        _state.update { current ->
             current.copy(
                 schedules =
                     current.schedules.map {
-                        if (it.id == result.data.id) {
+                        if (
+                            it.id ==
+                            result.data.id
+                        ) {
                             result.data
                         } else {
                             it
@@ -815,19 +957,24 @@ suspend fun EventRepository.saveSchedule(
             )
         }
     } else {
-        state.update { current ->
-            val restored =
+        _state.update { current ->
+
+            val withoutCandidate =
                 current.schedules
                     .filterNot {
-                        it.id == schedule.id
+                        it.id ==
+                            schedule.id
                     }
 
             current.copy(
                 schedules =
-                    if (previous != null) {
-                        restored + previous
+                    if (
+                        previous != null
+                    ) {
+                        withoutCandidate +
+                            previous
                     } else {
-                        restored
+                        withoutCandidate
                     }
             )
         }
@@ -839,33 +986,45 @@ suspend fun EventRepository.saveSchedule(
 suspend fun EventRepository.deleteSchedule(
     scheduleId: String
 ): ApiResult<Unit> {
+    val previous =
+        _state.value.schedules
+            .find {
+                it.id ==
+                    scheduleId
+            }
 
-    val deleted =
-        state.value.schedules
-            .find { it.id == scheduleId }
-
-    state.update { current ->
+    _state.update { current ->
         current.copy(
             schedules =
-                current.schedules.filterNot {
-                    it.id == scheduleId
-                }
+                current.schedules
+                    .filterNot {
+                        it.id ==
+                            scheduleId
+                    }
         )
     }
 
     val result =
         api.delete<Unit>(
-            Endpoints.schedule(scheduleId)
+            Endpoints.schedule(
+                scheduleId
+            )
         )
 
-    if (result !is ApiResult.Success &&
-        deleted != null
+    if (
+        result !is ApiResult.Success &&
+        previous != null
     ) {
-        state.update { current ->
+        _state.update { current ->
             current.copy(
                 schedules =
-                    (current.schedules + deleted)
-                        .distinctBy { it.id }
+                    (
+                        current.schedules +
+                            previous
+                        )
+                        .distinctBy {
+                            it.id
+                        }
             )
         }
     }
