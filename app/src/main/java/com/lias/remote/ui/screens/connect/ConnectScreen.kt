@@ -1,33 +1,31 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
-// Version: 20.0.0
+// File:
+// app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
+// Version: 25.0.0
 //
 // Purpose:
-//   First-run LIAS connection gate.
+//   First-connection experience.
 //
-// Batch 20:
-//   - Connect means "verify AND persist", not merely "save URL".
-//   - Wrong token stays on Connect screen.
-//   - Unreachable server stays on Connect screen.
-//   - User-visible error remains actionable.
-//   - No fake QR scanner action.
+// Batch 25:
+//   - Uses Batch-22 connectAndSave() verification path.
+//   - Never writes an unverified endpoint.
+//   - Authentication/network/compatibility failure message comes from
+//     unified SettingsViewModel diagnostics architecture.
+//   - Prevents double submit.
+//   - No QR action is shown unless a real QR contract exists.
 // ====================================================================
 
 package com.lias.remote.ui.screens.connect
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,7 +58,8 @@ fun ConnectScreen(
 ) {
 
     val state by
-        viewModel.uiState
+        viewModel
+            .uiState
             .collectAsState()
 
     Column(
@@ -70,12 +69,11 @@ fun ConnectScreen(
                 .background(
                     LiasThemeColors.background
                 )
-                .verticalScroll(
-                    rememberScrollState()
-                )
                 .padding(
-                    horizontal = 24.dp,
-                    vertical = 32.dp
+                    horizontal =
+                        24.dp,
+                    vertical =
+                        24.dp
                 ),
         horizontalAlignment =
             Alignment.CenterHorizontally,
@@ -83,12 +81,9 @@ fun ConnectScreen(
             Arrangement.Center
     ) {
 
-        Box(
+        androidx.compose.foundation.layout.Box(
             modifier =
                 Modifier
-                    .size(
-                        84.dp
-                    )
                     .shadow(
                         elevation =
                             12.dp,
@@ -110,6 +105,9 @@ fun ConnectScreen(
                             RoundedCornerShape(
                                 22.dp
                             )
+                    )
+                    .padding(
+                        20.dp
                     ),
             contentAlignment =
                 Alignment.Center
@@ -121,13 +119,14 @@ fun ConnectScreen(
                         .Outlined
                         .Shield,
                 contentDescription =
-                    "LIAS",
+                    null,
                 tint =
                     Color.White,
                 modifier =
-                    Modifier.size(
-                        44.dp
-                    )
+                    Modifier
+                        .padding(
+                            4.dp
+                        )
             )
         }
 
@@ -160,11 +159,12 @@ fun ConnectScreen(
 
         CupertinoText(
             text =
-                "Enter the address and authentication token for your LIAS server.",
+                "Enter the address of your LIAS server. The connection is verified before anything is saved.",
             style =
                 HigTypography.body,
             color =
-                LiasThemeColors.secondaryLabel,
+                LiasThemeColors
+                    .secondaryLabel,
             textAlign =
                 TextAlign.Center
         )
@@ -193,7 +193,9 @@ fun ConnectScreen(
                 label =
                     "LIAS Server",
                 placeholder =
-                    "http://192.168.1.1:8081"
+                    "http://192.168.1.1:8081",
+                enabled =
+                    !state.isConnecting
             )
 
             HigField(
@@ -204,15 +206,17 @@ fun ConnectScreen(
                 label =
                     "Auth Token",
                 placeholder =
-                    "Optional if LIAS authentication is disabled",
+                    "Optional",
                 visualTransformation =
-                    PasswordVisualTransformation()
+                    PasswordVisualTransformation(),
+                enabled =
+                    !state.isConnecting
             )
         }
 
         state.connectionError
             ?.let {
-                error ->
+                message ->
 
                 Spacer(
                     modifier =
@@ -221,7 +225,7 @@ fun ConnectScreen(
                         )
                 )
 
-                Box(
+                Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -239,47 +243,40 @@ fun ConnectScreen(
                             )
                             .padding(
                                 12.dp
-                            )
+                            ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            4.dp
+                        )
                 ) {
 
                     CupertinoText(
                         text =
-                            error,
+                            "Couldn’t Connect",
                         style =
-                            HigTypography.subheadline,
+                            HigTypography.headline,
+                        fontWeight =
+                            FontWeight.SemiBold,
                         color =
                             LiasThemeColors.red
                     )
+
+                    CupertinoText(
+                        text =
+                            message,
+                        style =
+                            HigTypography.subheadline,
+                        color =
+                            LiasThemeColors
+                                .secondaryLabel
+                    )
                 }
-            }
-
-        state.testResult
-            ?.let {
-                message ->
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            12.dp
-                        )
-                )
-
-                CupertinoText(
-                    text =
-                        message,
-                    style =
-                        HigTypography.subheadline,
-                    color =
-                        LiasThemeColors.green,
-                    textAlign =
-                        TextAlign.Center
-                )
             }
 
         Spacer(
             modifier =
                 Modifier.height(
-                    24.dp
+                    22.dp
                 )
         )
 
@@ -294,16 +291,15 @@ fun ConnectScreen(
                 },
             onClick = {
 
-                viewModel
-                    .connectAndSave(
-                        onConnected =
-                            onConnected
-                    )
+                viewModel.connectAndSave(
+                    onConnected =
+                        onConnected
+                )
             },
             enabled =
-                state.serverUrl
-                    .isNotBlank() &&
-                    !state.isConnecting,
+                !state.isConnecting &&
+                    state.serverUrl
+                        .isNotBlank(),
             style =
                 HigButtonStyle.Primary,
             modifier =
@@ -313,17 +309,18 @@ fun ConnectScreen(
         Spacer(
             modifier =
                 Modifier.height(
-                    18.dp
+                    12.dp
                 )
         )
 
         CupertinoText(
             text =
-                "Your token is stored locally with the app configuration and is never included in LIAS navigation links.",
+                "Your authentication token stays in this app’s local settings and is not included in diagnostics.",
             style =
                 HigTypography.caption,
             color =
-                LiasThemeColors.tertiaryLabel,
+                LiasThemeColors
+                    .tertiaryLabel,
             textAlign =
                 TextAlign.Center
         )
