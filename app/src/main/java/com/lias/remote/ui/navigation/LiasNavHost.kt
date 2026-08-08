@@ -6,16 +6,25 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -40,12 +49,11 @@ import com.lias.remote.ui.screens.rules.RulesScreen
 import com.lias.remote.ui.screens.schedules.SchedulesScreen
 import com.lias.remote.ui.screens.settings.ConnectionSettingsScreen
 import com.lias.remote.ui.screens.settings.SettingsScreen
+import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoScaffold
-import io.github.alexzhirkevich.cupertino.CupertinoTabBar
-import io.github.alexzhirkevich.cupertino.CupertinoTabBarItem
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
@@ -58,13 +66,13 @@ import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 sealed class LiasScreen(
     val route: String,
     val label: String,
-    val icon: @Composable () -> Unit
+    val icon: ImageVector
 ) {
-    data object Home : LiasScreen("home", "Home", { CupertinoIcon(CupertinoIcons.Outlined.House, contentDescription = "Home") })
-    data object Devices : LiasScreen("devices", "Devices", { CupertinoIcon(CupertinoIcons.Outlined.Iphone, contentDescription = "Devices") })
-    data object Schedules : LiasScreen("schedules", "Schedules", { CupertinoIcon(CupertinoIcons.Outlined.Clock, contentDescription = "Schedules") })
-    data object Rules : LiasScreen("rules", "Rules", { CupertinoIcon(CupertinoIcons.Outlined.Shield, contentDescription = "Rules") })
-    data object Settings : LiasScreen("settings", "Settings", { CupertinoIcon(CupertinoIcons.Outlined.Gear, contentDescription = "Settings") })
+    data object Home : LiasScreen("home", "Home", CupertinoIcons.Outlined.House)
+    data object Devices : LiasScreen("devices", "Devices", CupertinoIcons.Outlined.Iphone)
+    data object Schedules : LiasScreen("schedules", "Schedules", CupertinoIcons.Outlined.Clock)
+    data object Rules : LiasScreen("rules", "Rules", CupertinoIcons.Outlined.Shield)
+    data object Settings : LiasScreen("settings", "Settings", CupertinoIcons.Outlined.Gear)
 }
 
 @Composable
@@ -108,7 +116,7 @@ fun LiasNavHost(
                 CupertinoTopAppBar(
                     title = { CupertinoText("LIAS Remote — HIG Redesign") }
                 )
-                // System Banner anchored dynamically when connecting or disconnected
+                // Connection Banner
                 if (uiState.connectionState != ConnectionState.CONNECTED) {
                     Box(
                         modifier = Modifier
@@ -132,23 +140,51 @@ fun LiasNavHost(
             }
         },
         bottomBar = {
-            CupertinoTabBar {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HigSpec.TabBarHeight)
+                    .background(LiasThemeColors.secondaryBackground)
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 items.forEach { screen ->
                     val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                    CupertinoTabBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                    val color = if (isSelected) LiasThemeColors.blue else LiasThemeColors.tertiaryLabel
+                    val interactionSource = remember { MutableInteractionSource() }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null
+                            ) {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = screen.icon,
-                        label = { CupertinoText(screen.label) }
-                    )
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CupertinoIcon(
+                            imageVector = screen.icon,
+                            contentDescription = screen.label,
+                            tint = color,
+                            modifier = Modifier.size(HigSpec.IconSizeM)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        CupertinoText(
+                            text = screen.label,
+                            style = HigTypography.tabLabel,
+                            color = color
+                        )
+                    }
                 }
             }
         }
