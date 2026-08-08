@@ -1,23 +1,20 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 5.0.0
+// Version: 6.0.0
 //
 // Purpose:
-//   Central real-time LIAS state repository.
+//   Application-scoped source of truth for LIAS runtime state.
 //
-// Batch 5 changes:
-//
-//   1. SSE lifecycle and REST synchronization are separated.
-//   2. start() no longer blindly starts an SSE connection.
-//   3. SettingsRepository remains the authority for server configuration.
-//   4. Initial synchronization is explicitly Loading/Ready/Failed.
-//   5. Failed refreshes do not destroy usable cached data.
-//   6. A later refresh failure produces Stale state.
-//   7. Successful synchronization records a timestamp.
-//   8. Concurrent refreshAll() calls are serialized.
-//   9. Connection-state collection starts exactly once.
-//  10. SSE events continue to update the cached domain state.
-//  11. Existing EventRepositoryActions extensions remain compatible.
+// Guarantees:
+//   - Exactly one settings observer.
+//   - Exactly one SSE event collector.
+//   - Exactly one SSE connection-state collector.
+//   - REST sync and SSE transport state remain independent.
+//   - Initial failure is distinct from stale cached data.
+//   - Full refreshes are serialized.
+//   - Effective-status requests use bounded parallelism.
+//   - SSE event bursts cannot create uncontrolled refresh storms.
+//   - All ApiResult variants introduced in Batch 1 are handled.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -39,10 +36,13 @@ import com.lias.remote.core.network.EventConstants
 import com.lias.remote.core.network.LiasApiClient
 import com.lias.remote.core.network.LiasSseClient
 import com.lias.remote.core.store.SettingsRepository
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,12 +51,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
-import java.util.concurrent.ConcurrentHashMap
 
 class EventRepository(
     internal val api: LiasApiClient,
@@ -64,146 +64,62 @@ class EventRepository(
     private val settings: SettingsRepository
 ) {
 
-    // ----------------------------------------------------------------
-    // Observable state
-    // ----------------------------------------------------------------
-
     internal val _state =
-        MutableStateFlow(
-            UiState()
-        )
+        MutableStateFlow(UiState())
 
-    val state:
-        StateFlow<UiState> =
+    val state: StateFlow<UiState> =
         _state.asStateFlow()
 
-    internal val _uiEvents =
+    private val _uiEvents =
         MutableSharedFlow<UiEvent>(
             replay = 0,
             extraBufferCapacity = 64
         )
 
-    val uiEvents:
-        SharedFlow<UiEvent> =
+    val uiEvents: SharedFlow<UiEvent> =
         _uiEvents.asSharedFlow()
-
-    // ----------------------------------------------------------------
-    // Internal runtime state
-    // ----------------------------------------------------------------
 
     private val json =
         Json {
             ignoreUnknownKeys = true
+            isLenient = true
+            explicitNulls = false
         }
 
     private val scope =
         CoroutineScope(
-            SupervisorJob() +
-                Dispatchers.Default
+            SupervisorJob() + Dispatchers.Default
         )
 
     private val refreshMutex =
         Mutex()
 
-    @Volatile
-    private var lastSseConnectedTime:
-        Long = 0L
+    private val started =
+        AtomicBoolean(false)
 
     private val recentToastMap =
         ConcurrentHashMap<String, Long>()
 
     @Volatile
-    private var started =
-        false
+    private var lastSseConnectedTime =
+        0L
 
-    // ----------------------------------------------------------------
-    // Configuration observers
-    // ----------------------------------------------------------------
-
-    init {
-
-        scope.launch {
-
-            settings.serverUrl.collectLatest { url ->
-
-                api.baseUrl =
-                    url
-
-                sse.baseUrl =
-                    url
-
-                sse.disconnect()
-
-                _state.value =
-                    _state.value.copy(
-                        connectionState =
-                            ConnectionState.DISCONNECTED
-                    )
-
-                if (
-                    url.isBlank()
-                ) {
-
-                    _state.value =
-                        _state.value.copy(
-                            syncState =
-                                SyncState.Idle,
-                            isInitialLoaded = false,
-                            errorMessage = null
-                        )
-
-                    return@collectLatest
-                }
-
-                /*
-                 * The URL in DataStore represents a verified/persisted
-                 * connection configuration after Batch 4.
-                 *
-                 * Start the live stream and perform the initial REST
-                 * synchronization from this single authority.
-                 */
-                sse.connect(
-                    scope
-                )
-
-                refreshAll()
-            }
-        }
-
-        scope.launch {
-
-            settings.authToken.collectLatest { token ->
-
-                api.authToken =
-                    token
-
-                sse.authToken =
-                    token
-            }
-        }
-    }
+    @Volatile
+    private var lastEffectiveStatusRefreshTime =
+        0L
 
     // ----------------------------------------------------------------
     // Lifecycle
     // ----------------------------------------------------------------
 
-    /**
-     * Starts repository collectors.
-     *
-     * This function is intentionally idempotent.
-     *
-     * The serverUrl DataStore observer is responsible for starting
-     * the actual SSE connection. This prevents a duplicate connection
-     * to the default localhost URL during application startup.
-     */
     fun start() {
-
-        if (started) {
+        if (!started.compareAndSet(false, true)) {
             return
         }
 
-        started =
-            true
+        scope.launch {
+            observeConfiguration()
+        }
 
         scope.launch {
             collectSseEvents()
@@ -214,41 +130,126 @@ class EventRepository(
         }
     }
 
+    fun stop() {
+        sse.disconnect()
+
+        _state.update {
+            it.copy(
+                connectionState =
+                    ConnectionState.DISCONNECTED
+            )
+        }
+    }
+
     // ----------------------------------------------------------------
-    // SSE connection state
+    // UI events
+    // ----------------------------------------------------------------
+
+    suspend fun emitUiEvent(
+        event: UiEvent
+    ) {
+        _uiEvents.emit(event)
+    }
+
+    fun tryEmitUiEvent(
+        event: UiEvent
+    ) {
+        _uiEvents.tryEmit(event)
+    }
+
+    // ----------------------------------------------------------------
+    // Configuration
+    // ----------------------------------------------------------------
+
+    private suspend fun observeConfiguration() {
+        coroutineScope {
+
+            launch {
+                settings.serverUrl.collectLatest { rawUrl ->
+
+                    val url =
+                        rawUrl.trim()
+
+                    api.baseUrl =
+                        url
+
+                    sse.baseUrl =
+                        url
+
+                    sse.disconnect()
+
+                    _state.update { current ->
+                        current.copy(
+                            connectionState =
+                                ConnectionState.DISCONNECTED
+                        )
+                    }
+
+                    if (url.isBlank()) {
+                        clearRuntimeState()
+                        return@collectLatest
+                    }
+
+                    sse.connect(scope)
+                    refreshAll()
+                }
+            }
+
+            launch {
+                settings.authToken.collectLatest { rawToken ->
+
+                    val token =
+                        rawToken
+                            ?.trim()
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+
+                    api.authToken =
+                        token
+
+                    sse.authToken =
+                        token
+                }
+            }
+        }
+    }
+
+    private fun clearRuntimeState() {
+        _state.value =
+            UiState(
+                connectionState =
+                    ConnectionState.DISCONNECTED,
+                syncState =
+                    SyncState.Idle
+            )
+    }
+
+    // ----------------------------------------------------------------
+    // SSE transport
     // ----------------------------------------------------------------
 
     private suspend fun collectConnectionState() {
+        sse.connectionState.collect { connectionState ->
 
-        sse.connectionState.collect { connState ->
-
-            val current =
-                _state.value
-
-            _state.value =
+            _state.update { current ->
                 current.copy(
                     connectionState =
-                        connState
+                        connectionState
                 )
+            }
 
             if (
-                connState ==
+                connectionState ==
                 ConnectionState.CONNECTED
             ) {
-
                 lastSseConnectedTime =
                     System.currentTimeMillis()
 
-                /*
-                 * If we already have cached data, a reconnect means the
-                 * live stream has returned. Keep the data and, if it was
-                 * stale, request a fresh primary synchronization.
-                 */
                 if (
-                    current.syncState is
-                        SyncState.Stale
+                    _state.value.syncState
+                    is SyncState.Stale
                 ) {
-
                     scope.launch {
                         refreshAll()
                     }
@@ -258,364 +259,377 @@ class EventRepository(
     }
 
     // ----------------------------------------------------------------
-    // Primary synchronization
+    // Authoritative full synchronization
     // ----------------------------------------------------------------
 
-    internal suspend fun refreshAll() {
+    suspend fun refreshAll() {
+        if (api.baseUrl.trim().isBlank()) {
+            return
+        }
 
         refreshMutex.withLock {
 
-            if (
-                api.baseUrl.isBlank()
-            ) {
-                return
-            }
-
-            val previous =
+            val before =
                 _state.value
 
-            val hasUsableCache =
-                previous.syncState.hasUsableData ||
-                    previous.isInitialLoaded
+            val previouslyUsable =
+                before.isInitialLoaded ||
+                    before.syncState.hasUsableData
 
-            _state.value =
-                previous.copy(
+            _state.update {
+                it.copy(
                     syncState =
                         SyncState.Loading,
+                    isRefreshing = true,
                     errorMessage = null
                 )
+            }
 
             try {
+                val devicesResult =
+                    api.get<DeviceListResponse>(
+                        Endpoints.DEVICES
+                    )
 
-                coroutineScope {
+                val devices =
+                    when (devicesResult) {
+                        is ApiResult.Success ->
+                            devicesResult.data.devices
 
-                    // ------------------------------------------------
-                    // Primary device inventory
-                    // ------------------------------------------------
-
-                    val devicesResult =
-                        api.get<DeviceListResponse>(
-                            Endpoints.DEVICES
-                        )
-
-                    val currentDevices =
-                        when (
-                            devicesResult
-                        ) {
-
-                            is ApiResult.Success ->
-                                devicesResult
-                                    .data
-                                    .devices
-
-                            is ApiResult.HttpError ->
-                                throw SyncException(
-                                    "Unable to load devices: HTTP ${devicesResult.code}"
-                                )
-
-                            is ApiResult.NetworkError ->
-                                throw SyncException(
-                                    "Unable to load devices: ${devicesResult.cause.message ?: "network error"}"
-                                )
-
-                            is ApiResult.ConflictError ->
-                                throw SyncException(
+                        else ->
+                            throw SyncFailure(
+                                resultMessage(
+                                    devicesResult,
                                     "Unable to load devices."
                                 )
-                        }
+                            )
+                    }
 
-                    _state.value =
-                        _state.value.copy(
-                            devices =
-                                currentDevices
-                        )
+                val (
+                    tagsResult,
+                    policiesResult,
+                    schedulesResult,
+                    statsResult
+                ) = coroutineScope {
 
-                    // ------------------------------------------------
-                    // Secondary resources in parallel
-                    // ------------------------------------------------
-
-                    val tagsDeferred =
+                    val tags =
                         async {
                             api.get<List<Tag>>(
                                 Endpoints.TAGS
                             )
                         }
 
-                    val policiesDeferred =
+                    val policies =
                         async {
                             api.get<List<Policy>>(
                                 Endpoints.POLICIES
                             )
                         }
 
-                    val schedulesDeferred =
+                    val schedules =
                         async {
                             api.get<List<Schedule>>(
                                 Endpoints.SCHEDULES
                             )
                         }
 
-                    val statsDeferred =
+                    val stats =
                         async {
                             api.get<NetworkStats>(
                                 Endpoints.STATS
                             )
                         }
 
-                    val tagsResult =
-                        tagsDeferred.await()
-
-                    val policiesResult =
-                        policiesDeferred.await()
-
-                    val schedulesResult =
-                        schedulesDeferred.await()
-
-                    val statsResult =
-                        statsDeferred.await()
-
-                    /*
-                     * Secondary resource failures do not invalidate
-                     * already loaded primary device data.
-                     *
-                     * Preserve the existing cache for an individual
-                     * resource rather than replacing it with empty data.
-                     */
-                    val loadedTags =
-                        (
-                            tagsResult as?
-                                ApiResult.Success
-                            )?.data
-                            ?: previous.tags
-
-                    val loadedPolicies =
-                        (
-                            policiesResult as?
-                                ApiResult.Success
-                            )?.data
-                            ?: previous.policies
-
-                    val loadedSchedules =
-                        (
-                            schedulesResult as?
-                                ApiResult.Success
-                            )?.data
-                            ?: previous.schedules
-
-                    val loadedStats =
-                        (
-                            statsResult as?
-                                ApiResult.Success
-                            )?.data
-                            ?: previous.stats
-
-                    _state.value =
-                        _state.value.copy(
-                            tags =
-                                loadedTags,
-
-                            policies =
-                                loadedPolicies,
-
-                            schedules =
-                                loadedSchedules,
-
-                            stats =
-                                loadedStats
-                        )
-
-                    // ------------------------------------------------
-                    // Effective status enrichment
-                    // ------------------------------------------------
-
-                    launch {
-
-                        val deviceStatusMap =
-                            mutableMapOf<
-                                String,
-                                EffectiveStatus
-                            >()
-
-                        currentDevices.forEach { device ->
-
-                            if (
-                                device.pdid.isBlank()
-                            ) {
-                                return@forEach
-                            }
-
-                            when (
-                                val result =
-                                    api.getDeviceEffectiveStatus(
-                                        device.pdid
-                                    )
-                            ) {
-
-                                is ApiResult.Success ->
-                                    deviceStatusMap[
-                                        device.pdid
-                                    ] =
-                                        result.data
-
-                                else -> Unit
-                            }
-                        }
-
-                        val tagStatusMap =
-                            mutableMapOf<
-                                String,
-                                EffectiveStatus
-                            >()
-
-                        loadedTags.forEach { tag ->
-
-                            when (
-                                val result =
-                                    api.getTagEffectiveStatus(
-                                        tag.id
-                                    )
-                            ) {
-
-                                is ApiResult.Success ->
-                                    tagStatusMap[
-                                        tag.id
-                                    ] =
-                                        result.data
-
-                                else -> Unit
-                            }
-                        }
-
-                        _state.value =
-                            _state.value.copy(
-                                deviceEffectiveStatuses =
-                                    deviceStatusMap,
-
-                                tagEffectiveStatuses =
-                                    tagStatusMap
-                            )
-                    }
+                    listOf(
+                        tags.await(),
+                        policies.await(),
+                        schedules.await(),
+                        stats.await()
+                    )
                 }
+
+                @Suppress("UNCHECKED_CAST")
+                val loadedTags =
+                    (tagsResult as? ApiResult.Success<List<Tag>>)
+                        ?.data
+                        ?: before.tags
+
+                @Suppress("UNCHECKED_CAST")
+                val loadedPolicies =
+                    (policiesResult as? ApiResult.Success<List<Policy>>)
+                        ?.data
+                        ?: before.policies
+
+                @Suppress("UNCHECKED_CAST")
+                val loadedSchedules =
+                    (schedulesResult as? ApiResult.Success<List<Schedule>>)
+                        ?.data
+                        ?: before.schedules
+
+                @Suppress("UNCHECKED_CAST")
+                val loadedStats =
+                    (statsResult as? ApiResult.Success<NetworkStats>)
+                        ?.data
+                        ?: before.stats
+
+                _state.update {
+                    it.copy(
+                        devices = devices,
+                        tags = loadedTags,
+                        policies = loadedPolicies,
+                        schedules = loadedSchedules,
+                        stats = loadedStats
+                    )
+                }
+
+                refreshEffectiveStatuses(
+                    devices = devices,
+                    tags = loadedTags
+                )
 
                 val synchronizedAt =
                     System.currentTimeMillis()
 
-                _state.value =
-                    _state.value.copy(
-                        isInitialLoaded = true,
-
-                        lastSuccessfulSyncAt =
-                            synchronizedAt,
-
-                        syncState =
-                            SyncState.Ready(
-                                synchronizedAt
-                            ),
-
-                        errorMessage = null
+                val partialFailure =
+                    firstMeaningfulError(
+                        tagsResult,
+                        policiesResult,
+                        schedulesResult,
+                        statsResult
                     )
 
-            } catch (
-                error: SyncException
-            ) {
-
-                val message =
-                    error.message
-                        ?: "Unable to synchronize with LIAS."
-
-                if (
-                    hasUsableCache
-                ) {
-
-                    _state.value =
-                        _state.value.copy(
+                if (partialFailure == null) {
+                    _state.update {
+                        it.copy(
+                            syncState =
+                                SyncState.Ready(
+                                    synchronizedAt
+                                ),
+                            isInitialLoaded = true,
+                            isRefreshing = false,
+                            lastSuccessfulSyncAt =
+                                synchronizedAt,
+                            errorMessage = null
+                        )
+                    }
+                } else {
+                    /*
+                     * Devices were successfully loaded, so the app has
+                     * usable state. Secondary-resource failure is
+                     * represented as stale/partial rather than a blank
+                     * fatal screen.
+                     */
+                    _state.update {
+                        it.copy(
                             syncState =
                                 SyncState.Stale(
                                     synchronizedAt =
-                                        previous.lastSuccessfulSyncAt,
-
+                                        synchronizedAt,
                                     message =
-                                        message
+                                        partialFailure
                                 ),
-
+                            isInitialLoaded = true,
+                            isRefreshing = false,
+                            lastSuccessfulSyncAt =
+                                synchronizedAt,
                             errorMessage =
-                                message
+                                partialFailure
                         )
+                    }
+                }
 
-                } else {
+            } catch (failure: SyncFailure) {
 
-                    _state.value =
-                        _state.value.copy(
+                val message =
+                    failure.message
+                        ?: "Unable to synchronize with LIAS."
+
+                _state.update { current ->
+
+                    if (previouslyUsable) {
+                        current.copy(
+                            syncState =
+                                SyncState.Stale(
+                                    synchronizedAt =
+                                        before.lastSuccessfulSyncAt,
+                                    message = message
+                                ),
+                            isRefreshing = false,
+                            errorMessage = message
+                        )
+                    } else {
+                        current.copy(
                             syncState =
                                 SyncState.Failed(
                                     message
                                 ),
-
-                            isInitialLoaded =
-                                false,
-
-                            errorMessage =
-                                message
+                            isInitialLoaded = false,
+                            isRefreshing = false,
+                            errorMessage = message
                         )
+                    }
+                }
+
+            } catch (error: Exception) {
+
+                val message =
+                    error.message
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "Unable to synchronize with LIAS."
+
+                _state.update { current ->
+
+                    if (previouslyUsable) {
+                        current.copy(
+                            syncState =
+                                SyncState.Stale(
+                                    synchronizedAt =
+                                        before.lastSuccessfulSyncAt,
+                                    message = message
+                                ),
+                            isRefreshing = false,
+                            errorMessage = message
+                        )
+                    } else {
+                        current.copy(
+                            syncState =
+                                SyncState.Failed(
+                                    message
+                                ),
+                            isInitialLoaded = false,
+                            isRefreshing = false,
+                            errorMessage = message
+                        )
+                    }
                 }
             }
         }
     }
 
+    private suspend fun refreshEffectiveStatuses(
+        devices: List<Device>,
+        tags: List<Tag>
+    ) {
+        val deviceStatuses =
+            mutableMapOf<String, EffectiveStatus>()
+
+        devices
+            .filter {
+                it.pdid.isNotBlank()
+            }
+            .chunked(EFFECTIVE_STATUS_BATCH_SIZE)
+            .forEach { batch ->
+
+                val results =
+                    coroutineScope {
+                        batch.map { device ->
+                            async {
+                                device.pdid to
+                                    api.getDeviceEffectiveStatus(
+                                        device.pdid
+                                    )
+                            }
+                        }.awaitAll()
+                    }
+
+                results.forEach { (pdid, result) ->
+                    if (
+                        result
+                        is ApiResult.Success
+                    ) {
+                        deviceStatuses[pdid] =
+                            result.data
+                    }
+                }
+            }
+
+        val tagStatuses =
+            mutableMapOf<String, EffectiveStatus>()
+
+        tags
+            .filter {
+                it.id.isNotBlank()
+            }
+            .chunked(EFFECTIVE_STATUS_BATCH_SIZE)
+            .forEach { batch ->
+
+                val results =
+                    coroutineScope {
+                        batch.map { tag ->
+                            async {
+                                tag.id to
+                                    api.getTagEffectiveStatus(
+                                        tag.id
+                                    )
+                            }
+                        }.awaitAll()
+                    }
+
+                results.forEach { (tagId, result) ->
+                    if (
+                        result
+                        is ApiResult.Success
+                    ) {
+                        tagStatuses[tagId] =
+                            result.data
+                    }
+                }
+            }
+
+        _state.update {
+            it.copy(
+                deviceEffectiveStatuses =
+                    deviceStatuses,
+                tagEffectiveStatuses =
+                    tagStatuses
+            )
+        }
+    }
+
     // ----------------------------------------------------------------
-    // SSE events
+    // SSE reconciliation
     // ----------------------------------------------------------------
 
     private suspend fun collectSseEvents() {
-
         sse.events.collect { event ->
 
             val now =
                 System.currentTimeMillis()
 
-            val isReplayPhase =
-                (
-                    now -
-                        lastSseConnectedTime
-                    ) < 2500L
+            val replayPhase =
+                lastSseConnectedTime > 0 &&
+                    now - lastSseConnectedTime <
+                    REPLAY_SUPPRESSION_WINDOW_MS
 
             val toastKey =
                 "${event.type}:${event.deviceID}"
 
-            val lastToastTime =
-                recentToastMap[
-                    toastKey
-                ] ?: 0L
+            val lastToast =
+                recentToastMap[toastKey]
+                    ?: 0L
 
-            val isDuplicateToast =
-                (
-                    now -
-                        lastToastTime
-                    ) < 3000L
+            val duplicateToast =
+                now - lastToast <
+                    DUPLICATE_TOAST_WINDOW_MS
 
-            val shouldShowToast =
-                !isReplayPhase &&
-                    !isDuplicateToast
+            val showToast =
+                !replayPhase &&
+                    !duplicateToast
 
-            when (
-                event.type
-            ) {
+            when (event.type) {
 
                 EventConstants.DEVICE_ADDED -> {
-
                     refreshSingleDevice(
                         event.deviceID
                     )
 
-                    if (
-                        shouldShowToast
-                    ) {
+                    if (showToast) {
+                        recentToastMap[toastKey] =
+                            now
 
-                        recentToastMap[
-                            toastKey
-                        ] = now
-
-                        _uiEvents.emit(
+                        tryEmitUiEvent(
                             UiEvent.ShowSnackbar(
                                 "New device discovered"
                             )
@@ -624,66 +638,52 @@ class EventRepository(
                 }
 
                 EventConstants.DEVICE_ONLINE -> {
-
                     refreshSingleDevice(
                         event.deviceID
                     )
 
-                    if (
-                        shouldShowToast
-                    ) {
+                    if (showToast) {
+                        recentToastMap[toastKey] =
+                            now
 
-                        recentToastMap[
-                            toastKey
-                        ] = now
-
-                        val confirmedBy =
+                        val confirmations =
                             event.payload?.let {
                                 try {
-                                    json.decodeFromJsonElement<
-                                        DeviceEventPayload
-                                    >(it)
-                                        .safeConfirmedBy
-                                } catch (
-                                    _: Exception
-                                ) {
+                                    json.decodeFromJsonElement<DeviceEventPayload>(
+                                        it
+                                    ).safeConfirmedBy
+                                } catch (_: Exception) {
                                     emptyList()
                                 }
-                            }
-                                ?: emptyList()
+                            }.orEmpty()
 
-                        val verifiedText =
+                        val suffix =
                             if (
-                                confirmedBy.isNotEmpty()
+                                confirmations.isNotEmpty()
                             ) {
-                                " · ${confirmedBy.size} sources"
+                                " · ${confirmations.size} sources"
                             } else {
                                 ""
                             }
 
-                        _uiEvents.emit(
+                        tryEmitUiEvent(
                             UiEvent.ShowSnackbar(
-                                "Device online$verifiedText"
+                                "Device online$suffix"
                             )
                         )
                     }
                 }
 
                 EventConstants.DEVICE_OFFLINE -> {
-
                     refreshSingleDevice(
                         event.deviceID
                     )
 
-                    if (
-                        shouldShowToast
-                    ) {
+                    if (showToast) {
+                        recentToastMap[toastKey] =
+                            now
 
-                        recentToastMap[
-                            toastKey
-                        ] = now
-
-                        _uiEvents.emit(
+                        tryEmitUiEvent(
                             UiEvent.ShowSnackbar(
                                 "Device offline"
                             )
@@ -691,79 +691,79 @@ class EventRepository(
                     }
                 }
 
-                EventConstants.EFFECTIVE_STATUS_CHANGED -> {
-
-                    refreshAll()
-                }
-
                 EventConstants.HOSTNAME_CHANGED,
                 EventConstants.FINGERPRINT_UPDATED,
                 EventConstants.IP_CHANGED,
                 EventConstants.MAC_CHANGED -> {
-
                     refreshSingleDevice(
                         event.deviceID
                     )
                 }
 
-                EventConstants.DEVICE_REMOVED -> {
+                EventConstants.EFFECTIVE_STATUS_CHANGED -> {
+                    scheduleEffectiveStatusRefresh()
+                }
 
-                    _state.value =
-                        _state.value.copy(
+                EventConstants.DEVICE_REMOVED -> {
+                    _state.update { current ->
+                        current.copy(
                             devices =
-                                _state.value
-                                    .devices
+                                current.devices
                                     .filterNot {
                                         it.pdid ==
                                             event.deviceID
+                                    },
+                            deviceEffectiveStatuses =
+                                current
+                                    .deviceEffectiveStatuses
+                                    .filterKeys {
+                                        it !=
+                                            event.deviceID
                                     }
                         )
+                    }
                 }
 
                 EventConstants.DEVICE_REIDENTIFIED -> {
-
                     val payload =
                         event.payload?.let {
-
                             try {
-                                json.decodeFromJsonElement<
-                                    DeviceReidentifiedPayload
-                                >(it)
-                            } catch (
-                                _: Exception
-                            ) {
+                                json.decodeFromJsonElement<DeviceReidentifiedPayload>(
+                                    it
+                                )
+                            } catch (_: Exception) {
                                 null
                             }
                         }
 
-                    if (
-                        payload != null
-                    ) {
-
-                        _state.value =
-                            _state.value.copy(
+                    if (payload != null) {
+                        _state.update { current ->
+                            current.copy(
                                 devices =
-                                    _state.value
-                                        .devices
+                                    current.devices
                                         .filterNot {
                                             it.pdid ==
                                                 payload.oldPdid
+                                        },
+                                deviceEffectiveStatuses =
+                                    current
+                                        .deviceEffectiveStatuses
+                                        .filterKeys {
+                                            it !=
+                                                payload.oldPdid
                                         }
                             )
+                        }
 
                         refreshSingleDevice(
                             payload.newPdid
                         )
 
-                        if (
-                            shouldShowToast
-                        ) {
+                        if (showToast) {
+                            recentToastMap[toastKey] =
+                                now
 
-                            recentToastMap[
-                                toastKey
-                            ] = now
-
-                            _uiEvents.emit(
+                            tryEmitUiEvent(
                                 UiEvent.ShowSnackbar(
                                     "Device identity updated"
                                 )
@@ -773,17 +773,13 @@ class EventRepository(
                 }
 
                 EventConstants.SECURITY_ALERT -> {
-
                     val payload =
                         event.payload?.let {
-
                             try {
-                                json.decodeFromJsonElement<
-                                    SecurityAlertPayload
-                                >(it)
-                            } catch (
-                                _: Exception
-                            ) {
+                                json.decodeFromJsonElement<SecurityAlertPayload>(
+                                    it
+                                )
+                            } catch (_: Exception) {
                                 null
                             }
                         }
@@ -793,89 +789,94 @@ class EventRepository(
                             ?.takeIf {
                                 it.isNotBlank()
                             }
-                            ?: "Anomaly detected"
+                            ?: "A network security anomaly was detected."
 
-                    _uiEvents.emit(
+                    tryEmitUiEvent(
                         UiEvent.ShowSecurityAlert(
-                            details
+                            details = details,
+                            pdid =
+                                payload?.pdid.orEmpty()
                         )
                     )
 
-                    _uiEvents.emit(
+                    tryEmitUiEvent(
                         UiEvent.ShowSnackbarError(
                             "Security alert: $details"
                         )
                     )
                 }
 
-                EventConstants.PING -> {
-                    // PING is transport-level keepalive.
-                    // No domain refresh is required.
-                }
+                EventConstants.PING -> Unit
             }
         }
     }
 
-    // ----------------------------------------------------------------
-    // Individual device refresh
-    // ----------------------------------------------------------------
+    private fun scheduleEffectiveStatusRefresh() {
+        val now =
+            System.currentTimeMillis()
+
+        if (
+            now -
+                lastEffectiveStatusRefreshTime <
+            EFFECTIVE_STATUS_REFRESH_DEBOUNCE_MS
+        ) {
+            return
+        }
+
+        lastEffectiveStatusRefreshTime =
+            now
+
+        scope.launch {
+            val snapshot =
+                _state.value
+
+            refreshEffectiveStatuses(
+                devices =
+                    snapshot.devices,
+                tags =
+                    snapshot.tags
+            )
+        }
+    }
 
     private suspend fun refreshSingleDevice(
         pdid: String
     ) {
-
-        if (
-            pdid.isBlank()
-        ) {
+        if (pdid.isBlank()) {
             return
         }
 
         when (
             val result =
                 api.get<Device>(
-                    Endpoints.device(
-                        pdid
-                    )
+                    Endpoints.device(pdid)
                 )
         ) {
-
             is ApiResult.Success -> {
+                _state.update { current ->
 
-                val updatedDevice =
-                    result.data
+                    val devices =
+                        current.devices
+                            .toMutableList()
 
-                val currentDevices =
-                    _state.value
-                        .devices
-                        .toMutableList()
-
-                val index =
-                    currentDevices
-                        .indexOfFirst {
+                    val index =
+                        devices.indexOfFirst {
                             it.pdid == pdid
                         }
 
-                if (
-                    index != -1
-                ) {
+                    if (index >= 0) {
+                        devices[index] =
+                            result.data
+                    } else {
+                        devices.add(
+                            result.data
+                        )
+                    }
 
-                    currentDevices[
-                        index
-                    ] =
-                        updatedDevice
-
-                } else {
-
-                    currentDevices.add(
-                        updatedDevice
+                    current.copy(
+                        devices = devices
                     )
                 }
-
-                _state.value =
-                    _state.value.copy(
-                        devices =
-                            currentDevices
-                    )
             }
 
             else -> Unit
@@ -883,12 +884,89 @@ class EventRepository(
     }
 
     // ----------------------------------------------------------------
-    // Internal exception
+    // State helpers
     // ----------------------------------------------------------------
 
-    private class SyncException(
+    fun clearError() {
+        _state.update {
+            it.copy(
+                errorMessage = null
+            )
+        }
+    }
+
+    fun setError(
+        message: String?
+    ) {
+        _state.update {
+            it.copy(
+                errorMessage = message
+            )
+        }
+    }
+
+    private fun firstMeaningfulError(
+        vararg results: ApiResult<*>
+    ): String? {
+        results.forEach { result ->
+
+            if (
+                result !is ApiResult.Success
+            ) {
+                return resultMessage(
+                    result,
+                    "Some LIAS data could not be refreshed."
+                )
+            }
+        }
+
+        return null
+    }
+
+    private fun resultMessage(
+        result: ApiResult<*>,
+        fallback: String
+    ): String =
+        when (result) {
+            is ApiResult.Success<*> ->
+                fallback
+
+            is ApiResult.AuthenticationError ->
+                result.message
+
+            is ApiResult.HttpError ->
+                result.message
+
+            is ApiResult.ConflictError ->
+                result.message
+
+            is ApiResult.NetworkError ->
+                result.cause.message
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?: fallback
+
+            is ApiResult.SerializationError ->
+                "The LIAS server returned an invalid response."
+        }
+
+    private class SyncFailure(
         message: String
-    ) : Exception(
-        message
-    )
+    ) : Exception(message)
+
+    private companion object {
+
+        const val EFFECTIVE_STATUS_BATCH_SIZE =
+            8
+
+        const val EFFECTIVE_STATUS_REFRESH_DEBOUNCE_MS =
+            750L
+
+        const val REPLAY_SUPPRESSION_WINDOW_MS =
+            2_500L
+
+        const val DUPLICATE_TOAST_WINDOW_MS =
+            3_000L
+    }
 }
