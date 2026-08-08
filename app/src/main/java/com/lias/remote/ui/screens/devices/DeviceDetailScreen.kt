@@ -1,30 +1,37 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 19.0.0
+// File:
+// app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
+// Version: 26.0.0
 //
 // Purpose:
-//   Authoritative device detail and management surface.
+//   Authoritative device detail and actions.
 //
-// Batch 19:
-//   - Removes pol_pause_<pdid> inference entirely.
-//   - EffectiveStatus drives Pause/Resume/Extend.
-//   - Adds tag management.
-//   - Adds complete DIS identity/enrichment evidence.
-//   - Adds historical MAC/IP observations.
-//   - Shows source_info provenance without inventing certainty.
-//   - User creation leaves ID blank for server generation.
+// Batch 26:
+//   - Explicit unavailable-device state.
+//   - EffectiveStatus controls every Internet action.
+//   - No pol_pause_<pdid> inspection.
+//   - Pause uses dedicated fixed-one-hour endpoint.
+//   - Extend supports active extension management/cancellation.
+//   - New User is sent with id="" for LIAS/server ownership.
+//   - Removes emoji device/action icons.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,33 +39,37 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.lias.remote.core.device.DevicePresentation
 import com.lias.remote.core.models.FlowLog
-import com.lias.remote.core.models.TemporaryAccessKind
 import com.lias.remote.core.models.User
-import com.lias.remote.core.models.temporaryAccessKind
 import com.lias.remote.core.network.ApiResult
-import com.lias.remote.core.util.ConfigurationSafety
-import com.lias.remote.core.util.EffectiveAccessFormatter
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.access.AccessPresentationResolver
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
-import com.lias.remote.ui.components.ScreenStateView
+import com.lias.remote.ui.components.StatusDot
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
 
 @Composable
 fun DeviceDetailScreen(
@@ -81,120 +92,40 @@ fun DeviceDetailScreen(
                     pdid
             }
 
+    /*
+     * Do not show missing-state during initial inventory hydration.
+     */
     if (
-        device == null
+        device ==
+        null
     ) {
 
-        HigLargeTitleScaffold(
-            title =
-                "Device",
-            scrollState =
-                scrollState,
-            navLeading = {
-
-                HigTextButton(
-                    text =
-                        "‹ Devices",
-                    onClick =
-                        onBack
-                )
-            }
-        ) { padding ->
-
-            ScreenStateView(
-                title =
-                    "Device Unavailable",
-                message =
-                    "This device is no longer present in the current LIAS inventory.",
-                actionText =
-                    "Back to Devices",
-                onAction =
-                    onBack,
-                modifier =
-                    Modifier.padding(
-                        padding
-                    )
-            )
-        }
+        DeviceUnavailableScreen(
+            isLoading =
+                !state.isInitialLoaded,
+            onBack =
+                onBack,
+            onRefresh =
+                viewModel::refresh
+        )
 
         return
     }
 
-    var logs by
-        remember(
-            pdid
-        ) {
-            mutableStateOf<List<FlowLog>>(
-                emptyList()
-            )
-        }
-
-    var loadingLogs by
-        remember(
-            pdid
-        ) {
-            mutableStateOf(
-                true
-            )
-        }
-
-    var showExtend by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var showPause by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var showRename by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var showTags by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var showUser by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
     val status =
-        viewModel.effectiveStatusFor(
-            pdid
-        )
+        state
+            .effectiveStatusForDevice(
+                device.pdid
+            )
 
     val access =
-        EffectiveAccessFormatter
-            .present(
-                status
+        AccessPresentationResolver
+            .resolve(
+                device =
+                    device,
+                status =
+                    status
             )
-
-    val temporary =
-        status?.temporaryAccessKind
-            ?: TemporaryAccessKind.NONE
-
-    val infrastructure =
-        ConfigurationSafety
-            .INFRASTRUCTURE_TAG_ID in
-            DevicePresentation
-                .normalizedTagIds(
-                    device
-                )
 
     val assignedUser =
         state.users
@@ -203,19 +134,72 @@ fun DeviceDetailScreen(
                     device.userID
             }
 
-    val tagNames =
-        DevicePresentation
-            .tagNames(
-                device,
-                state.tags
+    var logs by
+        remember(
+            pdid
+        ) {
+            mutableStateOf<
+                List<FlowLog>
+            >(
+                emptyList()
             )
+        }
+
+    var isLoadingLogs by
+        remember(
+            pdid
+        ) {
+            mutableStateOf(
+                true
+            )
+        }
+
+    var logsError by
+        remember(
+            pdid
+        ) {
+            mutableStateOf<String?>(
+                null
+            )
+        }
+
+    var showExtendSheet by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var showPauseSheet by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var showUserAssignmentSheet by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var showRenameDialog by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
     LaunchedEffect(
         pdid
     ) {
 
-        loadingLogs =
+        isLoadingLogs =
             true
+
+        logsError =
+            null
 
         when (
             val result =
@@ -226,20 +210,23 @@ fun DeviceDetailScreen(
         ) {
 
             is ApiResult.Success ->
+
                 logs =
                     result.data
 
             else ->
-                Unit
+
+                logsError =
+                    "Recent activity could not be loaded."
         }
 
-        loadingLogs =
+        isLoadingLogs =
             false
     }
 
     HigLargeTitleScaffold(
         title =
-            device.displayName,
+            "",
         scrollState =
             scrollState,
         navLeading = {
@@ -250,19 +237,9 @@ fun DeviceDetailScreen(
                 onClick =
                     onBack
             )
-        },
-        navTrailing = {
-
-            HigTextButton(
-                text =
-                    "Rename",
-                onClick = {
-                    showRename =
-                        true
-                }
-            )
         }
-    ) { padding ->
+    ) {
+        padding ->
 
         LazyColumn(
             state =
@@ -273,138 +250,146 @@ fun DeviceDetailScreen(
                 padding
         ) {
 
-            item {
+            item(
+                key =
+                    "profile"
+            ) {
 
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(
-                                horizontal = 16.dp,
-                                vertical = 12.dp
+                                16.dp
                             ),
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            8.dp
-                        )
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
                 ) {
 
-                    Row(
+                    Box(
                         modifier =
-                            Modifier.fillMaxWidth(),
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween
+                            Modifier
+                                .size(
+                                    64.dp
+                                )
+                                .background(
+                                    color =
+                                        LiasThemeColors.blue,
+                                    shape =
+                                        RoundedCornerShape(
+                                            16.dp
+                                        )
+                                ),
+                        contentAlignment =
+                            Alignment.Center
                     ) {
 
-                        Column(
+                        CupertinoIcon(
+                            imageVector =
+                                CupertinoIcons
+                                    .Outlined
+                                    .Iphone,
+                            contentDescription =
+                                null,
+                            tint =
+                                androidx.compose.ui.graphics.Color.White,
                             modifier =
-                                Modifier.weight(
-                                    1f
+                                Modifier.size(
+                                    34.dp
                                 )
-                        ) {
-
-                            CupertinoText(
-                                text =
-                                    device.displayName,
-                                style =
-                                    HigTypography.title1,
-                                fontWeight =
-                                    FontWeight.Bold,
-                                color =
-                                    LiasThemeColors.label
-                            )
-
-                            CupertinoText(
-                                text =
-                                    if (
-                                        device.online
-                                    ) {
-                                        "Online · ${
-                                            device.currentIP
-                                                .ifBlank {
-                                                    "IP unavailable"
-                                                }
-                                        }"
-                                    } else {
-                                        "Offline"
-                                    },
-                                style =
-                                    HigTypography.subheadline,
-                                color =
-                                    if (
-                                        device.online
-                                    ) {
-                                        LiasThemeColors.green
-                                    } else {
-                                        LiasThemeColors
-                                            .secondaryLabel
-                                    }
-                            )
-                        }
-
-                        StatusPill(
-                            text =
-                                when {
-
-                                    infrastructure ->
-                                        "Immune"
-
-                                    temporary ==
-                                        TemporaryAccessKind.PAUSE ->
-                                        "Paused"
-
-                                    temporary ==
-                                        TemporaryAccessKind.EXTEND ->
-                                        "Extended"
-
-                                    else ->
-                                        access.title
-                                },
-                            tone =
-                                when {
-
-                                    infrastructure ->
-                                        PillTone.INFO
-
-                                    temporary ==
-                                        TemporaryAccessKind.PAUSE ->
-                                        PillTone.PAUSED
-
-                                    temporary ==
-                                        TemporaryAccessKind.EXTEND ->
-                                        PillTone.ALLOWED
-
-                                    access.isBlocked ->
-                                        PillTone.BLOCKED
-
-                                    access.isAllowed ->
-                                        PillTone.ALLOWED
-
-                                    else ->
-                                        PillTone.INFO
-                                }
                         )
                     }
 
-                    CupertinoText(
-                        text =
-                            if (
-                                infrastructure
-                            ) {
-                                "Infrastructure protection keeps this device online regardless of ordinary LIAS access rules."
-                            } else {
-                                access.explanation
-                            },
-                        style =
-                            HigTypography.caption,
-                        color =
-                            LiasThemeColors.secondaryLabel
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                10.dp
+                            )
                     )
 
-                    if (
-                        !infrastructure &&
-                        status != null
+                    CupertinoText(
+                        text =
+                            device.displayName,
+                        style =
+                            HigTypography.title1,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color =
+                            LiasThemeColors.label,
+                        textAlign =
+                            TextAlign.Center
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(
+                                6.dp
+                            )
+                    )
+
+                    Row(
+                        verticalAlignment =
+                            Alignment.CenterVertically,
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
                     ) {
+
+                        StatusDot(
+                            isOnline =
+                                device.online,
+                            isPaused =
+                                access.isPaused
+                        )
+
+                        CupertinoText(
+                            text =
+                                if (
+                                    device.online
+                                ) {
+                                    device.currentIP
+                                        .takeIf {
+                                            it.isNotBlank()
+                                        }
+                                        ?.let {
+                                            "Online · $it"
+                                        }
+                                        ?: "Online"
+                                } else {
+                                    "Offline"
+                                },
+                            style =
+                                HigTypography.body,
+                            color =
+                                if (
+                                    device.online
+                                ) {
+                                    LiasThemeColors.green
+                                } else {
+                                    LiasThemeColors
+                                        .tertiaryLabel
+                                }
+                        )
+
+                        StatusPill(
+                            text =
+                                access.label,
+                            tone =
+                                access.tone
+                        )
+                    }
+
+                    if (
+                        !access.isInfrastructure
+                    ) {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    16.dp
+                                )
+                        )
 
                         Row(
                             modifier =
@@ -417,8 +402,7 @@ fun DeviceDetailScreen(
 
                             when {
 
-                                temporary ==
-                                    TemporaryAccessKind.PAUSE ->
+                                access.canResumePause ->
 
                                     HigButton(
                                         text =
@@ -427,7 +411,7 @@ fun DeviceDetailScreen(
 
                                             viewModel
                                                 .unpauseDeviceInternet(
-                                                    pdid
+                                                    device.pdid
                                                 )
                                         },
                                         style =
@@ -438,36 +422,13 @@ fun DeviceDetailScreen(
                                             )
                                     )
 
-                                temporary ==
-                                    TemporaryAccessKind.EXTEND ->
+                                access.canManageExtension ->
 
                                     HigButton(
                                         text =
-                                            "Cancel Extension",
+                                            "Manage Access",
                                         onClick = {
-
-                                            viewModel
-                                                .cancelDeviceExtension(
-                                                    pdid
-                                                )
-                                        },
-                                        style =
-                                            HigButtonStyle.Gray,
-                                        modifier =
-                                            Modifier.weight(
-                                                1f
-                                            )
-                                    )
-
-                                status.action ==
-                                    "block" &&
-                                    status.extendAvailable ->
-
-                                    HigButton(
-                                        text =
-                                            "Extend",
-                                        onClick = {
-                                            showExtend =
+                                            showExtendSheet =
                                                 true
                                         },
                                         style =
@@ -478,13 +439,30 @@ fun DeviceDetailScreen(
                                             )
                                     )
 
-                                status.pauseAvailable ->
+                                access.canExtend ->
+
+                                    HigButton(
+                                        text =
+                                            "Extend",
+                                        onClick = {
+                                            showExtendSheet =
+                                                true
+                                        },
+                                        style =
+                                            HigButtonStyle.Secondary,
+                                        modifier =
+                                            Modifier.weight(
+                                                1f
+                                            )
+                                    )
+
+                                access.canPause ->
 
                                     HigButton(
                                         text =
                                             "Pause",
                                         onClick = {
-                                            showPause =
+                                            showPauseSheet =
                                                 true
                                         },
                                         style =
@@ -495,15 +473,51 @@ fun DeviceDetailScreen(
                                             )
                                     )
                             }
+
+                            HigButton(
+                                text =
+                                    "Rename",
+                                onClick = {
+                                    showRenameDialog =
+                                        true
+                                },
+                                style =
+                                    HigButtonStyle.Gray,
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            )
                         }
+
+                    } else {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    16.dp
+                                )
+                        )
+
+                        HigButton(
+                            text =
+                                "Rename",
+                            onClick = {
+                                showRenameDialog =
+                                    true
+                            },
+                            style =
+                                HigButtonStyle.Gray,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
 
             item {
-
                 ListSectionHeader(
-                    "Classification"
+                    "Access"
                 )
             }
 
@@ -512,66 +526,71 @@ fun DeviceDetailScreen(
                 GroupedListCard(
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 ) {
 
                     GroupedListRow(
                         primaryText =
-                            "Tags",
+                            "Effective Access",
                         secondaryText =
-                            tagNames.joinToString(
-                                " · "
-                            )
-                                .ifBlank {
-                                    "Generic Devices"
-                                },
+                            access.label,
                         trailingContent = {
 
-                            CupertinoText(
+                            StatusPill(
                                 text =
-                                    "›",
-                                style =
-                                    HigTypography.headline,
-                                color =
-                                    LiasThemeColors.tertiaryLabel
+                                    access.label,
+                                tone =
+                                    access.tone
                             )
                         },
                         showDivider =
-                            true,
-                        onClick = {
-                            showTags =
-                                true
-                        }
+                            true
                     )
 
                     GroupedListRow(
                         primaryText =
-                            "Assigned User",
+                            "Source",
                         secondaryText =
-                            assignedUser?.name
-                                ?: "Unassigned",
-                        trailingContent = {
-
-                            CupertinoText(
-                                text =
-                                    "›",
-                                style =
-                                    HigTypography.headline,
-                                color =
-                                    LiasThemeColors.tertiaryLabel
-                            )
-                        },
-                        onClick = {
-                            showUser =
-                                true
-                        }
+                            access.source
+                                ?.replace(
+                                    "_",
+                                    " "
+                                )
+                                ?.replaceFirstChar {
+                                    it.uppercase()
+                                }
+                                ?: "Not available",
+                        showDivider =
+                            status
+                                ?.activeExtension !=
+                                null
                     )
+
+                    status
+                        ?.activeExtension
+                        ?.let {
+                            extension ->
+
+                            GroupedListRow(
+                                primaryText =
+                                    if (
+                                        extension.reasonTag ==
+                                        "pause"
+                                    ) {
+                                        "Pause Timer"
+                                    } else {
+                                        "Access Extension"
+                                    },
+                                secondaryText =
+                                    "${extension.minutesLeft.coerceAtLeast(0)} minutes remaining"
+                            )
+                        }
                 }
             }
 
             item {
-
                 ListSectionHeader(
                     "Identity"
                 )
@@ -582,62 +601,19 @@ fun DeviceDetailScreen(
                 GroupedListCard(
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 ) {
 
                     GroupedListRow(
                         primaryText =
-                            "Identity Tier",
-                        secondaryText =
-                            DevicePresentation
-                                .identityTierTitle(
-                                    device.identityTier
-                                ),
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Confidence",
-                        secondaryText =
-                            DevicePresentation
-                                .confidencePercent(
-                                    device.confidence
-                                ),
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Device Type",
-                        secondaryText =
-                            DevicePresentation
-                                .deviceTypeTitle(
-                                    device
-                                ),
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
                             "Hostname",
                         secondaryText =
-                            device.hostname.ifBlank {
-                                "Not observed"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Canonical Hostname",
-                        secondaryText =
-                            device.canonicalHostname
+                            device.hostname
+                                .ifBlank {
+                                    device.canonicalHostname
+                                }
                                 .ifBlank {
                                     "Not available"
                                 },
@@ -647,11 +623,11 @@ fun DeviceDetailScreen(
 
                     GroupedListRow(
                         primaryText =
-                            "Manufacturer",
+                            "MAC Address",
                         secondaryText =
-                            device.manufacturer
+                            device.currentMAC
                                 .ifBlank {
-                                    "Unknown"
+                                    "Not available"
                                 },
                         showDivider =
                             true
@@ -661,85 +637,12 @@ fun DeviceDetailScreen(
                         primaryText =
                             "Vendor",
                         secondaryText =
-                            device.vendor.ifBlank {
-                                "Unknown"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Model",
-                        secondaryText =
-                            device.model.ifBlank {
-                                "Unknown"
-                            }
-                    )
-                }
-            }
-
-            item {
-
-                CupertinoText(
-                    text =
-                        DevicePresentation
-                            .identityTierExplanation(
-                                device.identityTier
-                            ),
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors.tertiaryLabel,
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 20.dp,
-                            vertical = 8.dp
-                        )
-                )
-            }
-
-            item {
-
-                ListSectionHeader(
-                    "Network Identity"
-                )
-            }
-
-            item {
-
-                GroupedListCard(
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 16.dp
-                        )
-                ) {
-
-                    GroupedListRow(
-                        primaryText =
-                            "Current MAC",
-                        secondaryText =
-                            device.currentMAC.ifBlank {
-                                "Unavailable"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Known MAC Addresses",
-                        secondaryText =
-                            device.safeMacs
-                                .distinct()
-                                .joinToString(
-                                    "\n"
-                                )
+                            device.vendor
                                 .ifBlank {
-                                    device.currentMAC
-                                        .ifBlank {
-                                            "None"
-                                        }
+                                    device.manufacturer
+                                }
+                                .ifBlank {
+                                    "Unknown"
                                 },
                         showDivider =
                             true
@@ -747,71 +650,115 @@ fun DeviceDetailScreen(
 
                     GroupedListRow(
                         primaryText =
-                            "Current IP",
+                            "Type",
                         secondaryText =
-                            device.currentIP.ifBlank {
-                                "Unavailable"
-                            },
+                            device.deviceType
+                                .ifBlank {
+                                    "Unclassified"
+                                },
                         showDivider =
                             true
                     )
 
                     GroupedListRow(
                         primaryText =
-                            "Known IP Addresses",
+                            "Identity Tier",
                         secondaryText =
-                            device.safeIps
-                                .distinct()
-                                .joinToString(
-                                    "\n"
-                                )
-                                .ifBlank {
-                                    device.currentIP
-                                        .ifBlank {
-                                            "None"
-                                        }
-                                }
+                            device.identityTier
+                                .replaceFirstChar {
+                                    it.uppercase()
+                                },
+                        showDivider =
+                            true
+                    )
+
+                    GroupedListRow(
+                        primaryText =
+                            "Assigned User",
+                        secondaryText =
+                            assignedUser
+                                ?.name
+                                ?: "Unassigned",
+                        trailingContent = {
+
+                            CupertinoText(
+                                text =
+                                    "›",
+                                style =
+                                    HigTypography.headline,
+                                color =
+                                    LiasThemeColors
+                                        .tertiaryLabel
+                            )
+                        },
+                        onClick = {
+                            showUserAssignmentSheet =
+                                true
+                        }
                     )
                 }
             }
 
-            if (
-                device.safeServices
-                    .isNotEmpty()
-            ) {
+            item {
+                ListSectionHeader(
+                    "Tags"
+                )
+            }
 
-                item {
+            item {
 
-                    ListSectionHeader(
-                        "Observed Services"
-                    )
-                }
+                GroupedListCard(
+                    modifier =
+                        Modifier.padding(
+                            horizontal =
+                                16.dp
+                        )
+                ) {
 
-                item {
-
-                    GroupedListCard(
-                        modifier =
-                            Modifier.padding(
-                                horizontal = 16.dp
-                            )
+                    if (
+                        device.safeTags
+                            .isEmpty()
                     ) {
 
-                        device.safeServices
-                            .distinct()
-                            .sorted()
+                        GroupedListRow(
+                            primaryText =
+                                "Generic",
+                            secondaryText =
+                                "No explicit tag assignment"
+                        )
+
+                    } else {
+
+                        device.safeTags
                             .forEachIndexed {
                                     index,
-                                    service ->
+                                    tagId ->
+
+                                val tag =
+                                    state.tags
+                                        .find {
+                                            it.id ==
+                                                tagId
+                                        }
 
                                 GroupedListRow(
                                     primaryText =
-                                        service,
+                                        tag
+                                            ?.name
+                                            ?: tagId,
+                                    secondaryText =
+                                        if (
+                                            tagId ==
+                                            "infrastructure"
+                                        ) {
+                                            "Protected infrastructure"
+                                        } else {
+                                            "Policy membership"
+                                        },
                                     showDivider =
                                         index <
-                                            device.safeServices
-                                                .distinct()
-                                                .size -
-                                            1
+                                            device.safeTags
+                                                .lastIndex
                                 )
                             }
                     }
@@ -819,9 +766,8 @@ fun DeviceDetailScreen(
             }
 
             item {
-
                 ListSectionHeader(
-                    "Discovery Evidence"
+                    "Activity · Last 24 Hours"
                 )
             }
 
@@ -830,227 +776,88 @@ fun DeviceDetailScreen(
                 GroupedListCard(
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
-                        )
-                ) {
-
-                    GroupedListRow(
-                        primaryText =
-                            "Identification",
-                        secondaryText =
-                            if (
-                                device.isFullyIdentified
-                            ) {
-                                "Fully identified"
-                            } else {
-                                "Still being enriched"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "First Seen",
-                        secondaryText =
-                            device.firstSeen.ifBlank {
-                                "Unknown"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "Last Seen",
-                        secondaryText =
-                            device.lastSeen.ifBlank {
-                                "Unknown"
-                            },
-                        showDivider =
-                            true
-                    )
-
-                    if (
-                        device.lastEnrichedAt
-                            .isNotBlank()
-                    ) {
-
-                        GroupedListRow(
-                            primaryText =
-                                "Last Enriched",
-                            secondaryText =
-                                device.lastEnrichedAt,
-                            showDivider =
-                                true
-                        )
-                    }
-
-                    if (
-                        device.lastNmapScanAt
-                            .isNotBlank()
-                    ) {
-
-                        GroupedListRow(
-                            primaryText =
-                                "Last Nmap Scan",
-                            secondaryText =
-                                device.lastNmapScanAt,
-                            showDivider =
-                                true
-                        )
-                    }
-
-                    if (
-                        device.nmapAttemptCount >
-                        0
-                    ) {
-
-                        GroupedListRow(
-                            primaryText =
-                                "Nmap Attempts",
-                            secondaryText =
-                                device.nmapAttemptCount
-                                    .toString()
-                        )
-                    }
-                }
-            }
-
-            if (
-                device.safeSourceInfo
-                    .isNotEmpty()
-            ) {
-
-                item {
-
-                    ListSectionHeader(
-                        "Field Provenance"
-                    )
-                }
-
-                item {
-
-                    GroupedListCard(
-                        modifier =
-                            Modifier.padding(
-                                horizontal = 16.dp
-                            )
-                    ) {
-
-                        val sources =
-                            device.safeSourceInfo
-                                .entries
-                                .sortedBy {
-                                    it.key
-                                }
-
-                        sources.forEachIndexed {
-                                index,
-                                entry ->
-
-                            GroupedListRow(
-                                primaryText =
-                                    DevicePresentation
-                                        .sourceTitle(
-                                            entry.key
-                                        ),
-                                secondaryText =
-                                    DevicePresentation
-                                        .sourceSummary(
-                                            entry.value
-                                        ),
-                                showDivider =
-                                    index <
-                                        sources.lastIndex
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-
-                ListSectionHeader(
-                    "Recent Access Decisions"
-                )
-            }
-
-            item {
-
-                GroupedListCard(
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 ) {
 
                     when {
 
-                        loadingLogs ->
+                        isLoadingLogs ->
 
                             GroupedListRow(
                                 primaryText =
                                     "Loading activity…"
                             )
 
+                        logsError !=
+                            null ->
+
+                            GroupedListRow(
+                                primaryText =
+                                    "Activity unavailable",
+                                secondaryText =
+                                    logsError
+                            )
+
                         logs.isEmpty() ->
 
                             GroupedListRow(
                                 primaryText =
-                                    "No recent activity logged"
+                                    "No recent activity"
                             )
 
                         else ->
 
-                            logs
-                                .take(
-                                    100
-                                )
-                                .forEachIndexed {
-                                        index,
-                                        log ->
+                            logs.forEachIndexed {
+                                    index,
+                                    log ->
 
-                                    GroupedListRow(
-                                        primaryText =
-                                            log.timestamp,
-                                        secondaryText =
-                                            if (
-                                                log.bytes >
-                                                0
-                                            ) {
-                                                "${log.bytes} bytes"
-                                            } else {
-                                                null
-                                            },
-                                        trailingContent = {
-
-                                            StatusPill(
-                                                text =
-                                                    log.action
-                                                        .replaceFirstChar {
-                                                            it.uppercase()
-                                                        },
-                                                tone =
-                                                    if (
-                                                        log.action ==
-                                                        "block"
-                                                    ) {
-                                                        PillTone.BLOCKED
-                                                    } else {
-                                                        PillTone.ALLOWED
-                                                    }
-                                            )
-                                        },
-                                        showDivider =
-                                            index <
-                                                logs
-                                                    .take(
-                                                        100
-                                                    )
-                                                    .lastIndex
+                                val blocked =
+                                    log.action.equals(
+                                        "block",
+                                        ignoreCase =
+                                            true
                                     )
-                                }
+
+                                GroupedListRow(
+                                    primaryText =
+                                        log.timestamp,
+                                    secondaryText =
+                                        if (
+                                            log.bytes >
+                                            0
+                                        ) {
+                                            "${log.bytes} bytes"
+                                        } else {
+                                            null
+                                        },
+                                    trailingContent = {
+
+                                        StatusPill(
+                                            text =
+                                                if (
+                                                    blocked
+                                                ) {
+                                                    "Blocked"
+                                                } else {
+                                                    "Allowed"
+                                                },
+                                            tone =
+                                                if (
+                                                    blocked
+                                                ) {
+                                                    PillTone.BLOCKED
+                                                } else {
+                                                    PillTone.ALLOWED
+                                                }
+                                        )
+                                    },
+                                    showDivider =
+                                        index <
+                                            logs.lastIndex
+                                )
+                            }
                     }
                 }
             }
@@ -1058,51 +865,55 @@ fun DeviceDetailScreen(
     }
 
     if (
-        showExtend
+        showExtendSheet &&
+        (
+            access.canExtend ||
+            access.canManageExtension
+            )
     ) {
 
         ExtendAccessSheet(
             targetLabel =
                 device.displayName,
             targetSubtitle =
-                device.currentIP.ifBlank {
-                    device.pdid
-                },
-            currentExtension =
-                status?.activeExtension
-                    ?.takeIf {
-                        temporary ==
-                            TemporaryAccessKind.EXTEND
+                device.currentIP
+                    .ifBlank {
+                        device.pdid
                     },
+            currentExtension =
+                status
+                    ?.activeExtension,
             onDismiss = {
-                showExtend =
+                showExtendSheet =
                     false
             },
             onConfirm = {
                 minutes ->
 
-                viewModel.extendDeviceAccess(
-                    pdid,
-                    minutes
-                )
+                viewModel
+                    .extendDeviceAccess(
+                        device.pdid,
+                        minutes
+                    )
 
-                showExtend =
+                showExtendSheet =
                     false
             },
             onCancelExtension =
                 if (
-                    temporary ==
-                    TemporaryAccessKind.EXTEND
+                    access.canManageExtension
                 ) {
+
                     {
+                        viewModel
+                            .cancelDeviceExtension(
+                                device.pdid
+                            )
 
-                        viewModel.cancelDeviceExtension(
-                            pdid
-                        )
-
-                        showExtend =
+                        showExtendSheet =
                             false
                     }
+
                 } else {
                     null
                 }
@@ -1110,84 +921,59 @@ fun DeviceDetailScreen(
     }
 
     if (
-        showPause
+        showPauseSheet &&
+        access.canPause
     ) {
 
         PauseSheet(
             targetLabel =
                 device.displayName,
             onDismiss = {
-                showPause =
+                showPauseSheet =
                     false
             },
             onConfirm = {
-                minutes ->
+                _ ->
 
-                viewModel.pauseDeviceInternet(
-                    pdid,
-                    minutes
-                )
+                viewModel
+                    .pauseDeviceInternet(
+                        device.pdid
+                    )
 
-                showPause =
+                showPauseSheet =
                     false
             }
         )
     }
 
     if (
-        showRename
+        showRenameDialog
     ) {
 
-        DeviceRenameDialog(
+        RenameDeviceDialog(
             currentName =
                 device.displayName,
             onDismiss = {
-                showRename =
+                showRenameDialog =
                     false
             },
             onConfirm = {
                 newName ->
 
-                viewModel.renameDevice(
-                    pdid,
-                    newName
-                )
+                viewModel
+                    .renameDevice(
+                        device.pdid,
+                        newName
+                    )
 
-                showRename =
+                showRenameDialog =
                     false
             }
         )
     }
 
     if (
-        showTags
-    ) {
-
-        MoveTagSheet(
-            device =
-                device,
-            allTags =
-                state.tags,
-            onDismiss = {
-                showTags =
-                    false
-            },
-            onConfirm = {
-                tagIds ->
-
-                viewModel.assignTags(
-                    pdid,
-                    tagIds
-                )
-
-                showTags =
-                    false
-            }
-        )
-    }
-
-    if (
-        showUser
+        showUserAssignmentSheet
     ) {
 
         UserAssignmentSheet(
@@ -1196,35 +982,305 @@ fun DeviceDetailScreen(
             assignedUserId =
                 device.userID,
             onDismiss = {
-                showUser =
+                showUserAssignmentSheet =
                     false
             },
             onSelectUser = {
                 userId ->
 
-                viewModel.assignDeviceUser(
-                    pdid,
-                    userId
-                )
+                viewModel
+                    .assignDeviceUser(
+                        device.pdid,
+                        userId
+                    )
 
-                showUser =
+                showUserAssignmentSheet =
                     false
             },
             onCreateUser = {
                 userName ->
 
                 /*
-                 * Server owns canonical user ID generation.
+                 * Server owns canonical User ID.
                  */
-                viewModel.createUser(
-                    User(
-                        id =
-                            "",
-                        name =
-                            userName.trim()
+                viewModel
+                    .createUser(
+                        User(
+                            id =
+                                "",
+                            name =
+                                userName.trim()
+                        )
                     )
-                )
             }
         )
+    }
+}
+
+@Composable
+private fun DeviceUnavailableScreen(
+    isLoading: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit
+) {
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(
+                    24.dp
+                ),
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+        verticalArrangement =
+            Arrangement.Center
+    ) {
+
+        CupertinoText(
+            text =
+                if (
+                    isLoading
+                ) {
+                    "Loading Device…"
+                } else {
+                    "Device Unavailable"
+                },
+            style =
+                HigTypography.title2,
+            fontWeight =
+                FontWeight.Bold,
+            color =
+                LiasThemeColors.label,
+            textAlign =
+                TextAlign.Center
+        )
+
+        Spacer(
+            modifier =
+                Modifier.height(
+                    8.dp
+                )
+        )
+
+        CupertinoText(
+            text =
+                if (
+                    isLoading
+                ) {
+                    "Waiting for the current LIAS inventory."
+                } else {
+                    "This device may have been removed, reidentified, or is no longer returned by LIAS."
+                },
+            style =
+                HigTypography.body,
+            color =
+                LiasThemeColors.secondaryLabel,
+            textAlign =
+                TextAlign.Center
+        )
+
+        Spacer(
+            modifier =
+                Modifier.height(
+                    20.dp
+                )
+        )
+
+        if (
+            !isLoading
+        ) {
+
+            HigButton(
+                text =
+                    "Refresh",
+                onClick =
+                    onRefresh,
+                style =
+                    HigButtonStyle.Secondary,
+                modifier =
+                    Modifier.fillMaxWidth()
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        8.dp
+                    )
+            )
+        }
+
+        HigButton(
+            text =
+                "Back to Devices",
+            onClick =
+                onBack,
+            style =
+                HigButtonStyle.Gray,
+            modifier =
+                Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun UserAssignmentSheet(
+    users: List<User>,
+    assignedUserId: String?,
+    onDismiss: () -> Unit,
+    onSelectUser: (String) -> Unit,
+    onCreateUser: (String) -> Unit
+) {
+
+    var newUserName by
+        remember {
+            mutableStateOf(
+                ""
+            )
+        }
+
+    HigModalSheet(
+        onDismiss =
+            onDismiss,
+        accessibilityLabel =
+            "Assign User"
+    ) {
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal =
+                            24.dp,
+                        vertical =
+                            16.dp
+                    ),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    16.dp
+                )
+        ) {
+
+            HigSheetHeader(
+                title =
+                    "Assign User",
+                onCancel =
+                    onDismiss
+            )
+
+            GroupedListCard {
+
+                GroupedListRow(
+                    primaryText =
+                        "Unassigned",
+                    secondaryText =
+                        if (
+                            assignedUserId
+                                .isNullOrBlank()
+                        ) {
+                            "Current"
+                        } else {
+                            null
+                        },
+                    onClick = {
+                        onSelectUser(
+                            ""
+                        )
+                    },
+                    showDivider =
+                        users.isNotEmpty()
+                )
+
+                users
+                    .sortedBy {
+                        it.name
+                            .lowercase()
+                    }
+                    .forEachIndexed {
+                            index,
+                            user ->
+
+                        GroupedListRow(
+                            primaryText =
+                                user.name,
+                            secondaryText =
+                                if (
+                                    user.id ==
+                                    assignedUserId
+                                ) {
+                                    "Current"
+                                } else {
+                                    null
+                                },
+                            onClick = {
+                                onSelectUser(
+                                    user.id
+                                )
+                            },
+                            showDivider =
+                                index <
+                                    users.lastIndex
+                        )
+                    }
+            }
+
+            ListSectionHeader(
+                "New User"
+            )
+
+            HigField(
+                value =
+                    newUserName,
+                onValueChange = {
+                    newUserName =
+                        it
+                },
+                label =
+                    "Name",
+                placeholder =
+                    "Family member"
+            )
+
+            HigButton(
+                text =
+                    "Create User",
+                onClick = {
+
+                    val name =
+                        newUserName
+                            .trim()
+
+                    if (
+                        name.isNotBlank()
+                    ) {
+
+                        onCreateUser(
+                            name
+                        )
+
+                        newUserName =
+                            ""
+                    }
+                },
+                enabled =
+                    newUserName
+                        .isNotBlank(),
+                style =
+                    HigButtonStyle.Primary,
+                modifier =
+                    Modifier.fillMaxWidth()
+            )
+
+            CupertinoText(
+                text =
+                    "After LIAS creates the user, select that user above to assign this device.",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors
+                        .tertiaryLabel
+            )
+        }
     }
 }
