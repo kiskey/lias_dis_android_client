@@ -1,11 +1,13 @@
 // ====================================================================
 // File: HigAlertDialog.kt
-// Version: 3.0.1 (HIG Redesign Fix)
-// Purpose: Fixed Alignment import and Spacer height modifier.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Fixed background import. Replaced Material3 buttons with
+//          CupertinoButton and CupertinoText.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import io.github.alexzhirkevich.cupertino.CupertinoButton
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun HigAlertDialog(
@@ -52,14 +56,14 @@ fun HigAlertDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
+                CupertinoText(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.W600,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 4.dp)
                 )
-                Text(
+                CupertinoText(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -73,27 +77,28 @@ fun HigAlertDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    HigTextButton(
-                        text = cancelText,
+                    CupertinoButton(
                         onClick = { onCancel(); onDismissRequest() },
+                        colors = CupertinoButtonDefaults.plainButtonColors(),
                         modifier = Modifier.weight(1f).padding(vertical = 12.dp)
-                    )
+                    ) {
+                        CupertinoText(text = cancelText)
+                    }
                     
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier
                         .width(0.5.dp)
                         .height(36.dp)
                         .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
                     
-                    HigTextButton(
-                        text = confirmText,
+                    CupertinoButton(
                         onClick = { onConfirm(); onDismissRequest() },
-                        isDestructive = isDestructive,
+                        colors = CupertinoButtonDefaults.plainButtonColors(contentColor = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
                         modifier = Modifier.weight(1f).padding(vertical = 12.dp)
-                    )
+                    ) {
+                        CupertinoText(text = confirmText, fontWeight = FontWeight.W600)
+                    }
                 }
             }
         }
     }
 }
-
-private fun background(color: androidx.compose.ui.graphics.Color) = androidx.compose.foundation.background(color)
