@@ -1,17 +1,15 @@
 // ====================================================================
 // File: HigButton.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Strict HIG button styles (Primary, Secondary, Gray, Danger)
-//          using CupertinoButton underlying engine. 10dp corners.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Refactored to use io.github.alexzhirkevich.cupertino API.
+//          CupertinoButton and CupertinoText.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,8 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
-import io.github.robinpcrd.cupertino.CupertinoButton
-import io.github.robinpcrd.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoButton
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 enum class HigButtonStyle {
     Primary, Secondary, Gray, Danger
@@ -62,7 +61,7 @@ fun HigButton(
             .defaultMinSize(minHeight = 44.dp)
             .clip(RoundedCornerShape(HigSpec.ButtonCorner))
     ) {
-        Text(
+        CupertinoText(
             text = text,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = if (style == HigButtonStyle.Primary || style == HigButtonStyle.Danger) FontWeight.W600 else FontWeight.W500,
@@ -86,7 +85,7 @@ fun HigTextButton(
         colors = CupertinoButtonDefaults.plainButtonColors(contentColor = color),
         modifier = modifier
     ) {
-        Text(
+        CupertinoText(
             text = text,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.W400,
