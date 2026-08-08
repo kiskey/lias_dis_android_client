@@ -1,7 +1,21 @@
+// ====================================================================
+// File: app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt
+// Version: 7.0.0
+//
+// Purpose:
+//   Reusable Apple-style alert dialog.
+//
+// Changes:
+//   - Preserves all existing call sites through defaults.
+//   - Adds optional composable content for editable dialogs.
+//   - Adds confirmEnabled.
+//   - Avoids forcing Material AlertDialog into the Cupertino UI.
+//   - Keeps destructive-action semantics explicit.
+// ====================================================================
+
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,75 +49,189 @@ fun HigAlertDialog(
     onConfirm: () -> Unit,
     isDestructive: Boolean = false,
     cancelText: String = "Cancel",
-    onCancel: () -> Unit = onDismissRequest
+    confirmEnabled: Boolean = true,
+    onCancel: () -> Unit = {},
+    content: (@Composable () -> Unit)? = null
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false
+            )
     ) {
         Box(
-            modifier = Modifier
-                .width(270.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(LiasThemeColors.secondaryBackground)
+            modifier =
+                Modifier
+                    .width(290.dp)
+                    .clip(
+                        RoundedCornerShape(
+                            14.dp
+                        )
+                    )
+                    .background(
+                        LiasThemeColors.secondaryBackground
+                    )
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
             ) {
+
                 CupertinoText(
                     text = title,
-                    style = HigTypography.headline,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    color = LiasThemeColors.label,
-                    modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 4.dp)
+                    style =
+                        HigTypography.headline,
+                    fontWeight =
+                        FontWeight.Bold,
+                    textAlign =
+                        TextAlign.Center,
+                    color =
+                        LiasThemeColors.label,
+                    modifier =
+                        Modifier.padding(
+                            top = 18.dp,
+                            start = 18.dp,
+                            end = 18.dp,
+                            bottom =
+                                if (message.isBlank()) {
+                                    10.dp
+                                } else {
+                                    4.dp
+                                }
+                        )
                 )
-                CupertinoText(
-                    text = message,
-                    style = HigTypography.subheadline,
-                    color = LiasThemeColors.secondaryLabel,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
-                )
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(0.5.dp)
-                        .background(LiasThemeColors.separator)
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    CupertinoButton(
-                        onClick = { onCancel(); onDismissRequest() },
-                        colors = CupertinoButtonDefaults.plainButtonColors(contentColor = LiasThemeColors.blue),
-                        modifier = Modifier.weight(1f).padding(vertical = 12.dp)
-                    ) {
-                        CupertinoText(text = cancelText, style = HigTypography.body)
-                    }
-                    
-                    Spacer(
-                        modifier = Modifier
-                            .width(0.5.dp)
-                            .height(44.dp)
-                            .background(LiasThemeColors.separator)
+
+                if (message.isNotBlank()) {
+                    CupertinoText(
+                        text = message,
+                        style =
+                            HigTypography.subheadline,
+                        color =
+                            LiasThemeColors.secondaryLabel,
+                        textAlign =
+                            TextAlign.Center,
+                        modifier =
+                            Modifier.padding(
+                                start = 18.dp,
+                                end = 18.dp,
+                                bottom =
+                                    if (content == null) {
+                                        16.dp
+                                    } else {
+                                        10.dp
+                                    }
+                            )
                     )
-                    
+                }
+
+                content?.let { dialogContent ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    bottom = 16.dp
+                                )
+                    ) {
+                        dialogContent()
+                    }
+                }
+
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(0.5.dp)
+                            .background(
+                                LiasThemeColors.separator
+                            )
+                )
+
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+
                     CupertinoButton(
-                        onClick = { onConfirm(); onDismissRequest() },
-                        colors = CupertinoButtonDefaults.plainButtonColors(
-                            contentColor = if (isDestructive) LiasThemeColors.red else LiasThemeColors.blue
-                        ),
-                        modifier = Modifier.weight(1f).padding(vertical = 12.dp)
+                        onClick = {
+                            onCancel()
+                            onDismissRequest()
+                        },
+                        colors =
+                            CupertinoButtonDefaults
+                                .plainButtonColors(
+                                    contentColor =
+                                        LiasThemeColors.blue
+                                ),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .padding(
+                                    vertical = 10.dp
+                                )
+                    ) {
+                        CupertinoText(
+                            text = cancelText,
+                            style =
+                                HigTypography.body
+                        )
+                    }
+
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(0.5.dp)
+                                .height(48.dp)
+                                .background(
+                                    LiasThemeColors.separator
+                                )
+                    )
+
+                    CupertinoButton(
+                        onClick = {
+                            if (confirmEnabled) {
+                                onConfirm()
+                                onDismissRequest()
+                            }
+                        },
+                        enabled =
+                            confirmEnabled,
+                        colors =
+                            CupertinoButtonDefaults
+                                .plainButtonColors(
+                                    contentColor =
+                                        if (isDestructive) {
+                                            LiasThemeColors.red
+                                        } else {
+                                            LiasThemeColors.blue
+                                        }
+                                ),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .padding(
+                                    vertical = 10.dp
+                                )
                     ) {
                         CupertinoText(
                             text = confirmText,
-                            style = HigTypography.headline,
-                            fontWeight = FontWeight.Bold
+                            style =
+                                HigTypography.headline,
+                            fontWeight =
+                                FontWeight.SemiBold,
+                            color =
+                                if (!confirmEnabled) {
+                                    LiasThemeColors.tertiaryLabel
+                                } else if (isDestructive) {
+                                    LiasThemeColors.red
+                                } else {
+                                    LiasThemeColors.blue
+                                }
                         )
                     }
                 }
