@@ -1,19 +1,21 @@
 # ====================================================================
 # File: gradle/libs.versions.toml
-# Version: 27.0.0
+# Version: 27.0.1
 #
-# Build compatibility:
+# Purpose:
+#   Central version catalog for LIAS Remote.
+#
+# Fix:
+#   Gradle version catalogs require TOML inline dependency/plugin tables
+#   to be syntactically complete. All inline tables are kept on one line.
+#
+# Build contract:
 #   AGP        8.9.3
-#   Gradle     8.11.1
 #   Kotlin     2.0.20
+#   Gradle     8.11.1
 #   Java       17
 #   compileSdk 36
 #   targetSdk  35
-#
-# Batch 27:
-#   - Upgrades AGP from unsupported 8.8/API-36 pairing.
-#   - Restores Batch-23 unit/contract-test dependencies.
-#   - Compose compiler plugin remains version-locked to Kotlin.
 # ====================================================================
 
 [versions]
@@ -50,194 +52,78 @@ cupertino = "0.1.0-alpha04"
 # AndroidX core / lifecycle
 # --------------------------------------------------------------------
 
-androidx-core-ktx = {
-    group = "androidx.core",
-    name = "core-ktx",
-    version.ref = "coreKtx"
-}
-
-androidx-lifecycle-runtime-ktx = {
-    group = "androidx.lifecycle",
-    name = "lifecycle-runtime-ktx",
-    version.ref = "lifecycle"
-}
-
-androidx-lifecycle-viewmodel-compose = {
-    group = "androidx.lifecycle",
-    name = "lifecycle-viewmodel-compose",
-    version.ref = "lifecycle"
-}
-
-androidx-lifecycle-runtime-compose = {
-    group = "androidx.lifecycle",
-    name = "lifecycle-runtime-compose",
-    version.ref = "lifecycle"
-}
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 
 
 # --------------------------------------------------------------------
 # Compose / Activity
 # --------------------------------------------------------------------
 
-androidx-activity-compose = {
-    group = "androidx.activity",
-    name = "activity-compose",
-    version.ref = "activityCompose"
-}
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
-androidx-compose-bom = {
-    group = "androidx.compose",
-    name = "compose-bom",
-    version.ref = "composeBom"
-}
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 
-androidx-ui = {
-    group = "androidx.compose.ui",
-    name = "ui"
-}
-
-androidx-ui-graphics = {
-    group = "androidx.compose.ui",
-    name = "ui-graphics"
-}
-
-androidx-ui-tooling = {
-    group = "androidx.compose.ui",
-    name = "ui-tooling"
-}
-
-androidx-ui-tooling-preview = {
-    group = "androidx.compose.ui",
-    name = "ui-tooling-preview"
-}
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 
 
 # --------------------------------------------------------------------
 # Navigation
 # --------------------------------------------------------------------
 
-androidx-navigation-compose = {
-    group = "androidx.navigation",
-    name = "navigation-compose",
-    version.ref = "navigationCompose"
-}
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 
 # --------------------------------------------------------------------
 # Networking
 # --------------------------------------------------------------------
 
-okhttp = {
-    group = "com.squareup.okhttp3",
-    name = "okhttp",
-    version.ref = "okhttp"
-}
-
-okhttp-sse = {
-    group = "com.squareup.okhttp3",
-    name = "okhttp-sse",
-    version.ref = "okhttp"
-}
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref = "okhttp" }
 
 
 # --------------------------------------------------------------------
 # Kotlin
 # --------------------------------------------------------------------
 
-kotlinx-serialization-json = {
-    group = "org.jetbrains.kotlinx",
-    name = "kotlinx-serialization-json",
-    version.ref = "kotlinxSerialization"
-}
-
-kotlinx-coroutines-android = {
-    group = "org.jetbrains.kotlinx",
-    name = "kotlinx-coroutines-android",
-    version.ref = "kotlinxCoroutines"
-}
-
-kotlinx-coroutines-test = {
-    group = "org.jetbrains.kotlinx",
-    name = "kotlinx-coroutines-test",
-    version.ref = "kotlinxCoroutines"
-}
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
 
 # --------------------------------------------------------------------
 # Persistence
 # --------------------------------------------------------------------
 
-androidx-datastore-preferences = {
-    group = "androidx.datastore",
-    name = "datastore-preferences",
-    version.ref = "datastore"
-}
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 
 # --------------------------------------------------------------------
-# Tests
+# Unit / contract testing
 # --------------------------------------------------------------------
 
-junit = {
-    group = "junit",
-    name = "junit",
-    version.ref = "junit"
-}
-
-mockwebserver = {
-    group = "com.squareup.okhttp3",
-    name = "mockwebserver",
-    version.ref = "mockWebServer"
-}
-
-robolectric = {
-    group = "org.robolectric",
-    name = "robolectric",
-    version.ref = "robolectric"
-}
-
-androidx-arch-core-testing = {
-    group = "androidx.arch.core",
-    name = "core-testing",
-    version.ref = "archCoreTesting"
-}
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockWebServer" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCoreTesting" }
 
 
 # --------------------------------------------------------------------
 # Compose Cupertino
 # --------------------------------------------------------------------
 
-cupertino = {
-    group = "io.github.alexzhirkevich",
-    name = "cupertino",
-    version.ref = "cupertino"
-}
-
-cupertino-icons-extended = {
-    group = "io.github.alexzhirkevich",
-    name = "cupertino-icons-extended",
-    version.ref = "cupertino"
-}
+cupertino = { group = "io.github.alexzhirkevich", name = "cupertino", version.ref = "cupertino" }
+cupertino-icons-extended = { group = "io.github.alexzhirkevich", name = "cupertino-icons-extended", version.ref = "cupertino" }
 
 
 [plugins]
 
-android-application = {
-    id = "com.android.application",
-    version.ref = "agp"
-}
-
-kotlin-android = {
-    id = "org.jetbrains.kotlin.android",
-    version.ref = "kotlin"
-}
-
-kotlin-serialization = {
-    id = "org.jetbrains.kotlin.plugin.serialization",
-    version.ref = "kotlin"
-}
-
-compose-compiler = {
-    id = "org.jetbrains.kotlin.plugin.compose",
-    version.ref = "kotlin"
-}
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
