@@ -1,9 +1,19 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/AppContainer.kt
-// Version: 1.2.0
-// Audit Fixes:
-//   1. Provided dedicated `sseOkHttpClient` instance with `readTimeout(0, TimeUnit.SECONDS)`
-//      to prevent OkHttp from killing long-lived SSE connections between 15s server pings.
+// Version: 2.0.0
+//
+// Purpose:
+//   Lightweight application-scoped dependency container.
+//
+// Design:
+//   Manual DI is intentionally retained. The supplied project uses
+//   this approach to avoid unnecessary dependency-injection startup
+//   overhead.
+//
+// Network:
+//   REST client has finite request timeouts.
+//   SSE client has an infinite read timeout because it is a long-lived
+//   HTTP stream.
 // ====================================================================
 
 package com.lias.remote.core
@@ -16,41 +26,78 @@ import com.lias.remote.repositories.EventRepository
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-class AppContainer(context: Context) {
+class AppContainer(
+    context: Context
+) {
 
-    val okHttpClient: OkHttpClient by lazy {
+    val okHttpClient:
+        OkHttpClient by lazy {
+
         OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
+            .connectTimeout(
+                10,
+                TimeUnit.SECONDS
+            )
+            .readTimeout(
+                15,
+                TimeUnit.SECONDS
+            )
+            .writeTimeout(
+                15,
+                TimeUnit.SECONDS
+            )
+            .callTimeout(
+                30,
+                TimeUnit.SECONDS
+            )
+            .retryOnConnectionFailure(
+                true
+            )
             .build()
     }
 
-    // Dedicated SSE OkHttpClient with infinite readTimeout (0) for long-lived streams
-    val sseOkHttpClient: OkHttpClient by lazy {
+    val sseOkHttpClient:
+        OkHttpClient by lazy {
+
         okHttpClient.newBuilder()
-            .readTimeout(0, TimeUnit.SECONDS)
+            .readTimeout(
+                0,
+                TimeUnit.SECONDS
+            )
+            .callTimeout(
+                0,
+                TimeUnit.SECONDS
+            )
             .build()
     }
 
-    val settingsRepository: SettingsRepository by lazy {
-        SettingsRepository(context)
-    }
+    val settingsRepository:
+        SettingsRepository by lazy {
+            SettingsRepository(
+                context.applicationContext
+            )
+        }
 
-    val liasApiClient: LiasApiClient by lazy {
-        LiasApiClient(okHttpClient)
-    }
+    val liasApiClient:
+        LiasApiClient by lazy {
+            LiasApiClient(
+                okHttpClient
+            )
+        }
 
-    val liasSseClient: LiasSseClient by lazy {
-        LiasSseClient(sseOkHttpClient)
-    }
+    val liasSseClient:
+        LiasSseClient by lazy {
+            LiasSseClient(
+                sseOkHttpClient
+            )
+        }
 
-    val eventRepository: EventRepository by lazy {
-        EventRepository(
-            api = liasApiClient,
-            sse = liasSseClient,
-            settings = settingsRepository
-        )
-    }
+    val eventRepository:
+        EventRepository by lazy {
+            EventRepository(
+                api = liasApiClient,
+                sse = liasSseClient,
+                settings = settingsRepository
+            )
+        }
 }
