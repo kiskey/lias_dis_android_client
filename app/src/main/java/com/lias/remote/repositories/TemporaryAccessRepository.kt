@@ -1,20 +1,21 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/repositories/TemporaryAccessRepository.kt
-// Version: 10.0.0
+// File:
+// app/src/main/java/com/lias/remote/repositories/TemporaryAccessRepository.kt
+// Version: 27.1.0
 //
 // Purpose:
-//   Authoritative temporary-access operations for EventRepository.
+//   Canonical authoritative temporary-access operations.
 //
 // Rules:
-//   - Mutate through dedicated server endpoints.
-//   - Never construct temporary Policy/Schedule objects locally.
-//   - Re-fetch EffectiveStatus immediately after successful mutation.
-//   - SSE remains the long-lived reconciliation mechanism.
+//   - dedicated LIAS endpoints only
+//   - no locally fabricated temporary Policy/Schedule
+//   - per-target mutation serialization
+//   - immediate EffectiveStatus refresh
+//   - complete authoritative reconciliation
 // ====================================================================
 
 package com.lias.remote.repositories
 
-import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.ExtendAccessResponse
 import com.lias.remote.core.models.PauseInternetResponse
 import com.lias.remote.core.network.ApiResult
@@ -28,157 +29,238 @@ import kotlinx.coroutines.flow.update
 
 suspend fun EventRepository.pauseDeviceAuthoritatively(
     pdid: String
-): ApiResult<PauseInternetResponse> {
-
-    val result =
-        api.pauseDevice(
-            pdid
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<PauseInternetResponse> =
+    mutations.mutate(
+        resourceKey =
+            "device:$pdid"
     ) {
-        refreshDeviceEffectiveStatus(
-            pdid
-        )
 
-        /*
-         * Policy and schedule lists also changed server-side.
-         *
-         * refreshAll() ensures:
-         *   - pol_pause_<pdid> appears in policy state
-         *   - server-created sched_pause_* appears in schedules
-         *   - stale temporary objects disappear after resume/expiry
-         */
-        refreshAll()
+        val existingStatus =
+            _state.value
+                .deviceEffectiveStatuses[
+                    pdid
+                ]
+
+        if (
+            existingStatus
+                ?.activeExtension
+                ?.reasonTag
+                ?.equals(
+                    "pause",
+                    ignoreCase =
+                        true
+                ) ==
+            true
+        ) {
+
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    "Internet is already paused for this device."
+            )
+        }
+
+        val result =
+            api.pauseDevice(
+                pdid
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshDeviceEffectiveStatus(
+                pdid
+            )
+
+            /*
+             * LIAS may create/remove temporary internal policy and
+             * schedule objects.
+             *
+             * Android refreshes them but NEVER derives pause state from
+             * their identifiers.
+             */
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 suspend fun EventRepository.resumeDeviceAuthoritatively(
     pdid: String
-): ApiResult<Unit> {
-
-    val result =
-        api.resumeDevice(
-            pdid
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<Unit> =
+    mutations.mutate(
+        resourceKey =
+            "device:$pdid"
     ) {
-        refreshDeviceEffectiveStatus(
-            pdid
-        )
 
-        refreshAll()
+        val result =
+            api.resumeDevice(
+                pdid
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshDeviceEffectiveStatus(
+                pdid
+            )
+
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 suspend fun EventRepository.extendDeviceAuthoritatively(
     pdid: String,
     minutes: Int
-): ApiResult<ExtendAccessResponse> {
-
-    val result =
-        api.extendDevice(
-            pdid =
-                pdid,
-            minutes =
-                minutes
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<ExtendAccessResponse> =
+    mutations.mutate(
+        resourceKey =
+            "device:$pdid"
     ) {
-        refreshDeviceEffectiveStatus(
-            pdid
-        )
 
-        refreshAll()
+        if (
+            minutes !in
+            1..120
+        ) {
+
+            return@mutate ApiResult.HttpError(
+                code =
+                    400,
+                message =
+                    "Extension duration must be between 1 and 120 minutes."
+            )
+        }
+
+        val result =
+            api.extendDevice(
+                pdid =
+                    pdid,
+                minutes =
+                    minutes
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshDeviceEffectiveStatus(
+                pdid
+            )
+
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 suspend fun EventRepository.cancelDeviceExtensionAuthoritatively(
     pdid: String
-): ApiResult<Unit> {
-
-    val result =
-        api.cancelDeviceExtend(
-            pdid
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<Unit> =
+    mutations.mutate(
+        resourceKey =
+            "device:$pdid"
     ) {
-        refreshDeviceEffectiveStatus(
-            pdid
-        )
 
-        refreshAll()
+        val result =
+            api.cancelDeviceExtend(
+                pdid
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshDeviceEffectiveStatus(
+                pdid
+            )
+
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 suspend fun EventRepository.extendTagAuthoritatively(
     tagId: String,
     minutes: Int
-): ApiResult<ExtendAccessResponse> {
-
-    val result =
-        api.extendTag(
-            tagId =
-                tagId,
-            minutes =
-                minutes
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<ExtendAccessResponse> =
+    mutations.mutate(
+        resourceKey =
+            "tag:$tagId"
     ) {
-        refreshTagEffectiveStatus(
-            tagId
-        )
 
-        refreshAll()
+        if (
+            minutes !in
+            1..120
+        ) {
+
+            return@mutate ApiResult.HttpError(
+                code =
+                    400,
+                message =
+                    "Extension duration must be between 1 and 120 minutes."
+            )
+        }
+
+        val result =
+            api.extendTag(
+                tagId =
+                    tagId,
+                minutes =
+                    minutes
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshTagEffectiveStatus(
+                tagId
+            )
+
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 suspend fun EventRepository.cancelTagExtensionAuthoritatively(
     tagId: String
-): ApiResult<Unit> {
-
-    val result =
-        api.cancelTagExtend(
-            tagId
-        )
-
-    if (
-        result is
-        ApiResult.Success
+): ApiResult<Unit> =
+    mutations.mutate(
+        resourceKey =
+            "tag:$tagId"
     ) {
-        refreshTagEffectiveStatus(
-            tagId
-        )
 
-        refreshAll()
+        val result =
+            api.cancelTagExtend(
+                tagId
+            )
+
+        if (
+            result is
+            ApiResult.Success
+        ) {
+
+            refreshTagEffectiveStatus(
+                tagId
+            )
+
+            refreshAll()
+        }
+
+        result
     }
-
-    return result
-}
 
 private suspend fun EventRepository.refreshDeviceEffectiveStatus(
     pdid: String
@@ -193,7 +275,8 @@ private suspend fun EventRepository.refreshDeviceEffectiveStatus(
 
         is ApiResult.Success -> {
 
-            _state.update { current ->
+            _state.update {
+                current ->
 
                 current.copy(
                     deviceEffectiveStatuses =
@@ -225,7 +308,8 @@ private suspend fun EventRepository.refreshTagEffectiveStatus(
 
         is ApiResult.Success -> {
 
-            _state.update { current ->
+            _state.update {
+                current ->
 
                 current.copy(
                     tagEffectiveStatuses =
