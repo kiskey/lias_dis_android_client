@@ -1,37 +1,34 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 16.0.0
+// Version: 19.0.0
 //
 // Purpose:
-//   Device + tag management.
+//   High-signal device inventory.
 //
-// Batch 16 additions:
-//   - Existing tag headers expose Edit.
-//   - Tag editor receives exact dependency impact.
-//   - Delete remains blocked until devices/rules are detached.
-//   - Built-in tags can be inspected but not changed/deleted.
-//   - Batch 11 authoritative EffectiveStatus behavior retained.
+// Batch 19:
+//   - Every physical device appears exactly once.
+//   - Primary group is presentation-only and selected by tag precedence.
+//   - All classifications remain visible on the device card.
+//   - Search covers identity/enrichment/services, not merely IP/MAC.
+//   - EffectiveStatus is the sole access-control UI authority.
+//   - Quick-list controls are intentionally minimal; metadata/tag/user
+//     management belongs in Device Detail.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,8 +37,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.device.DevicePresentation
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.Tag
@@ -51,6 +52,7 @@ import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.core.util.EffectiveAccessFormatter
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigLargeTitleScaffold
@@ -62,10 +64,6 @@ import com.lias.remote.ui.components.ScreenStateView
 import com.lias.remote.ui.components.StaleDataNotice
 import com.lias.remote.ui.components.StatusDot
 import com.lias.remote.ui.components.StatusPill
-import com.lias.remote.ui.components.formatTemporaryDuration
-import com.lias.remote.ui.components.rememberTemporaryMinutesLeft
-import com.lias.remote.ui.screens.ExtendAccessSheet
-import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
@@ -73,12 +71,12 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 @Composable
 fun DevicesScreen(
     viewModel: LiasViewModel,
-    onNavigateToDeviceDetail:
-        (String) -> Unit
+    onNavigateToDeviceDetail: (String) -> Unit
 ) {
 
     val state by
-        viewModel.state.collectAsState()
+        viewModel.state
+            .collectAsState()
 
     val scrollState =
         rememberLazyListState()
@@ -98,88 +96,41 @@ fun DevicesScreen(
             mutableStateOf<Tag?>(null)
         }
 
-    var activeDeviceForExtend by
-        remember {
-            mutableStateOf<Device?>(null)
-        }
-
-    var activeDeviceForPause by
-        remember {
-            mutableStateOf<Device?>(null)
-        }
-
-    var activeDeviceForRename by
-        remember {
-            mutableStateOf<Device?>(null)
-        }
-
-    var activeTagForExtend by
-        remember {
-            mutableStateOf<Tag?>(null)
-        }
-
-    val filteredDevices =
+    val filtered =
         remember(
             state.devices,
             searchQuery
         ) {
 
-            val query =
-                searchQuery.trim()
-
-            if (
-                query.isBlank()
-            ) {
-                state.devices
-            } else {
-
-                state.devices.filter { device ->
-
-                    device.displayName.contains(
-                        query,
-                        true
-                    ) ||
-                        device.currentMAC.contains(
-                            query,
-                            true
-                        ) ||
-                        device.currentIP.contains(
-                            query,
-                            true
-                        ) ||
-                        device.hostname.contains(
-                            query,
-                            true
-                        ) ||
-                        device.vendor.contains(
-                            query,
-                            true
-                        ) ||
-                        device.manufacturer.contains(
-                            query,
-                            true
-                        )
-                }
+            state.devices.filter {
+                DevicePresentation
+                    .matchesSearch(
+                        it,
+                        searchQuery
+                    )
             }
         }
 
     val groups =
         remember(
-            filteredDevices,
+            filtered,
             state.tags
         ) {
 
-            buildDeviceGroups(
-                filteredDevices,
-                state.tags
-            )
+            DevicePresentation
+                .groupDevicesOnce(
+                    filtered,
+                    state.tags
+                )
         }
 
     HigLargeTitleScaffold(
-        title = "Devices",
-        scrollState = scrollState,
+        title =
+            "Devices",
+        scrollState =
+            scrollState,
         searchPlaceholder =
-            "Search name, IP, MAC, or vendor",
+            "Search devices",
         searchQuery =
             searchQuery,
         onSearchQueryChanged = {
@@ -189,19 +140,26 @@ fun DevicesScreen(
         navTrailing = {
 
             HigTextButton(
-                text = "＋ Tag",
+                text =
+                    "＋ Tag",
                 onClick = {
-                    editingTag = null
-                    showTagEditor = true
+                    editingTag =
+                        null
+
+                    showTagEditor =
+                        true
                 }
             )
         }
     ) { padding ->
 
         LazyColumn(
-            state = scrollState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = padding
+            state =
+                scrollState,
+            modifier =
+                Modifier.fillMaxSize(),
+            contentPadding =
+                padding
         ) {
 
             when (
@@ -219,7 +177,8 @@ fun DevicesScreen(
                         item {
 
                             ScreenStateView(
-                                title = "Loading Devices",
+                                title =
+                                    "Loading Devices",
                                 message =
                                     "Synchronizing device and access state from LIAS."
                             )
@@ -289,7 +248,7 @@ fun DevicesScreen(
             }
 
             if (
-                filteredDevices.isEmpty()
+                filtered.isEmpty()
             ) {
 
                 item {
@@ -302,7 +261,8 @@ fun DevicesScreen(
                         actionText =
                             "Clear Search",
                         onAction = {
-                            searchQuery = ""
+                            searchQuery =
+                                ""
                         }
                     )
                 }
@@ -313,15 +273,17 @@ fun DevicesScreen(
             item {
 
                 ListSectionHeader(
-                    "${filteredDevices.size} ${
-                        if (
-                            filteredDevices.size == 1
-                        ) {
-                            "Device"
-                        } else {
-                            "Devices"
-                        }
-                    }",
+                    text =
+                        "${filtered.size} ${
+                            if (
+                                filtered.size ==
+                                1
+                            ) {
+                                "Device"
+                            } else {
+                                "Devices"
+                            }
+                        }",
                     trailingAction = {
 
                         HigTextButton(
@@ -340,59 +302,48 @@ fun DevicesScreen(
                 )
             }
 
-            groups.forEach { group ->
+            groups.forEach {
+                    group ->
 
                 item(
                     key =
-                        "header_${group.id}"
+                        "group_${group.tag.id}"
                 ) {
 
-                    val tag =
-                        state.tags.find {
-                            it.id ==
-                                group.id
-                        }
-
-                    val tagStatus =
+                    val status =
                         viewModel
                             .tagEffectiveStatusFor(
-                                group.id
+                                group.tag.id
                             )
 
                     DeviceGroupHeader(
-                        group =
-                            group,
                         tag =
-                            tag,
+                            group.tag,
+                        count =
+                            group.devices.size,
                         status =
-                            tagStatus,
-                        onEditTag = {
+                            status,
+                        onEdit = {
 
-                            if (
-                                tag != null
-                            ) {
-                                editingTag =
-                                    tag
+                            editingTag =
+                                group.tag
 
-                                showTagEditor =
-                                    true
-                            }
+                            showTagEditor =
+                                true
                         },
                         onExtend = {
 
-                            if (
-                                tag != null
-                            ) {
-                                activeTagForExtend =
-                                    tag
-                            }
+                            viewModel.extendTagAccess(
+                                group.tag.id,
+                                group.tag.name,
+                                60
+                            )
                         },
                         onCancelExtension = {
 
-                            viewModel
-                                .cancelTagExtension(
-                                    group.id
-                                )
+                            viewModel.cancelTagExtension(
+                                group.tag.id
+                            )
                         }
                     )
                 }
@@ -401,52 +352,80 @@ fun DevicesScreen(
                     items =
                         group.devices,
                     key = {
-                        "${group.id}:${it.pdid}"
+                        it.pdid
                     }
-                ) { device ->
+                ) {
+                    device ->
 
-                    DeviceCardItem(
+                    DeviceInventoryRow(
                         device =
                             device,
-                        effectiveStatus =
+                        tagNames =
+                            DevicePresentation
+                                .tagNames(
+                                    device,
+                                    state.tags
+                                ),
+                        status =
                             viewModel
                                 .effectiveStatusFor(
                                     device.pdid
                                 ),
-                        onExtend = {
-                            activeDeviceForExtend =
-                                device
+                        onOpen = {
+
+                            onNavigateToDeviceDetail(
+                                device.pdid
+                            )
                         },
                         onPause = {
-                            activeDeviceForPause =
-                                device
+
+                            viewModel.pauseDeviceInternet(
+                                device.pdid
+                            )
                         },
                         onResume = {
 
-                            viewModel
-                                .unpauseDeviceInternet(
-                                    device.pdid
-                                )
+                            viewModel.unpauseDeviceInternet(
+                                device.pdid
+                            )
+                        },
+                        onExtend = {
+
+                            /*
+                             * List view provides a fast one-hour action.
+                             * Custom duration remains available in
+                             * Device Detail.
+                             */
+                            viewModel.extendDeviceAccess(
+                                device.pdid,
+                                60
+                            )
                         },
                         onCancelExtension = {
 
-                            viewModel
-                                .cancelDeviceExtension(
-                                    device.pdid
-                                )
-                        },
-                        onRename = {
-                            activeDeviceForRename =
-                                device
-                        },
-                        onDetail = {
-
-                            onNavigateToDeviceDetail(
+                            viewModel.cancelDeviceExtension(
                                 device.pdid
                             )
                         }
                     )
                 }
+            }
+
+            item {
+
+                CupertinoText(
+                    text =
+                        "Multi-tag devices are shown once under their highest-precedence classification. All assigned tags remain active for LIAS rules.",
+                    style =
+                        HigTypography.caption,
+                    color =
+                        LiasThemeColors.tertiaryLabel,
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 20.dp,
+                            vertical = 16.dp
+                        )
+                )
             }
         }
     }
@@ -456,7 +435,8 @@ fun DevicesScreen(
     ) {
 
         val impact =
-            editingTag?.let { tag ->
+            editingTag?.let {
+                tag ->
 
                 ConfigurationSafety
                     .tagImpact(
@@ -475,24 +455,24 @@ fun DevicesScreen(
             dependencyImpact =
                 impact,
             onDismiss = {
+
                 showTagEditor =
                     false
 
                 editingTag =
                     null
             },
-            onSave = { tag ->
+            onSave = {
+                tag ->
 
                 if (
-                    editingTag == null
+                    editingTag ==
+                    null
                 ) {
-
                     viewModel.createTag(
                         tag
                     )
-
                 } else {
-
                     viewModel.updateTag(
                         tag
                     )
@@ -505,7 +485,8 @@ fun DevicesScreen(
                     null
             },
             onDelete =
-                editingTag?.let { tag ->
+                editingTag?.let {
+                    tag ->
 
                     {
                         viewModel.deleteTag(
@@ -521,312 +502,61 @@ fun DevicesScreen(
                 }
         )
     }
-
-    activeDeviceForExtend
-        ?.let { device ->
-
-            val status =
-                viewModel
-                    .effectiveStatusFor(
-                        device.pdid
-                    )
-
-            ExtendAccessSheet(
-                targetLabel =
-                    device.displayName,
-                targetSubtitle =
-                    device.currentIP.ifBlank {
-                        device.pdid
-                    },
-                currentExtension =
-                    status
-                        ?.activeExtension
-                        ?.takeIf {
-                            status.temporaryAccessKind ==
-                                TemporaryAccessKind.EXTEND
-                        },
-                onDismiss = {
-                    activeDeviceForExtend =
-                        null
-                },
-                onConfirm = { minutes ->
-
-                    viewModel
-                        .extendDeviceAccess(
-                            device.pdid,
-                            minutes
-                        )
-
-                    activeDeviceForExtend =
-                        null
-                },
-                onCancelExtension =
-                    if (
-                        status?.temporaryAccessKind ==
-                        TemporaryAccessKind.EXTEND
-                    ) {
-                        {
-
-                            viewModel
-                                .cancelDeviceExtension(
-                                    device.pdid
-                                )
-
-                            activeDeviceForExtend =
-                                null
-                        }
-                    } else {
-                        null
-                    }
-            )
-        }
-
-    activeDeviceForPause
-        ?.let { device ->
-
-            PauseSheet(
-                targetLabel =
-                    device.displayName,
-                onDismiss = {
-                    activeDeviceForPause =
-                        null
-                },
-                onConfirm = { minutes ->
-
-                    viewModel
-                        .pauseDeviceInternet(
-                            device.pdid,
-                            minutes
-                        )
-
-                    activeDeviceForPause =
-                        null
-                }
-            )
-        }
-
-    activeDeviceForRename
-        ?.let { device ->
-
-            DeviceRenameDialog(
-                currentName =
-                    device.displayName,
-                onDismiss = {
-                    activeDeviceForRename =
-                        null
-                },
-                onConfirm = { newName ->
-
-                    viewModel.renameDevice(
-                        device.pdid,
-                        newName
-                    )
-
-                    activeDeviceForRename =
-                        null
-                }
-            )
-        }
-
-    activeTagForExtend
-        ?.let { tag ->
-
-            val status =
-                viewModel
-                    .tagEffectiveStatusFor(
-                        tag.id
-                    )
-
-            ExtendAccessSheet(
-                targetLabel =
-                    tag.name,
-                targetSubtitle =
-                    "All devices using this tag",
-                currentExtension =
-                    status
-                        ?.activeExtension
-                        ?.takeIf {
-                            status.temporaryAccessKind ==
-                                TemporaryAccessKind.EXTEND
-                        },
-                onDismiss = {
-                    activeTagForExtend =
-                        null
-                },
-                onConfirm = { minutes ->
-
-                    viewModel.extendTagAccess(
-                        tag.id,
-                        tag.name,
-                        minutes
-                    )
-
-                    activeTagForExtend =
-                        null
-                },
-                onCancelExtension =
-                    if (
-                        status?.temporaryAccessKind ==
-                        TemporaryAccessKind.EXTEND
-                    ) {
-                        {
-
-                            viewModel
-                                .cancelTagExtension(
-                                    tag.id
-                                )
-
-                            activeTagForExtend =
-                                null
-                        }
-                    } else {
-                        null
-                    }
-            )
-        }
-}
-
-private data class DeviceGroup(
-    val id: String,
-    val name: String,
-    val devices: List<Device>
-)
-
-private fun buildDeviceGroups(
-    devices: List<Device>,
-    tags: List<Tag>
-): List<DeviceGroup> {
-
-    val knownTags =
-        tags.associateBy {
-            it.id
-        }
-
-    val grouped =
-        linkedMapOf<
-            String,
-            MutableList<Device>
-        >()
-
-    devices.forEach { device ->
-
-        val ids =
-            device.safeTags
-                .filter {
-                    it.isNotBlank()
-                }
-                .ifEmpty {
-                    listOf(
-                        "generic"
-                    )
-                }
-
-        ids.forEach { tagId ->
-
-            grouped.getOrPut(
-                tagId
-            ) {
-                mutableListOf()
-            }
-                .add(
-                    device
-                )
-        }
-    }
-
-    return grouped
-        .map {
-                (tagId, members) ->
-
-            DeviceGroup(
-                id =
-                    tagId,
-                name =
-                    knownTags[
-                        tagId
-                    ]?.name
-                        ?: when (
-                            tagId
-                        ) {
-                            "generic" ->
-                                "Other Devices"
-
-                            "infrastructure" ->
-                                "Infrastructure"
-
-                            else ->
-                                tagId
-                        },
-                devices =
-                    members.distinctBy {
-                        it.pdid
-                    }
-            )
-        }
 }
 
 @Composable
 private fun DeviceGroupHeader(
-    group: DeviceGroup,
-    tag: Tag?,
+    tag: Tag,
+    count: Int,
     status: EffectiveStatus?,
-    onEditTag: () -> Unit,
+    onEdit: () -> Unit,
     onExtend: () -> Unit,
     onCancelExtension: () -> Unit
 ) {
 
     val infrastructure =
-        group.id ==
-            "infrastructure"
+        tag.id ==
+            ConfigurationSafety
+                .INFRASTRUCTURE_TAG_ID
 
-    val temporaryKind =
-        status
-            ?.temporaryAccessKind
+    val temporary =
+        status?.temporaryAccessKind
             ?: TemporaryAccessKind.NONE
-
-    val minutesLeft =
-        rememberTemporaryMinutesLeft(
-            status?.activeExtension
-        )
 
     ListSectionHeader(
         text =
-            "${group.name} · ${group.devices.size}",
+            "${tag.name} · $count",
         trailingAction = {
 
             Row(
                 horizontalArrangement =
                     Arrangement.spacedBy(
-                        6.dp
+                        8.dp
                     ),
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
 
-                if (
-                    tag != null
-                ) {
-
-                    HigTextButton(
-                        text =
-                            if (
-                                tag.builtin
-                            ) {
-                                "Info"
-                            } else {
-                                "Edit"
-                            },
-                        onClick =
-                            onEditTag
-                    )
-                }
+                HigTextButton(
+                    text =
+                        if (
+                            tag.builtin
+                        ) {
+                            "Info"
+                        } else {
+                            "Edit"
+                        },
+                    onClick =
+                        onEdit
+                )
 
                 when {
 
-                    infrastructure -> {
+                    infrastructure ->
 
                         CupertinoText(
-                            text = "IMMUNE",
+                            text =
+                                "IMMUNE",
                             style =
                                 HigTypography.caption,
                             fontWeight =
@@ -834,38 +564,22 @@ private fun DeviceGroupHeader(
                             color =
                                 LiasThemeColors.secondaryLabel
                         )
-                    }
 
-                    temporaryKind ==
-                        TemporaryAccessKind.EXTEND -> {
+                    temporary ==
+                        TemporaryAccessKind.EXTEND ->
 
                         HigTextButton(
                             text =
-                                if (
-                                    minutesLeft != null &&
-                                    minutesLeft > 0
-                                ) {
-                                    "Cancel · ${
-                                        formatTemporaryDuration(
-                                            minutesLeft
-                                        )
-                                    }"
-                                } else {
-                                    "Cancel"
-                                },
+                                "Cancel",
                             onClick =
                                 onCancelExtension,
                             isDestructive =
                                 true
                         )
-                    }
 
-                    status?.action
-                        ?.equals(
-                            "block",
-                            true
-                        ) == true &&
-                        status.extendAvailable -> {
+                    status?.action ==
+                        "block" &&
+                        status.extendAvailable ->
 
                         HigTextButton(
                             text =
@@ -873,7 +587,6 @@ private fun DeviceGroupHeader(
                             onClick =
                                 onExtend
                         )
-                    }
                 }
             }
         }
@@ -881,71 +594,59 @@ private fun DeviceGroupHeader(
 }
 
 @Composable
-private fun DeviceCardItem(
+private fun DeviceInventoryRow(
     device: Device,
-    effectiveStatus: EffectiveStatus?,
-    onExtend: () -> Unit,
+    tagNames: List<String>,
+    status: EffectiveStatus?,
+    onOpen: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onCancelExtension: () -> Unit,
-    onRename: () -> Unit,
-    onDetail: () -> Unit
+    onExtend: () -> Unit,
+    onCancelExtension: () -> Unit
 ) {
 
     val infrastructure =
-        device.safeTags.contains(
-            "infrastructure"
-        )
+        DevicePresentation.INFRASTRUCTURE in
+            DevicePresentation
+                .normalizedTagIds(
+                    device
+                )
 
     val presentation =
-        EffectiveAccessFormatter.present(
-            effectiveStatus
-        )
+        EffectiveAccessFormatter
+            .present(
+                status
+            )
 
-    val temporaryKind =
-        effectiveStatus
-            ?.temporaryAccessKind
+    val temporary =
+        status?.temporaryAccessKind
             ?: TemporaryAccessKind.NONE
 
-    val minutesLeft =
-        rememberTemporaryMinutesLeft(
-            effectiveStatus?.activeExtension
-        )
-
-    Box(
+    GroupedListCard(
         modifier =
             Modifier
-                .fillMaxWidth()
                 .padding(
                     horizontal = 16.dp,
                     vertical = 4.dp
                 )
-                .clip(
-                    RoundedCornerShape(
-                        14.dp
-                    )
+                .heightIn(
+                    min = 64.dp
                 )
-                .background(
-                    LiasThemeColors.secondaryBackground
-                )
-                .border(
-                    width = 0.5.dp,
-                    color =
-                        LiasThemeColors.separator,
-                    shape =
-                        RoundedCornerShape(
-                            14.dp
-                        )
-                )
-                .clickable {
-                    onDetail()
+                .semantics {
+                    role =
+                        Role.Button
                 }
-                .padding(
-                    14.dp
-                )
+                .clickable {
+                    onOpen()
+                }
     ) {
 
-        Column {
+        Column(
+            modifier =
+                Modifier.padding(
+                    14.dp
+                )
+        ) {
 
             Row(
                 modifier =
@@ -972,15 +673,8 @@ private fun DeviceCardItem(
                             isOnline =
                                 device.online,
                             isPaused =
-                                temporaryKind ==
+                                temporary ==
                                     TemporaryAccessKind.PAUSE
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.width(
-                                    8.dp
-                                )
                         )
 
                         CupertinoText(
@@ -988,49 +682,72 @@ private fun DeviceCardItem(
                                 device.displayName,
                             style =
                                 HigTypography.headline,
+                            fontWeight =
+                                FontWeight.SemiBold,
                             color =
-                                LiasThemeColors.label
+                                LiasThemeColors.label,
+                            modifier =
+                                Modifier.padding(
+                                    start = 8.dp
+                                )
                         )
                     }
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(
-                                3.dp
-                            )
-                    )
 
                     CupertinoText(
                         text =
                             buildString {
 
                                 append(
-                                    device.currentIP.ifBlank {
-                                        if (
-                                            device.online
-                                        ) {
-                                            "IP unavailable"
-                                        } else {
-                                            "Offline"
-                                        }
+                                    if (
+                                        device.online
+                                    ) {
+                                        device.currentIP
+                                            .ifBlank {
+                                                "Online"
+                                            }
+                                    } else {
+                                        "Offline"
                                     }
                                 )
 
                                 append(" · ")
 
                                 append(
-                                    device.vendor.ifBlank {
-                                        device.manufacturer
-                                    }.ifBlank {
-                                        "Unclassified"
-                                    }
+                                    DevicePresentation
+                                        .deviceTypeTitle(
+                                            device
+                                        )
                                 )
                             },
                         style =
                             HigTypography.caption,
                         color =
-                            LiasThemeColors.tertiaryLabel
+                            LiasThemeColors.secondaryLabel,
+                        modifier =
+                            Modifier.padding(
+                                top = 3.dp
+                            )
                     )
+
+                    if (
+                        tagNames.isNotEmpty()
+                    ) {
+
+                        CupertinoText(
+                            text =
+                                tagNames.joinToString(
+                                    " · "
+                                ),
+                            style =
+                                HigTypography.caption,
+                            color =
+                                LiasThemeColors.tertiaryLabel,
+                            modifier =
+                                Modifier.padding(
+                                    top = 3.dp
+                                )
+                        )
+                    }
                 }
 
                 StatusPill(
@@ -1040,35 +757,13 @@ private fun DeviceCardItem(
                             infrastructure ->
                                 "Immune"
 
-                            temporaryKind ==
+                            temporary ==
                                 TemporaryAccessKind.PAUSE ->
-                                if (
-                                    minutesLeft != null &&
-                                    minutesLeft > 0
-                                ) {
-                                    "Paused · ${
-                                        formatTemporaryDuration(
-                                            minutesLeft
-                                        )
-                                    }"
-                                } else {
-                                    "Paused"
-                                }
+                                "Paused"
 
-                            temporaryKind ==
+                            temporary ==
                                 TemporaryAccessKind.EXTEND ->
-                                if (
-                                    minutesLeft != null &&
-                                    minutesLeft > 0
-                                ) {
-                                    "Extended · ${
-                                        formatTemporaryDuration(
-                                            minutesLeft
-                                        )
-                                    }"
-                                } else {
-                                    "Extended"
-                                }
+                                "Extended"
 
                             else ->
                                 presentation.title
@@ -1079,11 +774,11 @@ private fun DeviceCardItem(
                             infrastructure ->
                                 PillTone.INFO
 
-                            temporaryKind ==
+                            temporary ==
                                 TemporaryAccessKind.PAUSE ->
                                 PillTone.PAUSED
 
-                            temporaryKind ==
+                            temporary ==
                                 TemporaryAccessKind.EXTEND ->
                                 PillTone.ALLOWED
 
@@ -1099,63 +794,65 @@ private fun DeviceCardItem(
                 )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
-                    )
-            )
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        6.dp
-                    )
+            if (
+                !infrastructure &&
+                status != null
             ) {
 
-                when {
-
-                    infrastructure -> {
-
-                        HigButton(
-                            text =
-                                "View Details",
-                            onClick =
-                                onDetail,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = 10.dp
+                            ),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
                         )
-                    }
+                ) {
 
-                    temporaryKind ==
-                        TemporaryAccessKind.PAUSE -> {
+                    when {
 
-                        HigButton(
-                            text =
-                                "Resume",
-                            onClick =
-                                onResume,
-                            style =
-                                HigButtonStyle.Primary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                        if (
-                            presentation.canExtend
-                        ) {
+                        temporary ==
+                            TemporaryAccessKind.PAUSE ->
 
                             HigButton(
                                 text =
-                                    "Extend",
+                                    "Resume",
+                                onClick =
+                                    onResume,
+                                style =
+                                    HigButtonStyle.Primary,
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            )
+
+                        temporary ==
+                            TemporaryAccessKind.EXTEND ->
+
+                            HigButton(
+                                text =
+                                    "Cancel Extension",
+                                onClick =
+                                    onCancelExtension,
+                                style =
+                                    HigButtonStyle.Gray,
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            )
+
+                        status.action ==
+                            "block" &&
+                            status.extendAvailable ->
+
+                            HigButton(
+                                text =
+                                    "Extend 1h",
                                 onClick =
                                     onExtend,
                                 style =
@@ -1165,87 +862,36 @@ private fun DeviceCardItem(
                                         1f
                                     )
                             )
-                        }
+
+                        status.pauseAvailable ->
+
+                            HigButton(
+                                text =
+                                    "Pause",
+                                onClick =
+                                    onPause,
+                                style =
+                                    HigButtonStyle.Gray,
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            )
                     }
 
-                    temporaryKind ==
-                        TemporaryAccessKind.EXTEND -> {
-
-                        HigButton(
-                            text =
-                                "Cancel Extension",
-                            onClick =
-                                onCancelExtension,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                    }
-
-                    presentation.canExtend -> {
-
-                        HigButton(
-                            text =
-                                "Extend",
-                            onClick =
-                                onExtend,
-                            style =
-                                HigButtonStyle.Secondary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                    }
-
-                    presentation.canPause -> {
-
-                        HigButton(
-                            text =
-                                "Pause",
-                            onClick =
-                                onPause,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                    }
-
-                    else -> {
-
-                        HigButton(
-                            text =
-                                "View Details",
-                            onClick =
-                                onDetail,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                    }
+                    HigButton(
+                        text =
+                            "Details",
+                        onClick =
+                            onOpen,
+                        style =
+                            HigButtonStyle.Gray,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            )
+                    )
                 }
-
-                HigButton(
-                    text =
-                        "Rename",
-                    onClick =
-                        onRename,
-                    style =
-                        HigButtonStyle.Gray,
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        )
-                )
             }
         }
     }
