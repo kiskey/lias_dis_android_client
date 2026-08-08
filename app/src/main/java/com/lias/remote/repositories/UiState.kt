@@ -1,17 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 2.0.0
+// Version: 5.0.0
 //
 // Purpose:
-//   Immutable application state consumed by Compose UI.
+//   Single state container consumed by the Android UI.
 //
-// Design:
-//   State explicitly distinguishes:
-//     - first-load state
-//     - refresh state
-//     - connection state
-//     - recoverable error state
-//     - effective access state
+// Architectural rule:
+//   ConnectionState describes live transport.
+//   SyncState describes REST/cache synchronization.
+//   The two must never be conflated.
+//
+// Existing LIAS domain collections are preserved.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -26,29 +25,74 @@ import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ConnectionState
 
 data class UiState(
+
+    // ---------------------------------------------------------------
+    // Domain data
+    // ---------------------------------------------------------------
+
     val devices: List<Device> = emptyList(),
+
     val tags: List<Tag> = emptyList(),
+
     val policies: List<Policy> = emptyList(),
+
     val schedules: List<Schedule> = emptyList(),
+
     val stats: NetworkStats? = null,
+
     val users: List<User> = emptyList(),
 
+    // ---------------------------------------------------------------
+    // Effective policy state
+    // ---------------------------------------------------------------
+
     val deviceEffectiveStatuses:
-        Map<String, EffectiveStatus> = emptyMap(),
+        Map<String, EffectiveStatus> =
+        emptyMap(),
 
     val tagEffectiveStatuses:
-        Map<String, EffectiveStatus> = emptyMap(),
+        Map<String, EffectiveStatus> =
+        emptyMap(),
+
+    // ---------------------------------------------------------------
+    // Transport state
+    // ---------------------------------------------------------------
 
     val connectionState:
-        ConnectionState = ConnectionState.DISCONNECTED,
+        ConnectionState =
+        ConnectionState.DISCONNECTED,
 
+    // ---------------------------------------------------------------
+    // REST/data synchronization state
+    // ---------------------------------------------------------------
+
+    val syncState:
+        SyncState =
+        SyncState.Idle,
+
+    /**
+     * True once at least one complete primary synchronization has
+     * successfully populated the application.
+     *
+     * Kept as a convenience property for existing UI code.
+     */
     val isInitialLoaded: Boolean = false,
 
-    val isRefreshing: Boolean = false,
+    /**
+     * Last successful primary synchronization time.
+     *
+     * Epoch milliseconds.
+     */
+    val lastSuccessfulSyncAt:
+        Long? = null,
 
-    val errorMessage: String? = null,
-
-    val lastConnectionError: String? = null
+    /**
+     * Human-readable synchronization error.
+     *
+     * This is intentionally separate from transient snackbar events.
+     */
+    val errorMessage:
+        String? = null
 )
 
 sealed class UiEvent {
@@ -62,7 +106,6 @@ sealed class UiEvent {
     ) : UiEvent()
 
     data class ShowSecurityAlert(
-        val details: String,
-        val pdid: String = ""
+        val details: String
     ) : UiEvent()
 }
