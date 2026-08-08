@@ -68,7 +68,7 @@ fun RulesScreen(viewModel: LiasViewModel) {
                 )
                 HigTextButton(
                     text = "Import",
-                    onClick = { /* Document picker trigger */ }
+                    onClick = { /* System document picker trigger */ }
                 )
                 HigTextButton(
                     text = "＋",
