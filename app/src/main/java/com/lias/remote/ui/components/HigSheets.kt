@@ -1,74 +1,86 @@
-// ====================================================================
-// File: HigSheets.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: iOS Modal Bottom Sheet with 14dp corners, drag handle,
-// and safe-area padding. Prevents layout clipping in landscape.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HigModalSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    skipPartiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded)
+    val interactionSource = remember { MutableInteractionSource() }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner),
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 8.dp, bottom = 4.dp)
-                    .width(HigSpec.SheetHandleWidth)
-                    .height(HigSpec.SheetHandleHeight)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-            )
-        }
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn() + slideInVertically { it },
+        exit = fadeOut() + slideOutVertically { it }
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.ime)
-                .windowInsetsPadding(WindowInsets.navigationBars)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            content()
+            Column(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner))
+                    .background(LiasThemeColors.secondaryBackground)
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {} // Prevent dismiss propagation
+                    )
+                    .padding(bottom = 24.dp)
+            ) {
+                // Drag Handle
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 8.dp, bottom = 12.dp)
+                        .width(HigSpec.SheetHandleWidth)
+                        .height(HigSpec.SheetHandleHeight)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(LiasThemeColors.tertiaryLabel)
+                )
+                content()
+            }
         }
     }
 }
@@ -87,11 +99,11 @@ fun HigSheetHeader(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         HigTextButton(text = "Cancel", onClick = onCancel)
-        Text(
+        CupertinoText(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.W600,
-            color = MaterialTheme.colorScheme.onSurface
+            style = HigTypography.headline,
+            fontWeight = FontWeight.SemiBold,
+            color = LiasThemeColors.label
         )
         trailingAction?.invoke() ?: Spacer(modifier = Modifier.width(60.dp))
     }
