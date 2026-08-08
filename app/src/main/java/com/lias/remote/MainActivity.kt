@@ -1,21 +1,20 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 3.0.0
+// Version: 13.0.0
 //
 // Purpose:
-//   Android activity entry point.
+//   LIAS Remote activity + application foreground lifecycle boundary.
 //
-// Changes:
-//   - Owns Android Intent -> DeepLinkResolver boundary.
-//   - Supports cold-start deep links.
-//   - Supports warm-start deep links.
-//   - Keeps ViewModels activity-scoped.
-//   - Does not allow individual screens to inspect Intents.
+// Batch 13:
+//   - Marks repository foreground in onStart().
+//   - Disconnects foreground-only SSE in onStop().
+//   - ViewModels no longer own transport lifetime.
+//   - Configuration changes remain safe because EventRepository is
+//     application-scoped through AppContainer.
 // ====================================================================
 
 package com.lias.remote
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,135 +25,146 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
-import com.lias.remote.ui.navigation.DeepLinkResolver
-import com.lias.remote.ui.navigation.LiasDeepLink
 import com.lias.remote.ui.navigation.LiasNavHost
 import com.lias.remote.ui.theme.LiasTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity :
+    ComponentActivity() {
 
-    private var pendingDeepLink:
-        LiasDeepLink? = null
-
-    private var liasViewModel:
-        LiasViewModel? = null
-
-    private var settingsViewModel:
-        SettingsViewModel? = null
+    private val container:
+        com.lias.remote.core.AppContainer
+        get() =
+            (
+                application
+                    as LiasApplication
+                )
+                .container
 
     override fun onCreate(
-        savedInstanceState: Bundle?
+        savedInstanceState:
+            Bundle?
     ) {
+
         super.onCreate(
             savedInstanceState
         )
 
         enableEdgeToEdge()
 
-        val container =
-            (application as LiasApplication)
-                .container
+        /*
+         * Ensure application-scoped EventRepository exists before the
+         * activity reaches onStart().
+         */
+        val repository =
+            container.eventRepository
 
         val viewModelFactory =
             object :
                 ViewModelProvider.Factory {
 
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel>
-                    create(
-                        modelClass: Class<T>
-                    ): T {
+                @Suppress(
+                    "UNCHECKED_CAST"
+                )
+                override fun <
+                    T : ViewModel
+                > create(
+                    modelClass:
+                        Class<T>
+                ): T {
 
-                    if (
-                        modelClass.isAssignableFrom(
-                            LiasViewModel::class.java
-                        )
-                    ) {
-                        return LiasViewModel(
-                            container.eventRepository
-                        ) as T
+                    return when {
+
+                        modelClass
+                            .isAssignableFrom(
+                                LiasViewModel::class.java
+                            ) ->
+
+                            LiasViewModel(
+                                repository
+                            ) as T
+
+                        modelClass
+                            .isAssignableFrom(
+                                SettingsViewModel::class.java
+                            ) ->
+
+                            SettingsViewModel(
+                                settings =
+                                    container
+                                        .settingsRepository,
+                                api =
+                                    container
+                                        .liasApiClient,
+                                eventRepository =
+                                    repository
+                            ) as T
+
+                        else ->
+                            throw IllegalArgumentException(
+                                "Unknown ViewModel class: ${modelClass.name}"
+                            )
                     }
-
-                    if (
-                        modelClass.isAssignableFrom(
-                            SettingsViewModel::class.java
-                        )
-                    ) {
-                        return SettingsViewModel(
-                            container.settingsRepository,
-                            container.liasApiClient,
-                            container.eventRepository
-                        ) as T
-                    }
-
-                    throw IllegalArgumentException(
-                        "Unknown ViewModel class: " +
-                            modelClass.name
-                    )
                 }
             }
 
-        liasViewModel =
+        val liasViewModel =
             ViewModelProvider(
                 this,
                 viewModelFactory
-            )[LiasViewModel::class.java]
+            )[
+                LiasViewModel::class.java
+            ]
 
-        settingsViewModel =
+        val settingsViewModel =
             ViewModelProvider(
                 this,
                 viewModelFactory
-            )[SettingsViewModel::class.java]
-
-        pendingDeepLink =
-            DeepLinkResolver.resolve(
-                intent
-            )
+            )[
+                SettingsViewModel::class.java
+            ]
 
         setContent {
 
             val settingsState by
-                settingsViewModel!!
+                settingsViewModel
                     .uiState
                     .collectAsState()
 
             LiasTheme(
                 themeMode =
-                    settingsState.themeMode
+                    settingsState
+                        .themeMode
             ) {
+
                 LiasNavHost(
                     liasViewModel =
-                        liasViewModel!!,
-
+                        liasViewModel,
                     settingsViewModel =
-                        settingsViewModel!!,
-
-                    pendingDeepLink =
-                        pendingDeepLink,
-
-                    onDeepLinkConsumed = {
-                        pendingDeepLink =
-                            null
-                    }
+                        settingsViewModel
                 )
             }
         }
     }
 
-    override fun onNewIntent(
-        intent: Intent
-    ) {
-        super.onNewIntent(
-            intent
-        )
+    override fun onStart() {
 
-        setIntent(
-            intent
-        )
+        super.onStart()
 
-        pendingDeepLink =
-            DeepLinkResolver.resolve(
-                intent
+        container
+            .eventRepository
+            .setAppForeground(
+                true
             )
+    }
+
+    override fun onStop() {
+
+        container
+            .eventRepository
+            .setAppForeground(
+                false
+            )
+
+        super.onStop()
     }
 }
