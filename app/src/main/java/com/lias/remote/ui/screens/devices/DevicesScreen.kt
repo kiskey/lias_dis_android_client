@@ -1,9 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 3.3.0
+// Version: 3.4.0
 // Audit Fixes:
-//   1. Included Column and Spacer imports to resolve compileDebugKotlin failure.
-//   2. Dynamic trailing swipe action toggles between Pause and Resume based on policy state.
+//   1. Added Cupertino StatusPill badge (PAUSED · [X]m) and secondary subtitle cue
+//      when an individual device is in the paused state.
+//   2. Preserved all swipe cancel 'X' options, MoveTagSheet, and Cupertino styling.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -39,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +61,8 @@ import com.lias.remote.ui.components.HigSearchPill
 import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.MinutePickerSheet
+import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemGreenDark
@@ -163,7 +167,10 @@ fun DevicesScreen(
                     item(key = "card_${tag.id}") {
                         GroupedListCard {
                             devicesInTag.forEachIndexed { index, device ->
-                                val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+                                val pausePol = state.policies.find { it.id == "pol_pause_${device.pdid}" }
+                                val isPaused = pausePol != null && pausePol.enabled
+                                val pauseMinsLeft = pausePol?.expiresAt?.let { ExtendHelper.minutesUntil(it) } ?: 0
+
                                 val devStatus = viewModel.effectiveStatusFor(device.pdid)
                                 val canExtendDevice = ExtendHelper.isExtendAvailable(devStatus)
 
@@ -236,7 +243,7 @@ fun DevicesScreen(
                                     ) {
                                         GroupedListRow(
                                             primaryText = device.displayName,
-                                            secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
+                                            secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}${if (isPaused) " · ⏸ Paused" else ""}",
                                             leadingContent = {
                                                 Box(
                                                     modifier = Modifier
@@ -248,7 +255,22 @@ fun DevicesScreen(
                                                 )
                                             },
                                             trailingContent = {
-                                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    if (isPaused) {
+                                                        StatusPill(
+                                                            text = if (pauseMinsLeft > 0) "PAUSED · ${pauseMinsLeft}m" else "PAUSED",
+                                                            tone = PillTone.Blocked
+                                                        )
+                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.ChevronRight,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
                                             },
                                             showDivider = index < devicesInTag.size - 1,
                                             onClick = { onNavigateToDeviceDetail(device.pdid) }
