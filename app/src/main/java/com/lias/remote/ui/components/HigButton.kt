@@ -1,7 +1,8 @@
 // ====================================================================
 // File: HigButton.kt
-// Version: 3.0.1 (HIG Redesign Fix)
-// Purpose: Removed invalid cornerRadius parameter from CupertinoButton.
+// Version: 3.1.0 (HIG Redesign)
+// Purpose: Strict HIG button styles (Primary, Secondary, Gray, Danger)
+//          using CupertinoButton underlying engine. 10dp corners.
 // ====================================================================
 
 package com.lias.remote.ui.components
