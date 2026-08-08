@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/DeviceCard.kt
-// Version: 3.0.0
-// Purpose: Native iOS Device Card with CupertinoButton quick actions.
+// Version: 3.1.0
 // Audit Fixes:
-//   1. Replaced Material 3 Card with Surface and CupertinoButton controls.
+//   1. Added Cupertino StatusPill badge when device is in paused state.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -90,7 +89,13 @@ fun DeviceCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                if (isPaused) {
+                    StatusPill(
+                        text = "PAUSED",
+                        tone = PillTone.Blocked
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
                 Box(
                     modifier = Modifier
                         .size(HigSpec.StatusDotSize)
@@ -102,7 +107,7 @@ fun DeviceCard(
             }
             Spacer(modifier = Modifier.size(6.dp))
             Text(
-                text = "MAC: ${device.currentMAC.ifBlank { "N/A" }} · IP: ${device.currentIP.ifBlank { "N/A" }}",
+                text = "MAC: ${device.currentMAC.ifBlank { "N/A" }} · IP: ${device.currentIP.ifBlank { "N/A" }}${if (isPaused) " · ⏸ Paused" else ""}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
