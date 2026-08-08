@@ -114,9 +114,9 @@ fun LiasNavHost(
         topBar = {
             Column {
                 CupertinoTopAppBar(
-                    title = { CupertinoText("LIAS Remote — HIG Redesign") }
+                    title = { CupertinoText("LIAS Remote") }
                 )
-                // Connection Banner
+                // Connection Banner appears ONLY when actively connecting/reconnecting/disconnected
                 if (uiState.connectionState != ConnectionState.CONNECTED) {
                     Box(
                         modifier = Modifier
@@ -127,9 +127,9 @@ fun LiasNavHost(
                     ) {
                         CupertinoText(
                             text = when (uiState.connectionState) {
-                                ConnectionState.CONNECTING -> "Connecting to LIAS Server…"
-                                ConnectionState.RECONNECTING -> "Reconnecting to LIAS Server…"
-                                else -> "Disconnected from LIAS Server"
+                                ConnectionState.CONNECTING -> "Connecting to Server…"
+                                ConnectionState.RECONNECTING -> "Reconnecting to Server…"
+                                else -> "Server Disconnected"
                             },
                             style = HigTypography.subheadline,
                             color = LiasThemeColors.label,
