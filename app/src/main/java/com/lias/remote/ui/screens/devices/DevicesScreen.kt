@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 3.2.0
+// Version: 3.3.0
 // Audit Fixes:
-//   1. Added missing Column and Spacer imports to resolve compileDebugKotlin failure.
-//   2. Retained MoveTagSheet, Cupertino HIG cancel 'X' swipe options, and duplicate pause guards.
+//   1. Included Column and Spacer imports to resolve compileDebugKotlin failure.
+//   2. Dynamic trailing swipe action toggles between Pause and Resume based on policy state.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
