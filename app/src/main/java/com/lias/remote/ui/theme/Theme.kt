@@ -1,8 +1,7 @@
 // ====================================================================
 // File: Theme.kt
-// Version: 3.0.0 (HIG Redesign)
+// Version: 3.1.0 (HIG Redesign)
 // Purpose: Cupertino + Material3 bridge. Strict system theme adherence.
-//          No time-of-day overrides.
 // ====================================================================
 
 package com.lias.remote.ui.theme
@@ -62,7 +61,7 @@ fun LiasTheme(
     val darkTheme = when (themeMode) {
         "light" -> false
         "dark" -> true
-        else -> systemDark // Respect system only
+        else -> systemDark
     }
 
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
