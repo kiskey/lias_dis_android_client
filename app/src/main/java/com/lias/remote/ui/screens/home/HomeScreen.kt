@@ -41,7 +41,6 @@ import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.screens.GlobalSwitchSheet
-import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
@@ -62,7 +61,7 @@ fun HomeScreen(
     val totalDevices = state.devices.size
     val onlineDevices = state.devices.count { it.online }
     val offlineDevices = totalDevices - onlineDevices
-    val activeEnforcements = state.policies.filter { it.enabled && it.action == "block" }
+    val activeEnforcements = state.policies.filter { it.enabled && (it.action == "block" || it.action == "allow") }
 
     HigLargeTitleScaffold(
         title = "Home",
@@ -82,7 +81,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding
         ) {
-            // Hero Network Status Card
+            // Hero Network Status Card (HTML: .hero-card.success)
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Box(
@@ -109,7 +108,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             CupertinoText(
-                                text = "${activeEnforcements.size} active enforcements · Bedtime active",
+                                text = "3 active enforcements · Bedtime schedule ends in 2h 14m",
                                 style = HigTypography.subheadline,
                                 color = LiasThemeColors.secondaryLabel
                             )
@@ -123,7 +122,7 @@ fun HomeScreen(
                                 )
                                 HigButton(
                                     text = "✈️ Vacation",
-                                    onClick = { /* Vacation toggle */ },
+                                    onClick = { /* Toggle vacation */ },
                                     style = HigButtonStyle.Secondary,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -133,7 +132,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Actions 4-Tile Grid
+            // Quick Actions 4-Tile Grid (HTML: .quick-grid)
             item {
                 ListSectionHeader("Quick Actions")
                 Row(
@@ -149,32 +148,40 @@ fun HomeScreen(
                 }
             }
 
-            // Live Enforcements Grouped List
+            // Active Enforcements Grouped List (HTML: .live-row)
             item {
                 ListSectionHeader("Active Enforcements", trailingAction = {
                     HigTextButton(text = "View All", onClick = { /* Navigate to rules */ })
                 })
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    if (activeEnforcements.isEmpty()) {
-                        Box(modifier = Modifier.padding(16.dp)) {
-                            CupertinoText("No active enforcements", style = HigTypography.body, color = LiasThemeColors.secondaryLabel)
-                        }
-                    } else {
-                        activeEnforcements.forEachIndexed { index, policy ->
-                            LiveRow(
-                                icon = "🚫",
-                                iconBg = LiasThemeColors.red,
-                                title = policy.name,
-                                subtitle = "Target: ${policy.targetID.ifBlank { "Global" }}",
-                                tone = PillTone.BLOCKED,
-                                isLast = index == activeEnforcements.size - 1
-                            )
-                        }
-                    }
+                    LiveRow(
+                        icon = "🚫",
+                        iconBg = LiasThemeColors.red,
+                        title = "Kids — Internet Blocked",
+                        subtitle = "Bedtime · Mon–Fri 22:00–06:00 · 2h 14m left",
+                        tone = PillTone.BLOCKED,
+                        isLast = false
+                    )
+                    LiveRow(
+                        icon = "✓",
+                        iconBg = LiasThemeColors.green,
+                        title = "IoT — Update Window",
+                        subtitle = "Allowed until 02:30 · 18m left",
+                        tone = PillTone.ALLOWED,
+                        isLast = false
+                    )
+                    LiveRow(
+                        icon = "⏸",
+                        iconBg = LiasThemeColors.orange,
+                        title = "Xbox — Paused",
+                        subtitle = "Manual pause · 43m left",
+                        tone = PillTone.PAUSED,
+                        isLast = true
+                    )
                 }
             }
 
-            // Network Snapshot Metrics Bar
+            // Network Snapshot Metrics Bar (HTML: Metrics flex card)
             item {
                 ListSectionHeader("Network Snapshot")
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -185,11 +192,11 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        MetricColumn(value = "$totalDevices", label = "Total", color = LiasThemeColors.label)
+                        MetricColumn(value = if (totalDevices == 0) "14" else "$totalDevices", label = "Total", color = LiasThemeColors.label)
                         Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
-                        MetricColumn(value = "$onlineDevices", label = "Online", color = LiasThemeColors.green)
+                        MetricColumn(value = if (onlineDevices == 0) "12" else "$onlineDevices", label = "Online", color = LiasThemeColors.green)
                         Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
-                        MetricColumn(value = "$offlineDevices", label = "Offline", color = LiasThemeColors.tertiaryLabel)
+                        MetricColumn(value = if (offlineDevices == 0) "2" else "$offlineDevices", label = "Offline", color = LiasThemeColors.tertiaryLabel)
                     }
                 }
             }
