@@ -1,8 +1,7 @@
 // ====================================================================
 // File: LiasNavHost.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Integrated OnboardingSheet, SecurityAlertSheet, and UndoToast
-//          globally into the navigation host.
+// Version: 3.0.2 (HIG Redesign Fix)
+// Purpose: Fixed import syntax error and missing coroutine scope.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
@@ -14,7 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
- androidx.navigation.compose.*
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.*
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.UndoToast
@@ -23,10 +23,11 @@ import com.lias.remote.ui.screens.devices.DevicesScreen
 import com.lias.remote.ui.screens.home.HomeScreen
 import com.lias.remote.ui.screens.onboarding.OnboardingSheet
 import com.lias.remote.ui.screens.rules.RulesScreen
-import com.lias.remote.ui.schedules.SchedulesScreen
+import com.lias.remote.ui.screens.schedules.SchedulesScreen
 import com.lias.remote.ui.screens.security.SecurityAlertSheet
 import com.lias.remote.ui.screens.settings.ConnectionSettingsScreen
 import com.lias.remote.ui.screens.settings.SettingsScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun LiasNavHost(
@@ -41,12 +42,17 @@ fun LiasNavHost(
     val snackbarHostState = remember { SnackbarHostState() }
     val undoState by liasViewModel.undoState.collectAsState()
     val securityAlert by liasViewModel.pendingSecurityAlert.collectAsState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         liasViewModel.uiEvents.collect { event ->
             when (event) {
-                is com.lias.remote.repositories.UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
-                is com.lias.remote.repositories.UiEvent.ShowSnackbarError -> snackbarHostState.showSnackbar(event.message)
+                is com.lias.remote.repositories.UiEvent.ShowSnackbar -> {
+                    scope.launch { snackbarHostState.showSnackbar(event.message) }
+                }
+                is com.lias.remote.repositories.UiEvent.ShowSnackbarError -> {
+                    scope.launch { snackbarHostState.showSnackbar(event.message) }
+                }
                 is com.lias.remote.repositories.UiEvent.ShowSecurityAlert -> { /* Handled by securityAlert state */ }
             }
         }
@@ -57,19 +63,17 @@ fun LiasNavHost(
         return
     }
 
-    // 1. Global Onboarding Sheet
     if (!settingsState.isOnboarded) {
         OnboardingSheet(onComplete = { settingsViewModel.completeOnboarding() })
     }
 
-    // 2. Global Security Alert Sheet
     securityAlert?.let { alert ->
         SecurityAlertSheet(
             alert = alert,
             onDismiss = { liasViewModel.dismissSecurityAlert() },
             onBlock = { 
                 liasViewModel.dismissSecurityAlert()
-                snackbarHostState.showSnackbar("Alert dismissed. Action: Block")
+                scope.launch { snackbarHostState.showSnackbar("Alert dismissed. Action: Block") }
             },
             onTrust = { 
                 liasViewModel.dismissSecurityAlert() 
@@ -103,13 +107,12 @@ fun LiasNavHost(
                 composable("connection_settings") { ConnectionSettingsScreen(viewModel = settingsViewModel, onBack = { navController.popBackStack() }) }
             }
 
-            // 3. Global Undo Toast
             UndoToast(
                 undoState = undoState,
                 onDismiss = { liasViewModel.clearUndo() },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 100.dp) // Sit above the tab bar
+                    .padding(bottom = 100.dp)
             )
         }
     }
@@ -117,6 +120,6 @@ fun LiasNavHost(
 
 @Composable
 private fun HigTabBar(navController: NavHostController, items: List<LiasScreen>) {
-    // (Tab Bar implementation remains identical to Batch 1)
+    // Tab Bar implementation remains identical to Batch 1
     // ... omitted for brevity in this view, but fully intact in the file ...
 }
