@@ -1,10 +1,3 @@
-// ====================================================================
-// File: LiasViewModel.kt
-// Version: 3.2.0 (Cupertino Refactor)
-// Purpose: Added missing getDeviceLogs suspend function to resolve
-//          DeviceDetailScreen compilation error.
-// ====================================================================
-
 package com.lias.remote.ui
 
 import androidx.lifecycle.ViewModel
@@ -15,19 +8,20 @@ import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTags
-import com.lias.remote.repositories.cancelDeviceExtension
-import com.lias.remote.repositories.createTag
+import com.lias.remote.repositories.assignDeviceUser
+import com.lias.remote.repositories.createUser
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
+import com.lias.remote.repositories.exportPolicies
 import com.lias.remote.repositories.extendDeviceAccess
 import com.lias.remote.repositories.getDeviceLogs
-import com.lias.remote.repositories.pauseDeviceInternet
 import com.lias.remote.repositories.renameDevice
 import com.lias.remote.repositories.savePolicy
 import com.lias.remote.repositories.saveSchedule
@@ -136,6 +130,23 @@ class LiasViewModel(
                 _undoState.value = UndoState("Device renamed") {
                     viewModelScope.launch { eventRepository.renameDevice(pdid, prevName) }
                 }
+            }
+        }
+    }
+
+    fun assignDeviceUser(pdid: String, userId: String) {
+        viewModelScope.launch { eventRepository.assignDeviceUser(pdid, userId) }
+    }
+
+    fun createUser(user: User) {
+        viewModelScope.launch { eventRepository.createUser(user) }
+    }
+
+    fun exportPolicies() {
+        viewModelScope.launch {
+            val result = eventRepository.exportPolicies()
+            if (result is ApiResult.Success) {
+                eventRepository._uiEvents.emit(UiEvent.ShowSnackbar("Policies exported successfully"))
             }
         }
     }
