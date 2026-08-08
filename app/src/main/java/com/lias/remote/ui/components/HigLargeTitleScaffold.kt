@@ -1,13 +1,6 @@
-// ====================================================================
-// File: HigLargeTitleScaffold.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Two-tier large title nav bar. Adaptive landscape layout.
-//          Sticky search field with scroll-aware collapse.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -30,7 +20,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
-import io.github.robinpcrd.cupertino.CupertinoSearchTextField
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoScaffold
+import io.github.alexzhirkevich.cupertino.CupertinoSearchTextField
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun HigLargeTitleScaffold(
@@ -42,7 +36,6 @@ fun HigLargeTitleScaffold(
     searchPlaceholder: String = "",
     searchQuery: String = "",
     onSearchQueryChanged: (String) -> Unit = {},
-    floatingActionButton: (@Composable () -> Unit)? = null,
     bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -55,22 +48,22 @@ fun HigLargeTitleScaffold(
         }
     }
 
-    Scaffold(
+    CupertinoScaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = { floatingActionButton?.invoke() },
         bottomBar = { bottomBar?.invoke() }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(LiasThemeColors.background)
                 .padding(innerPadding)
         ) {
-            // Tier 1: Navigation Bar Row
+            // Tier 1: Sticky Navigation Bar Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)
+                    .background(LiasThemeColors.background)
                     .padding(horizontal = HigSpec.SpacingS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -84,10 +77,10 @@ fun HigLargeTitleScaffold(
                     contentAlignment = Alignment.Center
                 ) {
                     if (isCollapsed) {
-                        Text(
+                        CupertinoText(
                             text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            style = HigTypography.headline,
+                            color = LiasThemeColors.label,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -98,19 +91,19 @@ fun HigLargeTitleScaffold(
                 }
             }
 
-            // Tier 2: Large Title & Search
+            // Tier 2: Collapsible Large Title & Integrated Search Bar
             if (!isCollapsed) {
                 if (isLandscape) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingS),
+                            .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingXS),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
+                        CupertinoText(
                             text = title,
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            style = HigTypography.largeTitle,
+                            color = LiasThemeColors.label,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -125,15 +118,15 @@ fun HigLargeTitleScaffold(
                         }
                     }
                 } else {
-                    Text(
+                    CupertinoText(
                         text = title,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        style = HigTypography.largeTitle,
+                        color = LiasThemeColors.label,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingS)
+                            .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingXS)
                     )
                     if (searchPlaceholder.isNotEmpty()) {
                         HigSearchField(
@@ -142,13 +135,13 @@ fun HigLargeTitleScaffold(
                             placeholder = searchPlaceholder,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingS)
+                                .padding(horizontal = HigSpec.SpacingM, vertical = HigSpec.SpacingXS)
                         )
                     }
                 }
             }
 
-            // Main Content Area
+            // Main Content Stream Container
             Box(modifier = Modifier.fillMaxSize()) {
                 content(PaddingValues(bottom = HigSpec.BottomNavPadding))
             }
@@ -167,10 +160,10 @@ fun HigSearchField(
         value = query,
         onValueChange = onQueryChanged,
         placeholder = {
-            Text(
+            CupertinoText(
                 text = placeholder,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = HigTypography.body,
+                color = LiasThemeColors.tertiaryLabel
             )
         },
         modifier = modifier.fillMaxWidth()
