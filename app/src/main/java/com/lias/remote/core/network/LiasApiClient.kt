@@ -1,22 +1,33 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 22.0.0
+// Version: 27.0.2
 //
 // Purpose:
 //   Canonical LIAS REST client.
 //
-// Batch 22:
-//   - 401/403 -> AuthenticationError
-//   - malformed successful payload -> SerializationError
-//   - 409 preserves server message + conflicts
-//   - response bodies are closed deterministically
-//   - raw endpoints share the same HTTP classification
-//   - request URL is validated before execution
+// Compiler remediation:
+//   Public inline/reified API functions can only reference:
+//     - public API
+//     - or @PublishedApi internal declarations.
 //
-// Compatibility:
-//   baseUrl/authToken remain mutable because EventRepository currently
-//   follows persisted settings. Candidate connection testing no longer
-//   mutates this instance; LiasConnectionProbe owns an isolated client.
+//   Therefore:
+//     client
+//     json
+//     buildRequest()
+//     parseResponse()
+//     execute()
+//     transportFailure()
+//     JSON_MEDIA_TYPE
+//
+//   are exposed to the Kotlin inline ABI with @PublishedApi internal.
+//
+// Architecture retained:
+//   - AuthenticationError for 401/403
+//   - ConflictError for 409
+//   - NetworkError for transport failures
+//   - SerializationError for JSON contract failures
+//   - server-authoritative EffectiveStatus endpoints
+//   - deterministic Response.use { }
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -29,6 +40,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -37,17 +49,16 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 class LiasApiClient(
-    private val client: OkHttpClient
+
+    @PublishedApi
+    internal val client: OkHttpClient
 ) {
 
     @PublishedApi
     internal val json =
         Json {
-            ignoreUnknownKeys =
-                true
-
-            encodeDefaults =
-                true
+            ignoreUnknownKeys = true
+            encodeDefaults = true
         }
 
     @Volatile
@@ -58,8 +69,7 @@ class LiasApiClient(
     var authToken: String? =
         null
 
-    private fun normalizedBaseUrl():
-        String {
+    private fun normalizedBaseUrl(): String {
 
         var result =
             baseUrl
@@ -88,9 +98,7 @@ class LiasApiClient(
         }
 
         return result
-            .trimEnd(
-                '/'
-            )
+            .trimEnd('/')
     }
 
     @PublishedApi
@@ -105,9 +113,7 @@ class LiasApiClient(
 
         val normalizedPath =
             if (
-                path.startsWith(
-                    "/"
-                )
+                path.startsWith("/")
             ) {
                 path
             } else {
@@ -139,8 +145,7 @@ class LiasApiClient(
             }
 
         if (
-            body !=
-            null
+            body != null
         ) {
 
             builder.header(
@@ -157,9 +162,7 @@ class LiasApiClient(
             .build()
     }
 
-    @Suppress(
-        "UNCHECKED_CAST"
-    )
+    @Suppress("UNCHECKED_CAST")
     @PublishedApi
     internal fun <T> parseResponse(
         response: Response,
@@ -175,90 +178,80 @@ class LiasApiClient(
                 .orEmpty()
 
         if (
-            code ==
-            401 ||
-            code ==
-            403
+            code == 401 ||
+            code == 403
         ) {
 
-            return ApiResult
-                .AuthenticationError(
-                    code =
-                        code,
-                    message =
-                        decodeServerMessage(
-                            body
-                        )
-                            ?: if (
-                                code ==
-                                401
-                            ) {
-                                "LIAS rejected the authentication token."
-                            } else {
-                                "LIAS refused access to this operation."
-                            }
-                )
+            return ApiResult.AuthenticationError(
+                code = code,
+                message =
+                    decodeServerMessage(
+                        body
+                    )
+                        ?: if (
+                            code == 401
+                        ) {
+                            "LIAS rejected the authentication token."
+                        } else {
+                            "LIAS refused access to this operation."
+                        }
+            )
         }
 
         if (
-            code ==
-            409
+            code == 409
         ) {
 
-            val decoded =
+            val conflict =
                 decodeConflictResponse(
                     body
                 )
 
-            return ApiResult
-                .ConflictError(
-                    conflicts =
-                        decoded
-                            ?.conflicts
-                            .orEmpty(),
-                    message =
-                        decoded
-                            ?.message
+            return ApiResult.ConflictError(
+                conflicts =
+                    conflict
+                        ?.conflicts
+                        .orEmpty(),
+                message =
+                    conflict
+                        ?.message
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: conflict
+                            ?.error
                             ?.takeIf {
                                 it.isNotBlank()
                             }
-                            ?: decoded
-                                ?.error
-                                ?.takeIf {
-                                    it.isNotBlank()
-                                }
-                            ?: "LIAS reported a configuration conflict."
-                )
+                        ?: "LIAS reported a configuration conflict."
+            )
         }
 
         if (
             !response.isSuccessful
         ) {
 
-            return ApiResult
-                .HttpError(
-                    code =
-                        code,
-                    message =
-                        decodeServerMessage(
-                            body
-                        )
-                            ?: body
-                                .trim()
-                                .take(
-                                    MAX_SERVER_ERROR_LENGTH
-                                )
-                                .takeIf {
-                                    it.isNotBlank()
-                                }
-                            ?: "HTTP $code"
-                )
+            return ApiResult.HttpError(
+                code = code,
+                message =
+                    decodeServerMessage(
+                        body
+                    )
+                        ?: body
+                            .trim()
+                            .take(
+                                MAX_SERVER_ERROR_LENGTH
+                            )
+                            .takeIf {
+                                it.isNotBlank()
+                            }
+                        ?: "HTTP $code"
+            )
         }
 
         if (
             body.isBlank() ||
-            code ==
-            204
+            code == 204
         ) {
 
             return if (
@@ -274,11 +267,10 @@ class LiasApiClient(
 
             } else {
 
-                ApiResult
-                    .SerializationError(
-                        message =
-                            "LIAS returned an empty response where ${serializer.descriptor.serialName} was expected."
-                    )
+                ApiResult.SerializationError(
+                    message =
+                        "LIAS returned an empty response where ${serializer.descriptor.serialName} was expected."
+                )
             }
         }
 
@@ -295,25 +287,23 @@ class LiasApiClient(
             error: SerializationException
         ) {
 
-            ApiResult
-                .SerializationError(
-                    message =
-                        "LIAS returned data that does not match the expected ${serializer.descriptor.serialName} contract.",
-                    cause =
-                        error
-                )
+            ApiResult.SerializationError(
+                message =
+                    "LIAS returned data that does not match the expected ${serializer.descriptor.serialName} contract.",
+                cause =
+                    error
+            )
 
         } catch (
             error: IllegalArgumentException
         ) {
 
-            ApiResult
-                .SerializationError(
-                    message =
-                        "LIAS returned an invalid ${serializer.descriptor.serialName} payload.",
-                    cause =
-                        error
-                )
+            ApiResult.SerializationError(
+                message =
+                    "LIAS returned an invalid ${serializer.descriptor.serialName} payload.",
+                cause =
+                    error
+            )
         }
     }
 
@@ -324,8 +314,8 @@ class LiasApiClient(
     ): ApiResult<T> =
         execute {
             buildRequest(
-                path,
-                "GET"
+                path = path,
+                method = "GET"
             )
         }
 
@@ -338,15 +328,12 @@ class LiasApiClient(
 
             try {
 
-                val request =
-                    buildRequest(
-                        path,
-                        "GET"
-                    )
-
                 client
                     .newCall(
-                        request
+                        buildRequest(
+                            path = path,
+                            method = "GET"
+                        )
                     )
                     .execute()
                     .use {
@@ -390,20 +377,19 @@ class LiasApiClient(
                 error: Exception
             ) {
 
-                return ApiResult
-                    .SerializationError(
-                        message =
-                            "Unable to encode the LIAS request body.",
-                        cause =
-                            error
-                    )
+                return ApiResult.SerializationError(
+                    message =
+                        "Unable to encode the LIAS request body.",
+                    cause =
+                        error
+                )
             }
 
         return execute {
             buildRequest(
-                path,
-                "POST",
-                requestBody
+                path = path,
+                method = "POST",
+                body = requestBody
             )
         }
     }
@@ -431,20 +417,19 @@ class LiasApiClient(
                 error: Exception
             ) {
 
-                return ApiResult
-                    .SerializationError(
-                        message =
-                            "Unable to encode the LIAS request body.",
-                        cause =
-                            error
-                    )
+                return ApiResult.SerializationError(
+                    message =
+                        "Unable to encode the LIAS request body.",
+                    cause =
+                        error
+                )
             }
 
         return execute {
             buildRequest(
-                path,
-                "PUT",
-                requestBody
+                path = path,
+                method = "PUT",
+                body = requestBody
             )
         }
     }
@@ -456,8 +441,8 @@ class LiasApiClient(
     ): ApiResult<T> =
         execute {
             buildRequest(
-                path,
-                "DELETE"
+                path = path,
+                method = "DELETE"
             )
         }
 
@@ -469,7 +454,7 @@ class LiasApiClient(
             Dispatchers.IO
         ) {
 
-            val body =
+            val requestBody =
                 jsonPayload
                     .toRequestBody(
                         JSON_MEDIA_TYPE
@@ -480,9 +465,9 @@ class LiasApiClient(
                 client
                     .newCall(
                         buildRequest(
-                            path,
-                            "POST",
-                            body
+                            path = path,
+                            method = "POST",
+                            body = requestBody
                         )
                     )
                     .execute()
@@ -512,12 +497,14 @@ class LiasApiClient(
             Unit,
             ExtendAccessRequest
         >(
-            Endpoints.deviceExtend(
-                pdid
-            ),
-            ExtendAccessRequest(
-                minutes
-            )
+            path =
+                Endpoints.deviceExtend(
+                    pdid
+                ),
+            body =
+                ExtendAccessRequest(
+                    minutes
+                )
         )
 
     suspend fun cancelDeviceExtension(
@@ -537,12 +524,14 @@ class LiasApiClient(
             Unit,
             ExtendAccessRequest
         >(
-            Endpoints.tagExtend(
-                tagId
-            ),
-            ExtendAccessRequest(
-                minutes
-            )
+            path =
+                Endpoints.tagExtend(
+                    tagId
+                ),
+            body =
+                ExtendAccessRequest(
+                    minutes
+                )
         )
 
     suspend fun cancelTagExtension(
@@ -572,6 +561,13 @@ class LiasApiClient(
             )
         )
 
+    /**
+     * Public inline methods delegate here.
+     *
+     * Because this function itself is inline and can be reached by
+     * public inline callers, every non-public declaration used here
+     * must be @PublishedApi internal.
+     */
     @PublishedApi
     internal suspend inline fun <
         reified T
@@ -594,8 +590,10 @@ class LiasApiClient(
                         response ->
 
                         parseResponse(
-                            response,
-                            serializer()
+                            response =
+                                response,
+                            serializer =
+                                serializer()
                         )
                     }
 
@@ -637,39 +635,38 @@ class LiasApiClient(
                 ?.string()
                 .orEmpty()
 
-        val raw =
-            classifyRawHttp(
-                code =
-                    response.code,
-                successful =
-                    response.isSuccessful,
-                body =
-                    body
-            )
-
         return when (
-            raw
+            val result =
+                classifyRawHttp(
+                    code =
+                        response.code,
+                    successful =
+                        response.isSuccessful,
+                    body =
+                        body
+                )
         ) {
 
             is ApiResult.Success ->
+
                 ApiResult.Success(
                     Unit
                 )
 
             is ApiResult.AuthenticationError ->
-                raw
+                result
 
             is ApiResult.HttpError ->
-                raw
+                result
 
             is ApiResult.ConflictError ->
-                raw
+                result
 
             is ApiResult.NetworkError ->
-                raw
+                result
 
             is ApiResult.SerializationError ->
-                raw
+                result
         }
     }
 
@@ -680,27 +677,22 @@ class LiasApiClient(
     ): ApiResult<String> {
 
         if (
-            code ==
-            401 ||
-            code ==
-            403
+            code == 401 ||
+            code == 403
         ) {
 
-            return ApiResult
-                .AuthenticationError(
-                    code =
-                        code,
-                    message =
-                        decodeServerMessage(
-                            body
-                        )
-                            ?: "Authentication failed."
-                )
+            return ApiResult.AuthenticationError(
+                code = code,
+                message =
+                    decodeServerMessage(
+                        body
+                    )
+                        ?: "Authentication failed."
+            )
         }
 
         if (
-            code ==
-            409
+            code == 409
         ) {
 
             val conflict =
@@ -708,42 +700,45 @@ class LiasApiClient(
                     body
                 )
 
-            return ApiResult
-                .ConflictError(
-                    conflicts =
-                        conflict
-                            ?.conflicts
-                            .orEmpty(),
-                    message =
-                        conflict
-                            ?.message
+            return ApiResult.ConflictError(
+                conflicts =
+                    conflict
+                        ?.conflicts
+                        .orEmpty(),
+                message =
+                    conflict
+                        ?.message
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: conflict
+                            ?.error
                             ?.takeIf {
                                 it.isNotBlank()
                             }
-                            ?: "LIAS reported a conflict."
-                )
+                        ?: "LIAS reported a conflict."
+            )
         }
 
         if (
             !successful
         ) {
 
-            return ApiResult
-                .HttpError(
-                    code =
-                        code,
-                    message =
-                        decodeServerMessage(
-                            body
-                        )
-                            ?: body
-                                .take(
-                                    MAX_SERVER_ERROR_LENGTH
-                                )
-                                .ifBlank {
-                                    "HTTP $code"
-                                }
-                )
+            return ApiResult.HttpError(
+                code = code,
+                message =
+                    decodeServerMessage(
+                        body
+                    )
+                        ?: body
+                            .trim()
+                            .take(
+                                MAX_SERVER_ERROR_LENGTH
+                            )
+                            .ifBlank {
+                                "HTTP $code"
+                            }
+            )
         }
 
         return ApiResult.Success(
@@ -771,24 +766,28 @@ class LiasApiClient(
         body: String
     ): String? {
 
-        val conflict =
+        val decoded =
             decodeConflictResponse(
                 body
             )
 
-        return conflict
+        return decoded
             ?.message
             ?.takeIf {
                 it.isNotBlank()
             }
-            ?: conflict
+            ?: decoded
                 ?.error
                 ?.takeIf {
                     it.isNotBlank()
                 }
     }
 
-    private fun transportFailure(
+    /**
+     * Must be visible to public inline execute().
+     */
+    @PublishedApi
+    internal fun transportFailure(
         error: Exception
     ): ApiResult<Nothing> =
         when (
@@ -796,30 +795,36 @@ class LiasApiClient(
         ) {
 
             is SerializationException ->
-                ApiResult
-                    .SerializationError(
-                        message =
-                            "Unable to process LIAS data.",
-                        cause =
-                            error
-                    )
+
+                ApiResult.SerializationError(
+                    message =
+                        "Unable to process LIAS data.",
+                    cause =
+                        error
+                )
 
             is IOException ->
-                ApiResult
-                    .NetworkError(
-                        error
-                    )
+
+                ApiResult.NetworkError(
+                    error
+                )
 
             else ->
-                ApiResult
-                    .NetworkError(
-                        error
-                    )
+
+                ApiResult.NetworkError(
+                    error
+                )
         }
 
     companion object {
 
-        private val JSON_MEDIA_TYPE =
+        /**
+         * Referenced from public inline post()/put(), therefore this
+         * cannot remain private.
+         */
+        @PublishedApi
+        internal val JSON_MEDIA_TYPE:
+            MediaType =
             "application/json"
                 .toMediaType()
 
