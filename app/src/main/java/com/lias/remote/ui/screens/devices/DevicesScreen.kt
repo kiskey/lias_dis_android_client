@@ -51,7 +51,10 @@ import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoButton
 import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.ChevronRight
 
 @Composable
 fun DevicesScreen(
@@ -116,6 +119,7 @@ fun DevicesScreen(
                             statusAction = status.action,
                             onExtend = { activeDeviceForExtend = device },
                             onPause = { activeDeviceForPause = device },
+                            onRename = { activeDeviceForRename = device },
                             onDetail = { onNavigateToDeviceDetail(device.pdid) }
                         )
                     }
@@ -182,6 +186,7 @@ private fun DeviceCardItem(
     statusAction: String,
     onExtend: () -> Unit,
     onPause: () -> Unit,
+    onRename: () -> Unit,
     onDetail: () -> Unit
 ) {
     val isInfra = device.safeTags.contains("infrastructure")
@@ -223,19 +228,23 @@ private fun DeviceCardItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action row: Infrastructure devices have NO pause/extend buttons (Immune)
+            // Action row: Infrastructure devices are Immune (NO pause/extend buttons)
             if (!isInfra) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (isBlockedOrPaused) {
-                        // Extend option valid ONLY if blocked or in pause state
+                        // Extend option valid ONLY if blocked or paused
                         HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
                     } else {
                         HigButton(text = "⏸ Pause", onClick = onPause, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
                     }
+                    HigButton(text = "✏️", onClick = onRename, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
                     HigButton(text = "›", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
                 }
             } else {
-                HigButton(text = "View Details", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    HigButton(text = "View Details", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
+                    HigButton(text = "✏️", onClick = onRename, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
+                }
             }
         }
     }
