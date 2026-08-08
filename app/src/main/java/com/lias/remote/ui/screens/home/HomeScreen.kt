@@ -54,10 +54,10 @@ import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.outlined.Airplane
 import io.github.alexzhirkevich.cupertino.icons.outlined.Checkmark
 import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
-import io.github.alexzhirkevich.cupertino.icons.outlined.ExclamationmarkShield
-import io.github.alexzhirkevich.cupertino.icons.outlined.Globe
+import io.github.alexzhirkevich.cupertino.icons.outlined.ExclamationmarkTriangle
 import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
 import io.github.alexzhirkevich.cupertino.icons.outlined.Pause
+import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 import io.github.alexzhirkevich.cupertino.icons.outlined.Xmark
 
 @Composable
@@ -93,7 +93,7 @@ fun HomeScreen(
                     .padding(4.dp)
             ) {
                 CupertinoIcon(
-                    imageVector = CupertinoIcons.Outlined.ExclamationmarkShield,
+                    imageVector = CupertinoIcons.Outlined.ExclamationmarkTriangle,
                     contentDescription = "Security Alert",
                     tint = LiasThemeColors.red,
                     modifier = Modifier.size(22.dp)
@@ -128,7 +128,7 @@ fun HomeScreen(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CupertinoIcon(
-                                    imageVector = if (isVacationActive) CupertinoIcons.Outlined.Airplane else CupertinoIcons.Outlined.Globe,
+                                    imageVector = if (isVacationActive) CupertinoIcons.Outlined.Airplane else CupertinoIcons.Outlined.Shield,
                                     contentDescription = null,
                                     tint = if (isVacationActive) LiasThemeColors.orange else LiasThemeColors.green,
                                     modifier = Modifier.size(16.dp)
@@ -174,7 +174,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Actions 4-Tile Grid (Native Cupertino Vectors)
+            // Quick Actions 4-Tile Grid
             item {
                 ListSectionHeader("Quick Actions")
                 Row(
