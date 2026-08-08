@@ -2,7 +2,10 @@ package com.lias.remote.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+
+val LocalLiasDarkTheme = staticCompositionLocalOf { false }
 
 // Apple HIG Light Palette
 val SystemBlueLight = Color(0xFF007AFF)
@@ -51,45 +54,48 @@ val FillDark = Color(0x3D767680)
 val FillDark2 = Color(0x52767680)
 
 object LiasThemeColors {
+    val isDark: Boolean
+        @Composable get() = LocalLiasDarkTheme.current
+
     val background: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemBackgroundDark else SystemBackgroundLight
+        @Composable get() = if (isDark) SystemBackgroundDark else SystemBackgroundLight
 
     val secondaryBackground: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemSecondaryBackgroundDark else SystemSecondaryBackgroundLight
+        @Composable get() = if (isDark) SystemSecondaryBackgroundDark else SystemSecondaryBackgroundLight
 
     val tertiaryBackground: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemTertiaryBackgroundDark else SystemTertiaryBackgroundLight
+        @Composable get() = if (isDark) SystemTertiaryBackgroundDark else SystemTertiaryBackgroundLight
 
     val label: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemLabelDark else SystemLabelLight
+        @Composable get() = if (isDark) SystemLabelDark else SystemLabelLight
 
     val secondaryLabel: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemSecondaryLabelDark else SystemSecondaryLabelLight
+        @Composable get() = if (isDark) SystemSecondaryLabelDark else SystemSecondaryLabelLight
 
     val tertiaryLabel: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemTertiaryLabelDark else SystemTertiaryLabelLight
+        @Composable get() = if (isDark) SystemTertiaryLabelDark else SystemTertiaryLabelLight
 
     val separator: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemSeparatorDark else SystemSeparatorLight
+        @Composable get() = if (isDark) SystemSeparatorDark else SystemSeparatorLight
 
     val fill: Color
-        @Composable get() = if (isSystemInDarkTheme()) FillDark else FillLight
+        @Composable get() = if (isDark) FillDark else FillLight
 
     val fill2: Color
-        @Composable get() = if (isSystemInDarkTheme()) FillDark2 else FillLight2
+        @Composable get() = if (isDark) FillDark2 else FillLight2
 
     val blue: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemBlueDark else SystemBlueLight
+        @Composable get() = if (isDark) SystemBlueDark else SystemBlueLight
 
     val green: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemGreenDark else SystemGreenLight
+        @Composable get() = if (isDark) SystemGreenDark else SystemGreenLight
 
     val red: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemRedDark else SystemRedLight
+        @Composable get() = if (isDark) SystemRedDark else SystemRedLight
 
     val orange: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemOrangeDark else SystemOrangeLight
+        @Composable get() = if (isDark) SystemOrangeDark else SystemOrangeLight
 
     val indigo: Color
-        @Composable get() = if (isSystemInDarkTheme()) SystemIndigoDark else SystemIndigoLight
+        @Composable get() = if (isDark) SystemIndigoDark else SystemIndigoLight
 }
