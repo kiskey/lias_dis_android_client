@@ -28,13 +28,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.FlowLog
+import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
@@ -59,12 +63,16 @@ fun DeviceDetailScreen(
     var isLoadingLogs by remember { mutableStateOf(true) }
     var showExtendSheet by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
+    var showUserAssignmentSheet by remember { mutableStateOf(false) }
 
     val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+    val assignedUser = state.users.find { it.id == device.userID }
 
     LaunchedEffect(pdid) {
         val result = viewModel.getDeviceLogs(pdid)
-        if (result is ApiResult.Success<List<FlowLog>>) logs = result.data
+        if (result is ApiResult.Success<List<FlowLog>>) {
+            logs = result.data
+        }
         isLoadingLogs = false
     }
 
@@ -103,7 +111,7 @@ fun DeviceDetailScreen(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     
-                    // Sticky Action Bar (HTML: Extend / Rename buttons)
+                    // Sticky Action Bar
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -124,7 +132,7 @@ fun DeviceDetailScreen(
                             )
                             HigButton(
                                 text = "✏ Rename",
-                                onClick = { /* Rename modal */ },
+                                onClick = { /* Prompt rename */ },
                                 style = HigButtonStyle.Gray,
                                 modifier = Modifier.weight(1f)
                             )
@@ -133,18 +141,41 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Identity Grouped Card
+            // Identity Grouped Section
             item { ListSectionHeader("Identity") }
             item {
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                     GroupedListRow(primaryText = "Hostname", secondaryText = device.hostname.ifBlank { "N/A" }, showDivider = true)
                     GroupedListRow(primaryText = "MAC Address", secondaryText = device.currentMAC.ifBlank { "N/A" }, showDivider = true)
                     GroupedListRow(primaryText = "Vendor", secondaryText = device.vendor.ifBlank { "Unknown" }, showDivider = true)
-                    GroupedListRow(primaryText = "Type", secondaryText = device.deviceType.ifBlank { "Unclassified" })
+                    GroupedListRow(primaryText = "Type", secondaryText = device.deviceType.ifBlank { "Unclassified" }, showDivider = true)
+                    
+                    // Assigned User Entity Mapping
+                    GroupedListRow(
+                        primaryText = "Assigned User",
+                        secondaryText = assignedUser?.name ?: "Unassigned",
+                        trailingContent = { CupertinoText("›", style = HigTypography.headline, color = LiasThemeColors.tertiaryLabel) },
+                        onClick = { showUserAssignmentSheet = true }
+                    )
                 }
             }
 
-            // Timeline Activity Log (HTML: .log-row)
+            // Discovered Services Section
+            if (device.safeServices.isNotEmpty()) {
+                item { ListSectionHeader("Discovered Services") }
+                item {
+                    GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        device.safeServices.forEachIndexed { index, service ->
+                            GroupedListRow(
+                                primaryText = service,
+                                showDivider = index < device.safeServices.size - 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Timeline Activity Log Section
             item { ListSectionHeader("Activity · Last 24h") }
             item {
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -157,6 +188,7 @@ fun DeviceDetailScreen(
                             val isBlock = log.action == "block"
                             GroupedListRow(
                                 primaryText = log.timestamp,
+                                secondaryText = if (log.bytes > 0) "${log.bytes} bytes transferred" else null,
                                 trailingContent = { 
                                     StatusPill(text = log.action, tone = if (isBlock) PillTone.BLOCKED else PillTone.ALLOWED) 
                                 },
@@ -195,5 +227,79 @@ fun DeviceDetailScreen(
                 showPauseSheet = false
             }
         )
+    }
+
+    if (showUserAssignmentSheet) {
+        UserAssignmentSheet(
+            users = state.users,
+            assignedUserId = device.userID,
+            onDismiss = { showUserAssignmentSheet = false },
+            onSelectUser = { userId ->
+                viewModel.assignDeviceUser(device.pdid, userId)
+                showUserAssignmentSheet = false
+            },
+            onCreateUser = { userName ->
+                viewModel.createUser(User(id = "user_${System.currentTimeMillis()}", name = userName))
+            }
+        )
+    }
+}
+
+@Composable
+fun UserAssignmentSheet(
+    users: List<User>,
+    assignedUserId: String?,
+    onDismiss: () -> Unit,
+    onSelectUser: (userId: String) -> Unit,
+    onCreateUser: (name: String) -> Unit
+) {
+    var newUserName by remember { mutableStateOf("") }
+
+    HigModalSheet(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            HigSheetHeader(title = "Assign User", onCancel = onDismiss)
+
+            if (users.isNotEmpty()) {
+                GroupedListCard {
+                    users.forEachIndexed { index, user ->
+                        val isSelected = user.id == assignedUserId
+                        GroupedListRow(
+                            primaryText = user.name,
+                            trailingContent = {
+                                if (isSelected) {
+                                    CupertinoText("✓", color = LiasThemeColors.blue, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            showDivider = index < users.size - 1,
+                            onClick = { onSelectUser(user.id) }
+                        )
+                    }
+                }
+            }
+
+            HigField(
+                value = newUserName,
+                onValueChange = { newUserName = it },
+                label = "New User Profile",
+                placeholder = "e.g. John Doe"
+            )
+
+            HigButton(
+                text = "Create & Assign User",
+                onClick = {
+                    if (newUserName.isNotBlank()) {
+                        onCreateUser(newUserName)
+                        newUserName = ""
+                    }
+                },
+                style = HigButtonStyle.Primary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
