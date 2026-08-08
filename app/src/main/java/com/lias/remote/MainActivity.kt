@@ -1,20 +1,21 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/MainActivity.kt
-// Version: 20.0.0
+// Version: 24.0.0
 //
 // Purpose:
-//   Single-activity entry point.
+//   Single-activity LIAS Remote host.
 //
-// Batch 20:
-//   - Handles cold-start external deep links.
-//   - Handles deep links delivered while Activity is already alive.
-//   - Preserves an unconsumed URI through Activity recreation.
-//   - ViewModels remain Activity scoped.
-//   - Navigation state itself remains owned by Navigation Compose.
+// Integrated contracts:
+//   Batch 20:
+//     - external deep links
+//     - process/recreation-safe pending URI
+//     - singleTop new-intent delivery
 //
-// Lifecycle rule:
-//   MainActivity transports an Intent URI.
-//   LiasNavHost decides WHEN it is safe to consume it.
+//   Batch 22:
+//     - SettingsViewModel uses isolated LiasConnectionProbe
+//
+//   Batch 24:
+//     - removes obsolete SettingsViewModel(LiasApiClient) constructor
 // ====================================================================
 
 package com.lias.remote
@@ -43,6 +44,10 @@ class MainActivity :
             "lias.pending_deep_link"
     }
 
+    /**
+     * Kept outside composition so onNewIntent() can update the already
+     * running UI immediately.
+     */
     private val pendingDeepLink =
         mutableStateOf<String?>(
             null
@@ -74,7 +79,7 @@ class MainActivity :
                 )
                 .container
 
-        val viewModelFactory =
+        val factory =
             object :
                 ViewModelProvider.Factory {
 
@@ -89,27 +94,27 @@ class MainActivity :
 
                     return when {
 
-                        modelClass
-                            .isAssignableFrom(
-                                LiasViewModel::class.java
-                            ) ->
+                        modelClass.isAssignableFrom(
+                            LiasViewModel::class.java
+                        ) ->
 
                             LiasViewModel(
-                                container.eventRepository
+                                eventRepository =
+                                    container
+                                        .eventRepository
                             ) as T
 
-                        modelClass
-                            .isAssignableFrom(
-                                SettingsViewModel::class.java
-                            ) ->
+                        modelClass.isAssignableFrom(
+                            SettingsViewModel::class.java
+                        ) ->
 
                             SettingsViewModel(
                                 settings =
                                     container
                                         .settingsRepository,
-                                api =
+                                connectionProbe =
                                     container
-                                        .liasApiClient,
+                                        .liasConnectionProbe,
                                 eventRepository =
                                     container
                                         .eventRepository
@@ -127,7 +132,7 @@ class MainActivity :
         val liasViewModel =
             ViewModelProvider(
                 this,
-                viewModelFactory
+                factory
             )[
                 LiasViewModel::class.java
             ]
@@ -135,7 +140,7 @@ class MainActivity :
         val settingsViewModel =
             ViewModelProvider(
                 this,
-                viewModelFactory
+                factory
             )[
                 SettingsViewModel::class.java
             ]
@@ -149,7 +154,8 @@ class MainActivity :
 
             LiasTheme(
                 themeMode =
-                    settingsState.themeMode
+                    settingsState
+                        .themeMode
             ) {
 
                 LiasNavHost(
