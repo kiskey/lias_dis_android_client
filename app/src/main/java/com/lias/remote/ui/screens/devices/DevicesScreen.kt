@@ -2,6 +2,7 @@ package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,13 +27,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
@@ -40,6 +48,8 @@ import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoButton
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
 import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
@@ -93,7 +103,7 @@ fun DevicesScreen(
                             }
                         )
                     }
-                    items(devicesInTag.size, key = { index -> devicesInTag[index].pdid }) { index ->
+                    items(devicesInTag.size, key = { idx -> devicesInTag[idx].pdid }) { index ->
                         val device = devicesInTag[index]
                         val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
 
@@ -202,6 +212,56 @@ private fun DeviceCardItem(
                     HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
                 }
                 HigButton(text = "›", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Unit) {
+    var name by remember { mutableStateOf(initialTag?.name ?: "") }
+    var selectedColor by remember { mutableStateOf(initialTag?.color ?: "#0A84FF") }
+    val presetColors = listOf("#0A84FF", "#5856D6", "#FF9500", "#FF2D55", "#00C7BE", "#30D158", "#FFCC00", "#8E8E93")
+
+    HigModalSheet(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            HigSheetHeader(
+                title = if (initialTag == null) "New Tag" else "Edit Tag",
+                onCancel = onDismiss,
+                trailingAction = {
+                    CupertinoButton(
+                        onClick = {
+                            val finalId = initialTag?.id ?: name.lowercase().replace(" ", "_")
+                            onSave(Tag(id = finalId, name = name, color = selectedColor, precedence = initialTag?.precedence ?: 50, builtin = initialTag?.builtin ?: false))
+                        },
+                        colors = CupertinoButtonDefaults.plainButtonColors()
+                    ) {
+                        CupertinoText("Save", fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+
+            HigField(value = name, onValueChange = { name = it }, label = "Tag Name", placeholder = "e.g. Nursery")
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                CupertinoText("BADGE COLOR", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel, modifier = Modifier.padding(bottom = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    presetColors.forEach { colorHex ->
+                        val isSelected = selectedColor.equals(colorHex, ignoreCase = true)
+                        val color = Color(android.graphics.Color.parseColor(colorHex))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .then(if (isSelected) Modifier.border(2.dp, LiasThemeColors.label, CircleShape) else Modifier)
+                                .clickable { selectedColor = colorHex }
+                        )
+                    }
+                }
             }
         }
     }
