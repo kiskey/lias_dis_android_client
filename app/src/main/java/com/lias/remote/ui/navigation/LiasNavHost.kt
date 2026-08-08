@@ -145,7 +145,7 @@ fun LiasNavHost(
                     .fillMaxWidth()
                     .height(HigSpec.TabBarHeight)
                     .background(LiasThemeColors.secondaryBackground)
-                    .padding(top = 6.dp),
+                    .padding(top = 4.dp, bottom = 4.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -202,7 +202,14 @@ fun LiasNavHost(
                 composable(LiasScreen.Home.route) {
                     HomeScreen(
                         viewModel = liasViewModel,
-                        onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") }
+                        onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") },
+                        onNavigateToTab = { screen ->
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
                 composable(LiasScreen.Devices.route) {
@@ -244,7 +251,7 @@ fun LiasNavHost(
                 onDismiss = { liasViewModel.clearUndo() },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 100.dp)
+                    .padding(bottom = HigSpec.BottomNavPadding + 12.dp)
             )
         }
     }
