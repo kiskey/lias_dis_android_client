@@ -1,8 +1,13 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/ApiTypes.kt
-// Version: 1.3.0
-// Audit Fixes:
-//   1. Added ExtendAccessRequest DTO for extend endpoints (§2.3).
+// Version: 2.0.0
+//
+// Purpose:
+//   REST request/response DTOs exchanged with LIAS.
+//
+// Contract:
+//   DTOs mirror the supplied LIAS/DIS API contract. Unknown server
+//   fields remain safely ignored by LiasApiClient's Json configuration.
 // ====================================================================
 
 package com.lias.remote.core.network
@@ -27,13 +32,17 @@ data class ConflictResponse(
 
 @Serializable
 data class PolicyValidateRequest(
-    @SerialName("schedule_ids") val scheduleIds: List<String>
+    @SerialName("schedule_ids")
+    val scheduleIds: List<String>
 )
 
 @Serializable
 data class DeviceTagRequest(
-    @SerialName("tag_id") val tagId: String? = null,
-    @SerialName("tag_ids") val tagIds: List<String>? = null
+    @SerialName("tag_id")
+    val tagId: String? = null,
+
+    @SerialName("tag_ids")
+    val tagIds: List<String>? = null
 )
 
 @Serializable
@@ -43,7 +52,8 @@ data class RenameDeviceRequest(
 
 @Serializable
 data class UserDeviceRequest(
-    @SerialName("user_id") val userId: String
+    @SerialName("user_id")
+    val userId: String
 )
 
 @Serializable
@@ -53,7 +63,8 @@ data class VacationRequest(
 
 @Serializable
 data class VacationResponse(
-    @SerialName("vacation_mode") val vacationMode: Boolean = false
+    @SerialName("vacation_mode")
+    val vacationMode: Boolean = false
 )
 
 @Serializable
