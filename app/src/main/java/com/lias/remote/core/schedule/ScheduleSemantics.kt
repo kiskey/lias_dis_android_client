@@ -1,345 +1,408 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/core/schedule/ScheduleSemantics.kt
-// Version: 18.0.0
+// File:
+// app/src/main/java/com/lias/remote/core/schedule/ScheduleSemantics.kt
+// Version: 27.0.2
 //
 // Purpose:
-//   Client-side validation and presentation semantics.
+//   Client-side schedule draft semantics.
 //
-// LIAS remains authoritative. These checks mirror the backend where
-// practical and catch mistakes before a network round-trip.
+// Architectural authority:
+//   LIAS remains the final enforcement authority.
 //
-// Server-aligned checks:
-//   - non-empty name
-//   - mode downtime|whitelist
-//   - valid IANA timezone
-//   - >= 1 rule
-//   - HH:mm times
-//   - start != end
-//   - recurring rule has >= 1 weekday
-//   - calendar rule has BOTH dates
-//   - YYYY-MM-DD dates
+// This layer performs:
+//   - safe form validation
+//   - weekly rule normalization
+//   - calendar date-range validation
+//   - overnight-window representation
+//   - mode → action mapping
+//   - canonical DTO conversion
 //
-// Additional safe client check:
-//   - calendar start date must not be after end date
+// Supported LIAS schedule forms:
+//
+//   WEEKLY
+//     selected weekdays + start/end time
+//
+//   CALENDAR
+//     inclusive start/end dates + start/end time
+//
+// Important:
+//   An overnight rule such as 22:00 -> 06:00 is VALID.
+//   Equal start/end times are invalid zero-duration windows.
 // ====================================================================
 
 package com.lias.remote.core.schedule
 
-import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
-import com.lias.remote.core.util.ScheduleProjection
-import java.time.DateTimeException
+import com.lias.remote.core.models.ScheduleRule
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
-data class ScheduleValidationIssue(
-    val ruleIndex: Int? = null,
-    val message: String
-)
+enum class ScheduleRuleScope {
 
-data class ScheduleValidationResult(
-    val issues: List<ScheduleValidationIssue>
-) {
+    WEEKLY,
 
-    val valid: Boolean
-        get() =
-            issues.isEmpty()
-
-    val firstMessage: String?
-        get() =
-            issues
-                .firstOrNull()
-                ?.message
+    CALENDAR
 }
 
-object ScheduleSemantics {
+data class ScheduleRuleDraft(
 
-    val orderedDayKeys =
-        listOf(
-            "mon",
-            "tue",
-            "wed",
-            "thu",
-            "fri",
-            "sat",
-            "sun"
-        )
+    val scope:
+        ScheduleRuleScope =
+        ScheduleRuleScope.WEEKLY,
 
-    private val dayLabels =
-        mapOf(
-            "mon" to "Mon",
-            "tue" to "Tue",
-            "wed" to "Wed",
-            "thu" to "Thu",
-            "fri" to "Fri",
-            "sat" to "Sat",
-            "sun" to "Sun"
-        )
+    val days:
+        Set<String> =
+        DEFAULT_WEEKDAYS,
 
-    private val timeFormatter =
-        DateTimeFormatter
-            .ofPattern(
-                "HH:mm"
-            )
+    val startTime:
+        String =
+        "22:00",
 
-    private val dateFormatter =
-        DateTimeFormatter
-            .ISO_LOCAL_DATE
+    val endTime:
+        String =
+        "06:00",
 
-    val commonTimezones:
-        List<String>
+    val startDate:
+        String =
+        "",
+
+    val endDate:
+        String =
+        ""
+) {
+
+    val isOvernight:
+        Boolean
         get() {
 
-            val local =
-                ZoneId.systemDefault()
-                    .id
+            val start =
+                parseTimeOrNull(
+                    startTime
+                )
+                    ?: return false
 
-            return listOf(
-                local,
-                "UTC",
-                "America/Los_Angeles",
-                "America/Denver",
-                "America/Chicago",
-                "America/New_York",
-                "Europe/London",
-                "Europe/Paris",
-                "Asia/Kolkata",
-                "Asia/Tokyo",
-                "Australia/Sydney"
-            )
-                .distinct()
+            val end =
+                parseTimeOrNull(
+                    endTime
+                )
+                    ?: return false
+
+            return end <
+                start
         }
 
-    fun normalizeMode(
-        mode: String
-    ): String =
+    val isZeroDuration:
+        Boolean
+        get() {
+
+            val start =
+                parseTimeOrNull(
+                    startTime
+                )
+                    ?: return false
+
+            val end =
+                parseTimeOrNull(
+                    endTime
+                )
+                    ?: return false
+
+            return start ==
+                end
+        }
+
+    fun normalizedDays():
+        List<String> {
+
         if (
-            mode.equals(
-                "whitelist",
-                ignoreCase = true
-            )
+            scope ==
+            ScheduleRuleScope.CALENDAR
         ) {
-            "whitelist"
-        } else {
-            "downtime"
+
+            /*
+             * LIAS calendar rules are date-gated before weekly
+             * evaluation. The dashboard also serializes all seven days
+             * for calendar ranges, which keeps representation
+             * compatible across clients.
+             */
+            return ALL_DAYS
         }
 
-    fun normalizeDay(
-        day: String
-    ): String {
-
-        val normalized =
-            day.trim()
-                .lowercase()
-
-        return when {
-
-            normalized.startsWith(
-                "mon"
-            ) ->
-                "mon"
-
-            normalized.startsWith(
-                "tue"
-            ) ->
-                "tue"
-
-            normalized.startsWith(
-                "wed"
-            ) ->
-                "wed"
-
-            normalized.startsWith(
-                "thu"
-            ) ->
-                "thu"
-
-            normalized.startsWith(
-                "fri"
-            ) ->
-                "fri"
-
-            normalized.startsWith(
-                "sat"
-            ) ->
-                "sat"
-
-            normalized.startsWith(
-                "sun"
-            ) ->
-                "sun"
-
-            else ->
-                ""
-        }
-    }
-
-    fun orderedDays(
-        days: Collection<String>
-    ): List<String> {
-
-        val normalized =
-            days.map {
+        return days
+            .mapNotNull {
                 normalizeDay(
                     it
                 )
             }
-                .filter {
-                    it.isNotBlank()
-                }
-                .toSet()
-
-        return orderedDayKeys
-            .filter {
-                it in normalized
+            .distinct()
+            .sortedBy {
+                ALL_DAYS.indexOf(
+                    it
+                )
             }
     }
 
-    fun dayLabel(
-        day: String
-    ): String =
-        dayLabels[
-            normalizeDay(
-                day
-            )
-        ] ?: day
+    fun toScheduleRule(
+        scheduleMode: String
+    ): ScheduleRule {
 
-    fun modeTitle(
-        mode: String
-    ): String =
-        if (
-            normalizeMode(
-                mode
-            ) ==
-            "whitelist"
-        ) {
-            "Allowed Hours"
-        } else {
-            "Downtime"
-        }
-
-    fun modeExplanation(
-        mode: String
-    ): String =
-        if (
-            normalizeMode(
-                mode
-            ) ==
-            "whitelist"
-        ) {
-            "Internet is blocked by default and allowed only during the windows below."
-        } else {
-            "Internet is allowed by default and blocked during the windows below."
-        }
-
-    fun windowAction(
-        mode: String
-    ): String =
-        if (
-            normalizeMode(
-                mode
-            ) ==
-            "whitelist"
-        ) {
-            "Allow"
-        } else {
-            "Block"
-        }
-
-    fun validTimezone(
-        timezone: String
-    ): Boolean {
-
-        if (
-            timezone.trim()
-                .isBlank()
-        ) {
-            return false
-        }
-
-        return try {
-
-            ZoneId.of(
-                timezone.trim()
-            )
-
-            true
-
-        } catch (
-            _: DateTimeException
-        ) {
-            false
-        }
-    }
-
-    fun validTime(
-        time: String
-    ): Boolean =
-        try {
-
-            LocalTime.parse(
-                time.trim(),
-                timeFormatter
-            )
-
-            true
-
-        } catch (
-            _: DateTimeParseException
-        ) {
-            false
-        }
-
-    fun validDate(
-        date: String
-    ): Boolean =
-        try {
-
-            LocalDate.parse(
-                date.trim(),
-                dateFormatter
-            )
-
-            true
-
-        } catch (
-            _: DateTimeParseException
-        ) {
-            false
-        }
-
-    fun minutesOfDayOrNull(
-        time: String
-    ): Int? =
-        try {
-
-            val parsed =
-                LocalTime.parse(
-                    time.trim(),
-                    timeFormatter
+        val action =
+            ScheduleSemantics
+                .actionForMode(
+                    scheduleMode
                 )
 
-            parsed.hour *
-                60 +
-                parsed.minute
+        return ScheduleRule(
+            days =
+                normalizedDays(),
+            startTime =
+                startTime.trim(),
+            endTime =
+                endTime.trim(),
+            action =
+                action,
+            startDate =
+                if (
+                    scope ==
+                    ScheduleRuleScope.CALENDAR
+                ) {
 
-        } catch (
-            _: DateTimeParseException
+                    startDate
+                        .trim()
+                        .ifBlank {
+                            null
+                        }
+
+                } else {
+                    null
+                },
+            endDate =
+                if (
+                    scope ==
+                    ScheduleRuleScope.CALENDAR
+                ) {
+
+                    endDate
+                        .trim()
+                        .ifBlank {
+                            null
+                        }
+
+                } else {
+                    null
+                }
+        )
+    }
+
+    companion object {
+
+        private fun parseTimeOrNull(
+            value: String
+        ): LocalTime? =
+            try {
+
+                LocalTime.parse(
+                    value.trim(),
+                    TIME_FORMAT
+                )
+
+            } catch (
+                _: Exception
+            ) {
+                null
+            }
+    }
+}
+
+data class ScheduleDraft(
+
+    val name:
+        String =
+        "",
+
+    val mode:
+        String =
+        "downtime",
+
+    val timezone:
+        String =
+        "UTC",
+
+    val rules:
+        List<ScheduleRuleDraft> =
+        emptyList()
+) {
+
+    fun toSchedule(
+        initialSchedule: Schedule?
+    ): Schedule {
+
+        val normalizedMode =
+            ScheduleSemantics
+                .normalizeMode(
+                    mode
+                )
+
+        return Schedule(
+            /*
+             * Empty ID means CREATE.
+             *
+             * LIAS owns canonical schedule-ID generation.
+             */
+            id =
+                initialSchedule
+                    ?.id
+                    .orEmpty(),
+            name =
+                name.trim(),
+            mode =
+                normalizedMode,
+            timezone =
+                timezone
+                    .trim()
+                    .ifBlank {
+                        "UTC"
+                    },
+            rules =
+                rules.map {
+                    rule ->
+
+                    rule.toScheduleRule(
+                        normalizedMode
+                    )
+                }
+        )
+    }
+
+    companion object {
+
+        fun fromSchedule(
+            schedule: Schedule
+        ): ScheduleDraft =
+            ScheduleDraft(
+                name =
+                    schedule.name,
+                mode =
+                    ScheduleSemantics
+                        .normalizeMode(
+                            schedule.mode
+                        ),
+                timezone =
+                    schedule.timezone
+                        .ifBlank {
+                            "UTC"
+                        },
+                rules =
+                    schedule.safeRules
+                        .map {
+                            rule ->
+
+                            val hasCalendarRange =
+                                !rule.startDate
+                                    .isNullOrBlank() &&
+                                    !rule.endDate
+                                        .isNullOrBlank()
+
+                            ScheduleRuleDraft(
+                                scope =
+                                    if (
+                                        hasCalendarRange
+                                    ) {
+                                        ScheduleRuleScope.CALENDAR
+                                    } else {
+                                        ScheduleRuleScope.WEEKLY
+                                    },
+                                days =
+                                    rule.safeDays
+                                        .mapNotNull {
+                                            normalizeDay(
+                                                it
+                                            )
+                                        }
+                                        .toSet(),
+                                startTime =
+                                    rule.startTime,
+                                endTime =
+                                    rule.endTime,
+                                startDate =
+                                    rule.startDate
+                                        .orEmpty(),
+                                endDate =
+                                    rule.endDate
+                                        .orEmpty()
+                            )
+                        }
+            )
+    }
+}
+
+data class ScheduleValidationResult(
+
+    val valid:
+        Boolean,
+
+    val errors:
+        List<String>
+) {
+
+    val firstError:
+        String?
+        get() =
+            errors.firstOrNull()
+}
+
+object ScheduleSemantics {
+
+    fun normalizeMode(
+        raw: String
+    ): String =
+        when (
+            raw
+                .trim()
+                .lowercase()
         ) {
-            null
+
+            "whitelist" ->
+                "whitelist"
+
+            else ->
+                "downtime"
+        }
+
+    /**
+     * The schedule mode owns the wire action.
+     *
+     * Downtime:
+     *   rules BLOCK
+     *   default ALLOW
+     *
+     * Whitelist:
+     *   rules ALLOW
+     *   default BLOCK
+     */
+    fun actionForMode(
+        rawMode: String
+    ): String =
+        if (
+            normalizeMode(
+                rawMode
+            ) ==
+            "whitelist"
+        ) {
+            "allow"
+        } else {
+            "block"
         }
 
     fun validate(
         draft: ScheduleDraft
     ): ScheduleValidationResult {
 
-        val issues =
-            mutableListOf<
-                ScheduleValidationIssue
-            >()
+        val errors =
+            mutableListOf<String>()
 
         if (
             draft.name
@@ -347,15 +410,13 @@ object ScheduleSemantics {
                 .isBlank()
         ) {
 
-            issues +=
-                ScheduleValidationIssue(
-                    message =
-                        "Enter a schedule name."
-                )
+            errors +=
+                "Schedule name is required."
         }
 
         if (
             draft.mode
+                .trim()
                 .lowercase() !in
             setOf(
                 "downtime",
@@ -363,36 +424,36 @@ object ScheduleSemantics {
             )
         ) {
 
-            issues +=
-                ScheduleValidationIssue(
-                    message =
-                        "Choose Downtime or Allowed Hours."
-                )
+            errors +=
+                "Schedule mode must be Downtime or Whitelist."
         }
 
-        if (
-            !validTimezone(
-                draft.timezone
-            )
-        ) {
-
-            issues +=
-                ScheduleValidationIssue(
-                    message =
-                        "Enter a valid IANA timezone such as America/Los_Angeles."
-                )
-        }
+        val timezone =
+            draft.timezone
+                .trim()
 
         if (
-            draft.rules
-                .isEmpty()
+            timezone.isBlank()
         ) {
 
-            issues +=
-                ScheduleValidationIssue(
-                    message =
-                        "Add at least one time window."
+            errors +=
+                "Timezone is required."
+
+        } else {
+
+            try {
+
+                ZoneId.of(
+                    timezone
                 )
+
+            } catch (
+                _: Exception
+            ) {
+
+                errors +=
+                    "Timezone '$timezone' is not valid on this device."
+            }
         }
 
         draft.rules
@@ -400,197 +461,184 @@ object ScheduleSemantics {
                     index,
                     rule ->
 
-                val displayIndex =
-                    index + 1
-
-                if (
-                    !validTime(
-                        rule.startTime
+                errors +=
+                    validateRule(
+                        index =
+                            index,
+                        rule =
+                            rule
                     )
-                ) {
-
-                    issues +=
-                        ScheduleValidationIssue(
-                            ruleIndex =
-                                index,
-                            message =
-                                "Window $displayIndex has an invalid start time. Use HH:mm."
-                        )
-                }
-
-                if (
-                    !validTime(
-                        rule.endTime
-                    )
-                ) {
-
-                    issues +=
-                        ScheduleValidationIssue(
-                            ruleIndex =
-                                index,
-                            message =
-                                "Window $displayIndex has an invalid end time. Use HH:mm."
-                        )
-                }
-
-                if (
-                    validTime(
-                        rule.startTime
-                    ) &&
-                    validTime(
-                        rule.endTime
-                    ) &&
-                    rule.startTime ==
-                    rule.endTime
-                ) {
-
-                    issues +=
-                        ScheduleValidationIssue(
-                            ruleIndex =
-                                index,
-                            message =
-                                "Window $displayIndex cannot start and end at the same time."
-                        )
-                }
-
-                when (
-                    rule.scope
-                ) {
-
-                    ScheduleRuleScope.RECURRING -> {
-
-                        if (
-                            orderedDays(
-                                rule.days
-                            )
-                                .isEmpty()
-                        ) {
-
-                            issues +=
-                                ScheduleValidationIssue(
-                                    ruleIndex =
-                                        index,
-                                    message =
-                                        "Window $displayIndex needs at least one weekday."
-                                )
-                        }
-                    }
-
-                    ScheduleRuleScope.CALENDAR -> {
-
-                        if (
-                            rule.startDate
-                                .isBlank() ||
-                            rule.endDate
-                                .isBlank()
-                        ) {
-
-                            issues +=
-                                ScheduleValidationIssue(
-                                    ruleIndex =
-                                        index,
-                                    message =
-                                        "Window $displayIndex needs both a start date and end date."
-                                )
-
-                        } else {
-
-                            val validStart =
-                                validDate(
-                                    rule.startDate
-                                )
-
-                            val validEnd =
-                                validDate(
-                                    rule.endDate
-                                )
-
-                            if (
-                                !validStart
-                            ) {
-
-                                issues +=
-                                    ScheduleValidationIssue(
-                                        ruleIndex =
-                                            index,
-                                        message =
-                                            "Window $displayIndex has an invalid start date. Use YYYY-MM-DD."
-                                    )
-                            }
-
-                            if (
-                                !validEnd
-                            ) {
-
-                                issues +=
-                                    ScheduleValidationIssue(
-                                        ruleIndex =
-                                            index,
-                                        message =
-                                            "Window $displayIndex has an invalid end date. Use YYYY-MM-DD."
-                                    )
-                            }
-
-                            if (
-                                validStart &&
-                                validEnd
-                            ) {
-
-                                val start =
-                                    LocalDate.parse(
-                                        rule.startDate,
-                                        dateFormatter
-                                    )
-
-                                val end =
-                                    LocalDate.parse(
-                                        rule.endDate,
-                                        dateFormatter
-                                    )
-
-                                if (
-                                    start.isAfter(
-                                        end
-                                    )
-                                ) {
-
-                                    issues +=
-                                        ScheduleValidationIssue(
-                                            ruleIndex =
-                                                index,
-                                            message =
-                                                "Window $displayIndex starts after its end date."
-                                        )
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
         return ScheduleValidationResult(
-            issues =
-                issues
+            valid =
+                errors.isEmpty(),
+            errors =
+                errors
         )
     }
 
-    /**
-     * Local recurring-window conflict preview.
-     *
-     * ScheduleProjection works on recurring weekday windows.
-     * The server remains authoritative when the schedule is saved.
-     */
-    fun recurringConflicts(
-        schedule: Schedule
-    ): List<Conflict> =
-        ScheduleProjection
-            .detectConflicts(
-                listOf(
-                    schedule
-                )
+    private fun validateRule(
+        index: Int,
+        rule: ScheduleRuleDraft
+    ): List<String> {
+
+        val errors =
+            mutableListOf<String>()
+
+        val label =
+            "Rule ${index + 1}"
+
+        val startTime =
+            parseTime(
+                rule.startTime
             )
 
-    fun ruleSummary(
+        val endTime =
+            parseTime(
+                rule.endTime
+            )
+
+        if (
+            startTime ==
+            null
+        ) {
+
+            errors +=
+                "$label has an invalid start time."
+        }
+
+        if (
+            endTime ==
+            null
+        ) {
+
+            errors +=
+                "$label has an invalid end time."
+        }
+
+        if (
+            startTime !=
+            null &&
+            endTime !=
+            null &&
+            startTime ==
+            endTime
+        ) {
+
+            errors +=
+                "$label must have a non-zero time window."
+        }
+
+        when (
+            rule.scope
+        ) {
+
+            ScheduleRuleScope.WEEKLY -> {
+
+                val normalizedDays =
+                    rule.normalizedDays()
+
+                if (
+                    normalizedDays.isEmpty()
+                ) {
+
+                    errors +=
+                        "$label must include at least one day."
+                }
+
+                val unsupportedDays =
+                    rule.days
+                        .filter {
+                            normalizeDay(
+                                it
+                            ) ==
+                            null
+                        }
+
+                if (
+                    unsupportedDays.isNotEmpty()
+                ) {
+
+                    errors +=
+                        "$label contains an unsupported weekday."
+                }
+            }
+
+            ScheduleRuleScope.CALENDAR -> {
+
+                val startDateText =
+                    rule.startDate
+                        .trim()
+
+                val endDateText =
+                    rule.endDate
+                        .trim()
+
+                if (
+                    startDateText.isBlank() ||
+                    endDateText.isBlank()
+                ) {
+
+                    errors +=
+                        "$label requires both a start date and end date."
+
+                } else {
+
+                    val startDate =
+                        parseDate(
+                            startDateText
+                        )
+
+                    val endDate =
+                        parseDate(
+                            endDateText
+                        )
+
+                    if (
+                        startDate ==
+                        null
+                    ) {
+
+                        errors +=
+                            "$label has an invalid start date."
+                    }
+
+                    if (
+                        endDate ==
+                        null
+                    ) {
+
+                        errors +=
+                            "$label has an invalid end date."
+                    }
+
+                    if (
+                        startDate !=
+                        null &&
+                        endDate !=
+                        null &&
+                        endDate <
+                        startDate
+                    ) {
+
+                        errors +=
+                            "$label end date cannot be before its start date."
+                    }
+                }
+            }
+        }
+
+        return errors
+    }
+
+    /**
+     * Human-readable rule description.
+     *
+     * This is deliberately presentation-only. It never evaluates
+     * enforcement locally.
+     */
+    fun describeRule(
         rule: ScheduleRuleDraft
     ): String =
         buildString {
@@ -599,67 +647,190 @@ object ScheduleSemantics {
                 rule.scope
             ) {
 
-                ScheduleRuleScope.RECURRING -> {
+                ScheduleRuleScope.WEEKLY -> {
 
-                    val ordered =
-                        orderedDays(
-                            rule.days
-                        )
+                    val days =
+                        rule.normalizedDays()
 
                     append(
                         if (
-                            ordered.size ==
-                            7
+                            days.isEmpty()
                         ) {
-                            "Every day"
+                            "No days"
                         } else {
-                            ordered
-                                .joinToString(
-                                    " "
-                                ) {
-                                    dayLabel(
-                                        it
-                                    )
-                                }
-                        )
+                            days.joinToString(
+                                ", "
+                            ) {
+                                day ->
+
+                                day.uppercase()
+                            }
+                        }
+                    )
                 }
 
                 ScheduleRuleScope.CALENDAR -> {
 
-                    append(
-                        rule.startDate.ifBlank {
-                            "Start date"
-                        }
-                    )
+                    val startDate =
+                        rule.startDate
+                            .trim()
 
-                    append(" – ")
+                    val endDate =
+                        rule.endDate
+                            .trim()
 
                     append(
-                        rule.endDate.ifBlank {
-                            "End date"
+                        if (
+                            startDate.isBlank() ||
+                            endDate.isBlank()
+                        ) {
+                            "Calendar dates not set"
+                        } else {
+                            "$startDate to $endDate"
                         }
                     )
                 }
             }
 
-            append(" · ")
+            append(
+                " · "
+            )
 
             append(
                 rule.startTime
+                    .trim()
             )
 
-            append("–")
+            append(
+                "–"
+            )
 
             append(
                 rule.endTime
+                    .trim()
             )
 
             if (
                 rule.isOvernight
             ) {
+
                 append(
-                    " · next day"
+                    " · ends next day"
                 )
             }
         }
+
+    private fun parseTime(
+        value: String
+    ): LocalTime? =
+        try {
+
+            LocalTime.parse(
+                value.trim(),
+                TIME_FORMAT
+            )
+
+        } catch (
+            _: DateTimeParseException
+        ) {
+            null
+        }
+
+    private fun parseDate(
+        value: String
+    ): LocalDate? =
+        try {
+
+            LocalDate.parse(
+                value.trim(),
+                DATE_FORMAT
+            )
+
+        } catch (
+            _: DateTimeParseException
+        ) {
+            null
+        }
 }
+
+/*
+ * LIAS wire weekday convention.
+ *
+ * Keep three-letter lowercase names because:
+ *   - the existing ScheduleRule model uses string days
+ *   - the LIAS parser accepts these names
+ *   - the web client emits the same representation.
+ */
+val ALL_DAYS:
+    List<String> =
+    listOf(
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun"
+    )
+
+val DEFAULT_WEEKDAYS:
+    Set<String> =
+    linkedSetOf(
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+    )
+
+private val TIME_FORMAT =
+    DateTimeFormatter.ofPattern(
+        "HH:mm"
+    )
+
+private val DATE_FORMAT =
+    DateTimeFormatter.ISO_LOCAL_DATE
+
+private fun normalizeDay(
+    raw: String
+): String? =
+    when (
+        raw
+            .trim()
+            .lowercase()
+    ) {
+
+        "mon",
+        "monday" ->
+            "mon"
+
+        "tue",
+        "tues",
+        "tuesday" ->
+            "tue"
+
+        "wed",
+        "wednesday" ->
+            "wed"
+
+        "thu",
+        "thur",
+        "thurs",
+        "thursday" ->
+            "thu"
+
+        "fri",
+        "friday" ->
+            "fri"
+
+        "sat",
+        "saturday" ->
+            "sat"
+
+        "sun",
+        "sunday" ->
+            "sun"
+
+        else ->
+            null
+    }
