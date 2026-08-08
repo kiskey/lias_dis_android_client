@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
@@ -65,6 +66,7 @@ fun DevicesScreen(
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
     var activeDeviceForPause by remember { mutableStateOf<Device?>(null) }
+    var activeDeviceForRename by remember { mutableStateOf<Device?>(null) }
 
     val groupedDevices = remember(state.devices, searchQuery, state.tags) {
         val filtered = if (searchQuery.isBlank()) state.devices else state.devices.filter {
@@ -103,13 +105,15 @@ fun DevicesScreen(
                             }
                         )
                     }
-                    items(devicesInTag.size, key = { idx -> devicesInTag[idx].pdid }) { index ->
+                    items(devicesInTag.size, key = { index -> devicesInTag[index].pdid }) { index ->
                         val device = devicesInTag[index]
                         val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+                        val status = viewModel.effectiveStatusFor(device.pdid)
 
                         DeviceCardItem(
                             device = device,
                             isPaused = isPaused,
+                            statusAction = status.action,
                             onExtend = { activeDeviceForExtend = device },
                             onPause = { activeDeviceForPause = device },
                             onDetail = { onNavigateToDeviceDetail(device.pdid) }
@@ -158,16 +162,31 @@ fun DevicesScreen(
             }
         )
     }
+
+    activeDeviceForRename?.let { device ->
+        RenameDeviceDialog(
+            currentName = device.displayName,
+            onDismiss = { activeDeviceForRename = null },
+            onConfirm = { newName ->
+                viewModel.renameDevice(device.pdid, newName)
+                activeDeviceForRename = null
+            }
+        )
+    }
 }
 
 @Composable
 private fun DeviceCardItem(
     device: Device,
     isPaused: Boolean,
+    statusAction: String,
     onExtend: () -> Unit,
     onPause: () -> Unit,
     onDetail: () -> Unit
 ) {
+    val isInfra = device.safeTags.contains("infrastructure")
+    val isBlockedOrPaused = isPaused || statusAction == "block"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,24 +216,45 @@ private fun DeviceCardItem(
                     )
                 }
                 StatusPill(
-                    text = if (isPaused) "Paused" else if (device.online) "Allow" else "Offline",
-                    tone = if (isPaused) PillTone.PAUSED else if (device.online) PillTone.ALLOWED else PillTone.INFO
+                    text = if (isInfra) "Immune" else if (isPaused) "Paused" else if (isBlockedOrPaused) "Blocked" else if (device.online) "Allow" else "Offline",
+                    tone = if (isInfra) PillTone.INFO else if (isPaused) PillTone.PAUSED else if (isBlockedOrPaused) PillTone.BLOCKED else if (device.online) PillTone.ALLOWED else PillTone.INFO
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (isPaused) {
-                    HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
-                } else {
-                    HigButton(text = "⏸ Pause", onClick = onPause, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
-                    HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
+            // Action row: Infrastructure devices have NO pause/extend buttons (Immune)
+            if (!isInfra) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (isBlockedOrPaused) {
+                        // Extend option valid ONLY if blocked or in pause state
+                        HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
+                    } else {
+                        HigButton(text = "⏸ Pause", onClick = onPause, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
+                    }
+                    HigButton(text = "›", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
                 }
-                HigButton(text = "›", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
+            } else {
+                HigButton(text = "View Details", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.fillMaxWidth())
             }
         }
     }
+}
+
+@Composable
+fun RenameDeviceDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (newName: String) -> Unit
+) {
+    var text by remember { mutableStateOf(currentName) }
+    HigAlertDialog(
+        onDismissRequest = onDismiss,
+        title = "Rename Device",
+        message = "Enter a friendly name for this device:",
+        confirmText = "Save",
+        onConfirm = { if (text.isNotBlank()) onConfirm(text) }
+    )
 }
 
 @Composable
