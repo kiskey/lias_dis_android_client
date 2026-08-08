@@ -1,28 +1,32 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt
-// Version: 2.0.0
+// Version: 22.0.0
 //
 // Purpose:
-//   Resilient REST client for the LIAS Remote Android application.
+//   Canonical LIAS REST client.
 //
-// Audit / Stability Changes:
-//   1. Response bodies are always closed through Response.use.
-//   2. HTTP 401/403 are represented explicitly as AuthenticationError.
-//   3. Successful JSON decoding failures are represented as
-//      SerializationError instead of NetworkError.
-//   4. Empty successful responses correctly support Unit/204.
-//   5. Error payload parsing is tolerant of malformed/non-JSON bodies.
-//   6. URL normalization is centralized.
-//   7. Request construction remains compatible with existing repository
-//      callers and LIAS endpoint contracts.
+// Batch 22:
+//   - 401/403 -> AuthenticationError
+//   - malformed successful payload -> SerializationError
+//   - 409 preserves server message + conflicts
+//   - response bodies are closed deterministically
+//   - raw endpoints share the same HTTP classification
+//   - request URL is validated before execution
+//
+// Compatibility:
+//   baseUrl/authToken remain mutable because EventRepository currently
+//   follows persisted settings. Candidate connection testing no longer
+//   mutates this instance; LiasConnectionProbe owns an isolated client.
 // ====================================================================
 
 package com.lias.remote.core.network
 
 import com.lias.remote.core.models.EffectiveStatus
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import okhttp3.MediaType.Companion.toMediaType
@@ -33,36 +37,60 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 class LiasApiClient(
-    @PublishedApi
-    internal val client: OkHttpClient
+    private val client: OkHttpClient
 ) {
 
     @PublishedApi
-    internal val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-        isLenient = true
-        explicitNulls = false
-    }
+    internal val json =
+        Json {
+            ignoreUnknownKeys =
+                true
 
-    @Volatile
-    var baseUrl: String = "http://127.0.0.1:8081"
-
-    @Volatile
-    var authToken: String? = null
-
-    private fun normalizeUrl(raw: String): String {
-        var url = raw.trim()
-
-        if (url.isBlank()) {
-            return ""
+            encodeDefaults =
+                true
         }
 
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = "http://$url"
+    @Volatile
+    var baseUrl: String =
+        "http://127.0.0.1:8081"
+
+    @Volatile
+    var authToken: String? =
+        null
+
+    private fun normalizedBaseUrl():
+        String {
+
+        var result =
+            baseUrl
+                .trim()
+
+        if (
+            result.isBlank()
+        ) {
+            throw IllegalStateException(
+                "LIAS server URL is empty."
+            )
         }
 
-        return url.trimEnd('/')
+        if (
+            !result.startsWith(
+                "http://",
+                ignoreCase = true
+            ) &&
+            !result.startsWith(
+                "https://",
+                ignoreCase = true
+            )
+        ) {
+            result =
+                "http://$result"
+        }
+
+        return result
+            .trimEnd(
+                '/'
+            )
     }
 
     @PublishedApi
@@ -71,29 +99,50 @@ class LiasApiClient(
         method: String,
         body: RequestBody? = null
     ): Request {
-        val sanitizedBase = normalizeUrl(baseUrl)
 
-        require(sanitizedBase.isNotBlank()) {
-            "LIAS server URL is not configured."
-        }
+        val base =
+            normalizedBaseUrl()
 
         val normalizedPath =
-            if (path.startsWith("/")) path else "/$path"
+            if (
+                path.startsWith(
+                    "/"
+                )
+            ) {
+                path
+            } else {
+                "/$path"
+            }
 
-        val builder = Request.Builder()
-            .url("$sanitizedBase$normalizedPath")
-            .header("Accept", "application/json")
+        val builder =
+            Request.Builder()
+                .url(
+                    "$base$normalizedPath"
+                )
+                .header(
+                    "Accept",
+                    "application/json"
+                )
 
         authToken
-            ?.takeIf { it.isNotBlank() }
-            ?.let { token ->
+            ?.trim()
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                token ->
+
                 builder.header(
                     "Authorization",
                     "Bearer $token"
                 )
             }
 
-        if (body != null) {
+        if (
+            body !=
+            null
+        ) {
+
             builder.header(
                 "Content-Type",
                 "application/json"
@@ -101,433 +150,680 @@ class LiasApiClient(
         }
 
         return builder
-            .method(method, body)
+            .method(
+                method,
+                body
+            )
             .build()
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress(
+        "UNCHECKED_CAST"
+    )
     @PublishedApi
     internal fun <T> parseResponse(
         response: Response,
         serializer: KSerializer<T>
     ): ApiResult<T> {
-        return response.use { safeResponse ->
 
-            val bodyString =
-                safeResponse.body?.string().orEmpty()
+        val code =
+            response.code
 
-            when {
+        val body =
+            response.body
+                ?.string()
+                .orEmpty()
 
-                safeResponse.isSuccessful -> {
-                    if (
-                        safeResponse.code == 204 ||
-                        bodyString.isBlank()
-                    ) {
-                        if (
-                            serializer.descriptor.serialName ==
-                            "kotlin.Unit"
-                        ) {
-                            ApiResult.Success(Unit as T)
-                        } else {
-                            ApiResult.HttpError(
-                                safeResponse.code,
-                                "Empty payload returned for expected " +
-                                    serializer.descriptor.serialName
-                            )
-                        }
-                    } else {
-                        try {
-                            ApiResult.Success(
-                                json.decodeFromString(
-                                    serializer,
-                                    bodyString
-                                )
-                            )
-                        } catch (error: Exception) {
-                            ApiResult.SerializationError(
-                                cause = error,
-                                body = bodyString.take(MAX_ERROR_BODY_LENGTH)
-                            )
-                        }
-                    }
-                }
+        if (
+            code ==
+            401 ||
+            code ==
+            403
+        ) {
 
-                safeResponse.code == 401 ||
-                    safeResponse.code == 403 -> {
-                    ApiResult.AuthenticationError(
-                        code = safeResponse.code,
-                        message = decodeErrorMessage(
-                            bodyString,
-                            fallback = when (safeResponse.code) {
-                                401 -> "Authentication required."
-                                else -> "Access denied."
+            return ApiResult
+                .AuthenticationError(
+                    code =
+                        code,
+                    message =
+                        decodeServerMessage(
+                            body
+                        )
+                            ?: if (
+                                code ==
+                                401
+                            ) {
+                                "LIAS rejected the authentication token."
+                            } else {
+                                "LIAS refused access to this operation."
                             }
-                        )
-                    )
-                }
-
-                safeResponse.code == 409 -> {
-                    try {
-                        val errorResponse =
-                            json.decodeFromString(
-                                ConflictResponse.serializer(),
-                                bodyString
-                            )
-
-                        ApiResult.ConflictError(
-                            conflicts = errorResponse.conflicts,
-                            message = errorResponse.message
-                                ?.takeIf { it.isNotBlank() }
-                                ?: "The requested operation conflicts with existing configuration."
-                        )
-                    } catch (_: Exception) {
-                        ApiResult.HttpError(
-                            code = 409,
-                            message = decodeErrorMessage(
-                                bodyString,
-                                fallback = "Request conflicts with existing configuration."
-                            )
-                        )
-                    }
-                }
-
-                else -> {
-                    ApiResult.HttpError(
-                        code = safeResponse.code,
-                        message = decodeErrorMessage(
-                            bodyString,
-                            fallback = "HTTP ${safeResponse.code}"
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    private fun decodeErrorMessage(
-        body: String,
-        fallback: String
-    ): String {
-        if (body.isBlank()) {
-            return fallback
+                )
         }
 
-        return try {
-            val response =
-                json.decodeFromString(
-                    ConflictResponse.serializer(),
+        if (
+            code ==
+            409
+        ) {
+
+            val decoded =
+                decodeConflictResponse(
                     body
                 )
 
-            response.message
-                ?.takeIf { it.isNotBlank() }
-                ?: response.error
-                    ?.takeIf { it.isNotBlank() }
-                ?: body.take(MAX_ERROR_BODY_LENGTH)
-        } catch (_: Exception) {
-            body.take(MAX_ERROR_BODY_LENGTH)
+            return ApiResult
+                .ConflictError(
+                    conflicts =
+                        decoded
+                            ?.conflicts
+                            .orEmpty(),
+                    message =
+                        decoded
+                            ?.message
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?: decoded
+                                ?.error
+                                ?.takeIf {
+                                    it.isNotBlank()
+                                }
+                            ?: "LIAS reported a configuration conflict."
+                )
+        }
+
+        if (
+            !response.isSuccessful
+        ) {
+
+            return ApiResult
+                .HttpError(
+                    code =
+                        code,
+                    message =
+                        decodeServerMessage(
+                            body
+                        )
+                            ?: body
+                                .trim()
+                                .take(
+                                    MAX_SERVER_ERROR_LENGTH
+                                )
+                                .takeIf {
+                                    it.isNotBlank()
+                                }
+                            ?: "HTTP $code"
+                )
+        }
+
+        if (
+            body.isBlank() ||
+            code ==
+            204
+        ) {
+
+            return if (
+                serializer
+                    .descriptor
+                    .serialName ==
+                "kotlin.Unit"
+            ) {
+
+                ApiResult.Success(
+                    Unit as T
+                )
+
+            } else {
+
+                ApiResult
+                    .SerializationError(
+                        message =
+                            "LIAS returned an empty response where ${serializer.descriptor.serialName} was expected."
+                    )
+            }
+        }
+
+        return try {
+
+            ApiResult.Success(
+                json.decodeFromString(
+                    serializer,
+                    body
+                )
+            )
+
+        } catch (
+            error: SerializationException
+        ) {
+
+            ApiResult
+                .SerializationError(
+                    message =
+                        "LIAS returned data that does not match the expected ${serializer.descriptor.serialName} contract.",
+                    cause =
+                        error
+                )
+
+        } catch (
+            error: IllegalArgumentException
+        ) {
+
+            ApiResult
+                .SerializationError(
+                    message =
+                        "LIAS returned an invalid ${serializer.descriptor.serialName} payload.",
+                    cause =
+                        error
+                )
         }
     }
 
-    suspend inline fun <reified T> get(
+    suspend inline fun <
+        reified T
+    > get(
         path: String
     ): ApiResult<T> =
-        withContext(Dispatchers.IO) {
-            try {
-                val request =
-                    buildRequest(
-                        path = path,
-                        method = "GET"
-                    )
-
-                client
-                    .newCall(request)
-                    .execute()
-                    .let { response ->
-                        parseResponse(
-                            response,
-                            serializer()
-                        )
-                    }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
-            }
+        execute {
+            buildRequest(
+                path,
+                "GET"
+            )
         }
 
     suspend fun getRaw(
         path: String
     ): ApiResult<String> =
-        withContext(Dispatchers.IO) {
+        withContext(
+            Dispatchers.IO
+        ) {
+
             try {
+
                 val request =
                     buildRequest(
-                        path = path,
-                        method = "GET"
+                        path,
+                        "GET"
                     )
 
                 client
-                    .newCall(request)
+                    .newCall(
+                        request
+                    )
                     .execute()
-                    .use { response ->
+                    .use {
+                        response ->
 
-                        val body =
-                            response.body?.string().orEmpty()
-
-                        if (response.isSuccessful) {
-                            ApiResult.Success(body)
-                        } else if (
-                            response.code == 401 ||
-                            response.code == 403
-                        ) {
-                            ApiResult.AuthenticationError(
-                                code = response.code,
-                                message = decodeErrorMessage(
-                                    body,
-                                    fallback =
-                                        if (response.code == 401) {
-                                            "Authentication required."
-                                        } else {
-                                            "Access denied."
-                                        }
-                                )
-                            )
-                        } else {
-                            ApiResult.HttpError(
-                                response.code,
-                                decodeErrorMessage(
-                                    body,
-                                    fallback = "HTTP ${response.code}"
-                                )
-                            )
-                        }
+                        parseRawResponse(
+                            response
+                        )
                     }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
+
+            } catch (
+                error: Exception
+            ) {
+
+                transportFailure(
+                    error
+                )
             }
         }
 
-    suspend inline fun <reified T, reified B> post(
+    suspend inline fun <
+        reified T,
+        reified B
+    > post(
         path: String,
         body: B
-    ): ApiResult<T> =
-        withContext(Dispatchers.IO) {
+    ): ApiResult<T> {
+
+        val requestBody =
             try {
-                val bodyString =
-                    json.encodeToString(
-                        serializer<B>(),
-                        body
+
+                json.encodeToString(
+                    serializer<B>(),
+                    body
+                )
+                    .toRequestBody(
+                        JSON_MEDIA_TYPE
                     )
 
-                val requestBody =
-                    bodyString.toRequestBody(
-                        "application/json".toMediaType()
-                    )
+            } catch (
+                error: Exception
+            ) {
 
-                val request =
-                    buildRequest(
-                        path = path,
-                        method = "POST",
-                        body = requestBody
+                return ApiResult
+                    .SerializationError(
+                        message =
+                            "Unable to encode the LIAS request body.",
+                        cause =
+                            error
                     )
-
-                client
-                    .newCall(request)
-                    .execute()
-                    .let { response ->
-                        parseResponse(
-                            response,
-                            serializer()
-                        )
-                    }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
             }
+
+        return execute {
+            buildRequest(
+                path,
+                "POST",
+                requestBody
+            )
+        }
+    }
+
+    suspend inline fun <
+        reified T,
+        reified B
+    > put(
+        path: String,
+        body: B
+    ): ApiResult<T> {
+
+        val requestBody =
+            try {
+
+                json.encodeToString(
+                    serializer<B>(),
+                    body
+                )
+                    .toRequestBody(
+                        JSON_MEDIA_TYPE
+                    )
+
+            } catch (
+                error: Exception
+            ) {
+
+                return ApiResult
+                    .SerializationError(
+                        message =
+                            "Unable to encode the LIAS request body.",
+                        cause =
+                            error
+                    )
+            }
+
+        return execute {
+            buildRequest(
+                path,
+                "PUT",
+                requestBody
+            )
+        }
+    }
+
+    suspend inline fun <
+        reified T
+    > delete(
+        path: String
+    ): ApiResult<T> =
+        execute {
+            buildRequest(
+                path,
+                "DELETE"
+            )
         }
 
     suspend fun postRawJson(
         path: String,
         jsonPayload: String
     ): ApiResult<Unit> =
-        withContext(Dispatchers.IO) {
-            try {
-                val requestBody =
-                    jsonPayload.toRequestBody(
-                        "application/json".toMediaType()
+        withContext(
+            Dispatchers.IO
+        ) {
+
+            val body =
+                jsonPayload
+                    .toRequestBody(
+                        JSON_MEDIA_TYPE
                     )
 
-                val request =
-                    buildRequest(
-                        path = path,
-                        method = "POST",
-                        body = requestBody
-                    )
+            try {
 
                 client
-                    .newCall(request)
+                    .newCall(
+                        buildRequest(
+                            path,
+                            "POST",
+                            body
+                        )
+                    )
                     .execute()
-                    .use { response ->
+                    .use {
+                        response ->
 
-                        if (response.isSuccessful) {
-                            ApiResult.Success(Unit)
-                        } else if (
-                            response.code == 401 ||
-                            response.code == 403
-                        ) {
-                            ApiResult.AuthenticationError(
-                                code = response.code,
-                                message = decodeErrorMessage(
-                                    response.body?.string().orEmpty(),
-                                    fallback =
-                                        if (response.code == 401) {
-                                            "Authentication required."
-                                        } else {
-                                            "Access denied."
-                                        }
-                                )
-                            )
-                        } else {
-                            ApiResult.HttpError(
-                                response.code,
-                                decodeErrorMessage(
-                                    response.body?.string().orEmpty(),
-                                    fallback = "Import failed."
-                                )
-                            )
-                        }
-                    }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
-            }
-        }
-
-    suspend inline fun <reified T, reified B> put(
-        path: String,
-        body: B
-    ): ApiResult<T> =
-        withContext(Dispatchers.IO) {
-            try {
-                val bodyString =
-                    json.encodeToString(
-                        serializer<B>(),
-                        body
-                    )
-
-                val requestBody =
-                    bodyString.toRequestBody(
-                        "application/json".toMediaType()
-                    )
-
-                val request =
-                    buildRequest(
-                        path = path,
-                        method = "PUT",
-                        body = requestBody
-                    )
-
-                client
-                    .newCall(request)
-                    .execute()
-                    .let { response ->
-                        parseResponse(
-                            response,
-                            serializer()
+                        parseUnitResponse(
+                            response
                         )
                     }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
+
+            } catch (
+                error: Exception
+            ) {
+
+                transportFailure(
+                    error
+                )
             }
         }
-
-    suspend inline fun <reified T> delete(
-        path: String
-    ): ApiResult<T> =
-        withContext(Dispatchers.IO) {
-            try {
-                val request =
-                    buildRequest(
-                        path = path,
-                        method = "DELETE"
-                    )
-
-                client
-                    .newCall(request)
-                    .execute()
-                    .let { response ->
-                        parseResponse(
-                            response,
-                            serializer()
-                        )
-                    }
-            } catch (error: Exception) {
-                ApiResult.NetworkError(error)
-            }
-        }
-
-    // ----------------------------------------------------------------
-    // Extend Access
-    // ----------------------------------------------------------------
 
     suspend fun extendDeviceAccess(
         pdid: String,
         minutes: Int
-    ): ApiResult<Unit> {
-        return post<Unit, ExtendAccessRequest>(
-            path = Endpoints.deviceExtend(pdid),
-            body = ExtendAccessRequest(
-                minutes = minutes
+    ): ApiResult<Unit> =
+        post<
+            Unit,
+            ExtendAccessRequest
+        >(
+            Endpoints.deviceExtend(
+                pdid
+            ),
+            ExtendAccessRequest(
+                minutes
             )
         )
-    }
 
     suspend fun cancelDeviceExtension(
         pdid: String
-    ): ApiResult<Unit> {
-        return delete<Unit>(
-            Endpoints.deviceExtend(pdid)
+    ): ApiResult<Unit> =
+        delete(
+            Endpoints.deviceExtend(
+                pdid
+            )
         )
-    }
 
     suspend fun extendTagAccess(
         tagId: String,
         minutes: Int
-    ): ApiResult<Unit> {
-        return post<Unit, ExtendAccessRequest>(
-            path = Endpoints.tagExtend(tagId),
-            body = ExtendAccessRequest(
-                minutes = minutes
+    ): ApiResult<Unit> =
+        post<
+            Unit,
+            ExtendAccessRequest
+        >(
+            Endpoints.tagExtend(
+                tagId
+            ),
+            ExtendAccessRequest(
+                minutes
             )
         )
-    }
 
     suspend fun cancelTagExtension(
         tagId: String
-    ): ApiResult<Unit> {
-        return delete<Unit>(
-            Endpoints.tagExtend(tagId)
+    ): ApiResult<Unit> =
+        delete(
+            Endpoints.tagExtend(
+                tagId
+            )
         )
-    }
-
-    // ----------------------------------------------------------------
-    // Effective Status
-    // ----------------------------------------------------------------
 
     suspend fun getDeviceEffectiveStatus(
         pdid: String
-    ): ApiResult<EffectiveStatus> {
-        return get(
-            Endpoints.deviceEffectiveStatus(pdid)
+    ): ApiResult<EffectiveStatus> =
+        get(
+            Endpoints.deviceEffectiveStatus(
+                pdid
+            )
         )
-    }
 
     suspend fun getTagEffectiveStatus(
         tagId: String
-    ): ApiResult<EffectiveStatus> {
-        return get(
-            Endpoints.tagEffectiveStatus(tagId)
+    ): ApiResult<EffectiveStatus> =
+        get(
+            Endpoints.tagEffectiveStatus(
+                tagId
+            )
+        )
+
+    @PublishedApi
+    internal suspend inline fun <
+        reified T
+    > execute(
+        crossinline request:
+            () -> Request
+    ): ApiResult<T> =
+        withContext(
+            Dispatchers.IO
+        ) {
+
+            try {
+
+                client
+                    .newCall(
+                        request()
+                    )
+                    .execute()
+                    .use {
+                        response ->
+
+                        parseResponse(
+                            response,
+                            serializer()
+                        )
+                    }
+
+            } catch (
+                error: Exception
+            ) {
+
+                transportFailure(
+                    error
+                )
+            }
+        }
+
+    private fun parseRawResponse(
+        response: Response
+    ): ApiResult<String> {
+
+        val body =
+            response.body
+                ?.string()
+                .orEmpty()
+
+        return classifyRawHttp(
+            code =
+                response.code,
+            successful =
+                response.isSuccessful,
+            body =
+                body
         )
     }
 
-    private companion object {
-        const val MAX_ERROR_BODY_LENGTH = 4_096
+    private fun parseUnitResponse(
+        response: Response
+    ): ApiResult<Unit> {
+
+        val body =
+            response.body
+                ?.string()
+                .orEmpty()
+
+        val raw =
+            classifyRawHttp(
+                code =
+                    response.code,
+                successful =
+                    response.isSuccessful,
+                body =
+                    body
+            )
+
+        return when (
+            raw
+        ) {
+
+            is ApiResult.Success ->
+                ApiResult.Success(
+                    Unit
+                )
+
+            is ApiResult.AuthenticationError ->
+                raw
+
+            is ApiResult.HttpError ->
+                raw
+
+            is ApiResult.ConflictError ->
+                raw
+
+            is ApiResult.NetworkError ->
+                raw
+
+            is ApiResult.SerializationError ->
+                raw
+        }
+    }
+
+    private fun classifyRawHttp(
+        code: Int,
+        successful: Boolean,
+        body: String
+    ): ApiResult<String> {
+
+        if (
+            code ==
+            401 ||
+            code ==
+            403
+        ) {
+
+            return ApiResult
+                .AuthenticationError(
+                    code =
+                        code,
+                    message =
+                        decodeServerMessage(
+                            body
+                        )
+                            ?: "Authentication failed."
+                )
+        }
+
+        if (
+            code ==
+            409
+        ) {
+
+            val conflict =
+                decodeConflictResponse(
+                    body
+                )
+
+            return ApiResult
+                .ConflictError(
+                    conflicts =
+                        conflict
+                            ?.conflicts
+                            .orEmpty(),
+                    message =
+                        conflict
+                            ?.message
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?: "LIAS reported a conflict."
+                )
+        }
+
+        if (
+            !successful
+        ) {
+
+            return ApiResult
+                .HttpError(
+                    code =
+                        code,
+                    message =
+                        decodeServerMessage(
+                            body
+                        )
+                            ?: body
+                                .take(
+                                    MAX_SERVER_ERROR_LENGTH
+                                )
+                                .ifBlank {
+                                    "HTTP $code"
+                                }
+                )
+        }
+
+        return ApiResult.Success(
+            body
+        )
+    }
+
+    private fun decodeConflictResponse(
+        body: String
+    ): ConflictResponse? =
+        try {
+
+            json.decodeFromString(
+                ConflictResponse.serializer(),
+                body
+            )
+
+        } catch (
+            _: Exception
+        ) {
+            null
+        }
+
+    private fun decodeServerMessage(
+        body: String
+    ): String? {
+
+        val conflict =
+            decodeConflictResponse(
+                body
+            )
+
+        return conflict
+            ?.message
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?: conflict
+                ?.error
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+    }
+
+    private fun transportFailure(
+        error: Exception
+    ): ApiResult<Nothing> =
+        when (
+            error
+        ) {
+
+            is SerializationException ->
+                ApiResult
+                    .SerializationError(
+                        message =
+                            "Unable to process LIAS data.",
+                        cause =
+                            error
+                    )
+
+            is IOException ->
+                ApiResult
+                    .NetworkError(
+                        error
+                    )
+
+            else ->
+                ApiResult
+                    .NetworkError(
+                        error
+                    )
+        }
+
+    companion object {
+
+        private val JSON_MEDIA_TYPE =
+            "application/json"
+                .toMediaType()
+
+        private const val MAX_SERVER_ERROR_LENGTH =
+            512
     }
 }
