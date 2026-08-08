@@ -1,13 +1,14 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 13.0.0
+// Version: 25.0.0
 //
 // Purpose:
-//   Canonical application state.
+//   Canonical immutable application state.
 //
-// Batch 13:
-//   Adds explicit transport/lifecycle metadata so UI banners do not
-//   misrepresent an intentional background disconnect as a server fault.
+// Batch 25:
+//   - Keeps EffectiveStatus maps authoritative.
+//   - Defines explicit initial-loading semantics.
+//   - Adds status helper methods without fabricating action state.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -22,7 +23,6 @@ import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ConnectionState
 
 data class UiState(
-
     val devices:
         List<Device> =
         emptyList(),
@@ -59,85 +59,40 @@ data class UiState(
         ConnectionState =
         ConnectionState.DISCONNECTED,
 
-    val isNetworkAvailable:
-        Boolean =
-        true,
-
-    val isAppForeground:
-        Boolean =
-        false,
-
     val isInitialLoaded:
         Boolean =
         false,
 
-    val isRefreshing:
-        Boolean =
-        false,
-
-    /**
-     * Wall-clock time of the last successful complete REST
-     * reconciliation.
-     */
-    val lastSuccessfulSyncMs:
-        Long =
-        0L,
-
-    /**
-     * Human-readable transport failure from the SSE layer.
-     *
-     * This is informational. Cached content remains usable.
-     */
-    val transportError:
-        String? =
-        null,
-
     val errorMessage:
         String? =
-        null,
+        null
+) {
 
-    val syncState:
-        SyncState =
-        SyncState.Idle
-)
+    val isLoadingInitialData:
+        Boolean
+        get() =
+            !isInitialLoaded
 
-sealed interface SyncState {
+    val hasRepositoryError:
+        Boolean
+        get() =
+            !errorMessage
+                .isNullOrBlank()
 
-    data object Idle :
-        SyncState
+    fun effectiveStatusForDevice(
+        pdid: String
+    ): EffectiveStatus? =
+        deviceEffectiveStatuses[
+            pdid
+        ]
 
-    data object Loading :
-        SyncState
-
-    data class Ready(
-        val syncedAtMs: Long
-    ) : SyncState
-
-    data class Stale(
-        val message: String,
-        val lastSuccessfulSyncMs:
-            Long
-    ) : SyncState
-
-    data class Failed(
-        val message: String
-    ) : SyncState
+    fun effectiveStatusForTag(
+        tagId: String
+    ): EffectiveStatus? =
+        tagEffectiveStatuses[
+            tagId
+        ]
 }
-
-val SyncState.hasUsableData:
-    Boolean
-    get() =
-        when (this) {
-
-            is SyncState.Ready,
-            is SyncState.Stale ->
-                true
-
-            SyncState.Idle,
-            SyncState.Loading,
-            is SyncState.Failed ->
-                false
-        }
 
 sealed class UiEvent {
 
@@ -150,8 +105,6 @@ sealed class UiEvent {
     ) : UiEvent()
 
     data class ShowSecurityAlert(
-        val details: String,
-        val pdid: String =
-            ""
+        val details: String
     ) : UiEvent()
 }
