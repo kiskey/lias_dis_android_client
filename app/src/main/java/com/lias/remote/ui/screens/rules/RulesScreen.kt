@@ -1,26 +1,23 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt
-// Version: 9.0.0
+// Version: 17.0.0
 //
 // Purpose:
-//   Policy management UI.
+//   Policy inventory + entry point to complete PolicyWizardSheet.
 //
-// Corrections:
-//   - Global default treated as unique.
-//   - Temporary pause/extend policies are read-only system overrides.
-//   - New arbitrary global policies cannot be created.
-//   - Real target names displayed.
-//   - Empty schedule bundle warning shown.
-//   - Rule enable/disable remains unavailable for temporary policies.
-//   - infrastructure policies are never user-editable.
-//   - Loading / empty / stale / failure states supported.
+// UX corrections:
+//   - Global Access is separated from ordinary access rules.
+//   - "New Rule" creates only tag/device rules.
+//   - Policy subtitles describe target + behavior instead of exposing
+//     raw target IDs.
+//   - Priority appears only for device rules.
+//   - Temporary pause/extend policies are not shown as user-authored
+//     permanent rules.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,11 +28,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
-import com.lias.remote.core.util.PolicyValidation
+import com.lias.remote.core.policy.PolicyPresentation
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
@@ -63,6 +59,7 @@ import io.github.alexzhirkevich.cupertino.icons.outlined.Trash
 fun RulesScreen(
     viewModel: LiasViewModel
 ) {
+
     val state by
         viewModel.state
             .collectAsState()
@@ -91,41 +88,36 @@ fun RulesScreen(
             )
         }
 
-    val globalPolicy =
-        state.policies.find {
-            it.id ==
-                "global_default"
+    val permanentPolicies =
+        remember(
+            state.policies
+        ) {
+
+            state.policies
+                .filter {
+                    it.reasonTag
+                        .isNullOrBlank()
+                }
         }
 
-    val permanentPolicies =
-        state.policies
-            .filterNot {
-                isSystemTemporaryPolicy(
-                    it
-                )
-            }
-            .filterNot {
+    val globalPolicy =
+        permanentPolicies
+            .find {
                 it.id ==
                     "global_default"
-            }
-            .filterNot {
-                it.targetID ==
-                    "infrastructure"
             }
 
     val tagPolicies =
         permanentPolicies
             .filter {
                 it.type ==
-                    "tag"
+                    "tag" &&
+                    it.id !=
+                    "global_default"
             }
-            .sortedWith(
-                compareByDescending<Policy> {
-                    it.enabled
-                }.thenByDescending {
-                    it.priority
-                }
-            )
+            .sortedBy {
+                it.name.lowercase()
+            }
 
     val devicePolicies =
         permanentPolicies
@@ -135,19 +127,11 @@ fun RulesScreen(
             }
             .sortedWith(
                 compareByDescending<Policy> {
-                    it.enabled
-                }.thenByDescending {
                     it.priority
+                }.thenBy {
+                    it.name.lowercase()
                 }
             )
-
-    val temporaryPolicies =
-        state.policies
-            .filter {
-                isSystemTemporaryPolicy(
-                    it
-                )
-            }
 
     HigLargeTitleScaffold(
         title =
@@ -156,36 +140,18 @@ fun RulesScreen(
             scrollState,
         navTrailing = {
 
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        4.dp
-                    ),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
+            HigTextButton(
+                text =
+                    "＋",
+                onClick = {
 
-                HigTextButton(
-                    text =
-                        "Export",
-                    onClick = {
-                        viewModel
-                            .exportPolicies()
-                    }
-                )
+                    editingPolicy =
+                        null
 
-                HigTextButton(
-                    text =
-                        "＋",
-                    onClick = {
-                        editingPolicy =
-                            null
-
-                        showWizard =
-                            true
-                    }
-                )
-            }
+                    showWizard =
+                        true
+                }
+            )
         }
     ) { padding ->
 
@@ -209,12 +175,14 @@ fun RulesScreen(
                     if (
                         !state.isInitialLoaded
                     ) {
+
                         item {
+
                             ScreenStateView(
                                 title =
                                     "Loading Rules",
                                 message =
-                                    "Synchronizing LIAS policy configuration."
+                                    "Synchronizing policy configuration from LIAS."
                             )
                         }
 
@@ -225,6 +193,7 @@ fun RulesScreen(
                 is SyncState.Failed -> {
 
                     item {
+
                         ScreenStateView(
                             title =
                                 "Unable to Load Rules",
@@ -245,6 +214,7 @@ fun RulesScreen(
                 is SyncState.Stale -> {
 
                     item {
+
                         StaleDataNotice(
                             message =
                                 sync.message,
@@ -258,11 +228,8 @@ fun RulesScreen(
                     Unit
             }
 
-            // --------------------------------------------------------
-            // Global
-            // --------------------------------------------------------
-
             item {
+
                 ListSectionHeader(
                     "Global Access"
                 )
@@ -273,94 +240,110 @@ fun RulesScreen(
                 GroupedListCard(
                     modifier =
                         Modifier.padding(
-                            horizontal =
-                                16.dp
+                            horizontal = 16.dp
                         )
                 ) {
 
                     if (
-                        globalPolicy ==
+                        globalPolicy !=
                         null
                     ) {
+
                         GroupedListRow(
                             primaryText =
-                                "Global Access Switch",
+                                "Global Access",
                             secondaryText =
-                                "The server did not return global_default."
-                        )
-                    } else {
-                        PolicyRow(
-                            policy =
-                                globalPolicy,
-                            tags =
-                                state.tags,
-                            devices =
-                                state.devices,
-                            schedules =
-                                state.schedules,
-                            editable =
-                                true,
-                            toggleable =
-                                false,
-                            deletable =
-                                false,
-                            onToggle = {},
-                            onEdit = {
+                                PolicyPresentation
+                                    .policySubtitle(
+                                        globalPolicy,
+                                        state.tags,
+                                        state.devices,
+                                        state.schedules
+                                    ),
+                            trailingContent = {
+
+                                StatusPill(
+                                    text =
+                                        globalPolicy.action
+                                            .replaceFirstChar {
+                                                it.uppercase()
+                                            },
+                                    tone =
+                                        when (
+                                            globalPolicy.action
+                                        ) {
+
+                                            "block" ->
+                                                PillTone.BLOCKED
+
+                                            "allow" ->
+                                                PillTone.ALLOWED
+
+                                            else ->
+                                                PillTone.INFO
+                                        }
+                                )
+                            },
+                            onClick = {
+
                                 editingPolicy =
                                     globalPolicy
 
                                 showWizard =
                                     true
-                            },
-                            onDelete = {}
+                            }
+                        )
+
+                    } else {
+
+                        GroupedListRow(
+                            primaryText =
+                                "Global Access",
+                            secondaryText =
+                                "Waiting for global_default from LIAS"
                         )
                     }
                 }
             }
 
-            // --------------------------------------------------------
-            // Tag policies
-            // --------------------------------------------------------
-
             if (
-                tagPolicies
-                    .isNotEmpty()
+                tagPolicies.isNotEmpty()
             ) {
 
                 item {
+
                     ListSectionHeader(
-                        "Tag Rules · ${tagPolicies.size}"
+                        "Tag Groups · ${tagPolicies.size}"
                     )
                 }
 
                 item {
+
                     GroupedListCard(
                         modifier =
                             Modifier.padding(
-                                horizontal =
-                                    16.dp
+                                horizontal = 16.dp
                             )
                     ) {
 
                         tagPolicies
-                            .forEachIndexed { index, policy ->
+                            .forEachIndexed {
+                                    index,
+                                    policy ->
 
                                 PolicyRow(
                                     policy =
                                         policy,
-                                    tags =
-                                        state.tags,
-                                    devices =
-                                        state.devices,
-                                    schedules =
-                                        state.schedules,
-                                    editable =
-                                        true,
-                                    toggleable =
-                                        true,
-                                    deletable =
-                                        true,
-                                    onToggle = { enabled ->
+                                    subtitle =
+                                        PolicyPresentation
+                                            .policySubtitle(
+                                                policy,
+                                                state.tags,
+                                                state.devices,
+                                                state.schedules
+                                            ),
+                                    onToggle = {
+                                        enabled ->
 
                                         viewModel.savePolicy(
                                             policy.copy(
@@ -370,6 +353,7 @@ fun RulesScreen(
                                         )
                                     },
                                     onEdit = {
+
                                         editingPolicy =
                                             policy
 
@@ -377,6 +361,7 @@ fun RulesScreen(
                                             true
                                     },
                                     onDelete = {
+
                                         policyToDelete =
                                             policy
                                     },
@@ -390,49 +375,44 @@ fun RulesScreen(
                 }
             }
 
-            // --------------------------------------------------------
-            // Device policies
-            // --------------------------------------------------------
-
             if (
-                devicePolicies
-                    .isNotEmpty()
+                devicePolicies.isNotEmpty()
             ) {
 
                 item {
+
                     ListSectionHeader(
-                        "Device Rules · ${devicePolicies.size}"
+                        "Specific Devices · ${devicePolicies.size}"
                     )
                 }
 
                 item {
+
                     GroupedListCard(
                         modifier =
                             Modifier.padding(
-                                horizontal =
-                                    16.dp
+                                horizontal = 16.dp
                             )
                     ) {
 
                         devicePolicies
-                            .forEachIndexed { index, policy ->
+                            .forEachIndexed {
+                                    index,
+                                    policy ->
 
                                 PolicyRow(
                                     policy =
                                         policy,
-                                    tags =
-                                        state.tags,
-                                    devices =
-                                        state.devices,
-                                    schedules =
-                                        state.schedules,
-                                    editable =
-                                        true,
-                                    toggleable =
-                                        true,
-                                    deletable =
-                                        true,
-                                    onToggle = { enabled ->
+                                    subtitle =
+                                        PolicyPresentation
+                                            .policySubtitle(
+                                                policy,
+                                                state.tags,
+                                                state.devices,
+                                                state.schedules
+                                            ),
+                                    onToggle = {
+                                        enabled ->
 
                                         viewModel.savePolicy(
                                             policy.copy(
@@ -442,6 +422,7 @@ fun RulesScreen(
                                         )
                                     },
                                     onEdit = {
+
                                         editingPolicy =
                                             policy
 
@@ -449,6 +430,7 @@ fun RulesScreen(
                                             true
                                     },
                                     onDelete = {
+
                                         policyToDelete =
                                             policy
                                     },
@@ -462,76 +444,22 @@ fun RulesScreen(
                 }
             }
 
-            // --------------------------------------------------------
-            // Temporary server-owned policies
-            // --------------------------------------------------------
-
-            if (
-                temporaryPolicies
-                    .isNotEmpty()
-            ) {
-
-                item {
-                    ListSectionHeader(
-                        "Temporary Overrides · ${temporaryPolicies.size}"
-                    )
-                }
-
-                item {
-                    GroupedListCard(
-                        modifier =
-                            Modifier.padding(
-                                horizontal =
-                                    16.dp
-                            )
-                    ) {
-
-                        temporaryPolicies
-                            .forEachIndexed { index, policy ->
-
-                                PolicyRow(
-                                    policy =
-                                        policy,
-                                    tags =
-                                        state.tags,
-                                    devices =
-                                        state.devices,
-                                    schedules =
-                                        state.schedules,
-                                    editable =
-                                        false,
-                                    toggleable =
-                                        false,
-                                    deletable =
-                                        false,
-                                    onToggle = {},
-                                    onEdit = {},
-                                    onDelete = {},
-                                    showDivider =
-                                        index <
-                                            temporaryPolicies
-                                                .lastIndex
-                                )
-                            }
-                    }
-                }
-            }
-
             if (
                 tagPolicies.isEmpty() &&
-                devicePolicies.isEmpty() &&
-                temporaryPolicies.isEmpty()
+                devicePolicies.isEmpty()
             ) {
 
                 item {
+
                     ScreenStateView(
                         title =
                             "No Custom Rules",
                         message =
-                            "Create a tag or device rule. Global Access remains available above.",
+                            "Global Access is active. Add a tag or device rule when you need a more specific restriction.",
                         actionText =
                             "Create Rule",
                         onAction = {
+
                             editingPolicy =
                                 null
 
@@ -542,77 +470,45 @@ fun RulesScreen(
                 }
             }
 
-            // --------------------------------------------------------
-            // Precedence explanation
-            // --------------------------------------------------------
-
             item {
-                ListSectionHeader(
-                    "How Rules Are Evaluated"
-                )
-            }
 
-            item {
-                GroupedListCard(
+                Column(
                     modifier =
                         Modifier.padding(
-                            horizontal =
-                                16.dp
+                            horizontal = 20.dp,
+                            vertical = 16.dp
                         )
                 ) {
 
-                    GroupedListRow(
-                        primaryText =
-                            "1 · Infrastructure",
-                        secondaryText =
-                            "Always allowed and immune to every access rule.",
-                        showDivider =
-                            true
+                    CupertinoText(
+                        text =
+                            "How rules are applied",
+                        style =
+                            HigTypography.headline,
+                        color =
+                            LiasThemeColors.label
                     )
 
-                    GroupedListRow(
-                        primaryText =
-                            "2 · Global Access",
-                        secondaryText =
-                            "Global Block or Allow immediately overrides every non-infrastructure device.",
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "3 · Device Rule",
-                        secondaryText =
-                            "In Global Schedule mode, the highest-priority matching device rule is evaluated first.",
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "4 · Tag Rules",
-                        secondaryText =
-                            "If no device rule applies, matching tag rules are combined. Any blocking tag rule blocks access.",
-                        showDivider =
-                            true
-                    )
-
-                    GroupedListRow(
-                        primaryText =
-                            "5 · Global Schedule",
-                        secondaryText =
-                            "Used as the fallback when no device or tag rule applies."
+                    CupertinoText(
+                        text =
+                            "Infrastructure is always online. Global Allow or Block overrides ordinary rules. In Global Schedule mode, a device-specific rule is checked first; otherwise matching tag rules are evaluated together.",
+                        style =
+                            HigTypography.caption,
+                        color =
+                            LiasThemeColors.secondaryLabel,
+                        modifier =
+                            Modifier.padding(
+                                top = 5.dp
+                            )
                     )
                 }
             }
         }
     }
 
-    // ----------------------------------------------------------------
-    // Wizard
-    // ----------------------------------------------------------------
-
-    if (showWizard) {
+    if (
+        showWizard
+    ) {
 
         PolicyWizardSheet(
             initialPolicy =
@@ -623,22 +519,20 @@ fun RulesScreen(
                 state.devices,
             schedules =
                 state.schedules,
-            existingPolicies =
-                state.policies,
-            onValidateSchedules = { scheduleIds ->
-
-                viewModel.validatePolicy(
-                    scheduleIds
-                )
-            },
+            policies =
+                permanentPolicies,
+            validateSchedules =
+                viewModel::validatePolicy,
             onDismiss = {
+
                 showWizard =
                     false
 
                 editingPolicy =
                     null
             },
-            onSave = { policy ->
+            onSave = {
+                policy ->
 
                 viewModel.savePolicy(
                     policy
@@ -653,10 +547,6 @@ fun RulesScreen(
         )
     }
 
-    // ----------------------------------------------------------------
-    // Delete
-    // ----------------------------------------------------------------
-
     policyToDelete
         ?.let { policy ->
 
@@ -666,23 +556,46 @@ fun RulesScreen(
                         null
                 },
                 title =
-                    "Delete Rule",
+                    "Delete Rule?",
                 message =
-                    when (
-                        policy.type
-                    ) {
-                        "device" ->
-                            "Delete “${policy.name}”? This device will fall through to applicable tag rules, then the global policy."
+                    buildString {
 
-                        "tag" ->
-                            "Delete “${policy.name}”? Devices using this tag will continue through any other matching tag rules or the global fallback."
+                        append(
+                            "Delete “"
+                        )
 
-                        else ->
-                            "Delete “${policy.name}”?"
+                        append(
+                            policy.name
+                        )
+
+                        append(
+                            "”? "
+                        )
+
+                        when (
+                            policy.type
+                        ) {
+
+                            "device" ->
+                                append(
+                                    "The device will fall through to matching tag rules or Global Access."
+                                )
+
+                            "tag" ->
+                                append(
+                                    "Devices in this tag will continue through their remaining applicable rules."
+                                )
+
+                            else ->
+                                append(
+                                    "This rule will be permanently removed."
+                                )
+                        }
                     },
                 confirmText =
-                    "Delete",
+                    "Delete Rule",
                 onConfirm = {
+
                     viewModel.deletePolicy(
                         policy.id,
                         policy.name,
@@ -701,243 +614,56 @@ fun RulesScreen(
 @Composable
 private fun PolicyRow(
     policy: Policy,
-    tags: List<com.lias.remote.core.models.Tag>,
-    devices: List<com.lias.remote.core.models.Device>,
-    schedules: List<com.lias.remote.core.models.Schedule>,
-    editable: Boolean,
-    toggleable: Boolean,
-    deletable: Boolean,
+    subtitle: String,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    showDivider: Boolean = false
+    showDivider: Boolean
 ) {
-    val selectedSchedules =
-        policy.resolveScheduleIDs()
-            .mapNotNull { id ->
-                schedules.find {
-                    it.id == id
-                }
-            }
 
-    val target =
-        PolicyValidation
-            .targetLabel(
-                policy =
-                    policy,
-                tags =
-                    tags,
-                devices =
-                    devices
+    HigSwipeRow(
+        leadingAction =
+            SwipeAction(
+                icon =
+                    CupertinoIcons
+                        .Outlined
+                        .Pencil,
+                color =
+                    LiasThemeColors.blue,
+                onTrigger =
+                    onEdit
+            ),
+        trailingAction =
+            SwipeAction(
+                icon =
+                    CupertinoIcons
+                        .Outlined
+                        .Trash,
+                color =
+                    LiasThemeColors.red,
+                onTrigger =
+                    onDelete
             )
-
-    val emptySchedule =
-        policy.action ==
-            "schedule" &&
-            policy.resolveScheduleIDs()
-                .isEmpty()
-
-    val secondary =
-        buildString {
-
-            append(
-                target
-            )
-
-            if (
-                policy.type !=
-                "global"
-            ) {
-                append(
-                    " · Priority "
-                )
-                append(
-                    policy.priority
-                )
-            }
-
-            when (
-                policy.action
-            ) {
-                "schedule" -> {
-                    append(
-                        " · "
-                    )
-
-                    append(
-                        when {
-                            selectedSchedules.isEmpty() ->
-                                "No schedules"
-
-                            selectedSchedules.size == 1 ->
-                                selectedSchedules
-                                    .first()
-                                    .name
-
-                            else ->
-                                "${selectedSchedules.size} schedules"
-                        }
-                    )
-                }
-
-                "allow" ->
-                    append(
-                        " · Always Allow"
-                    )
-
-                "block" ->
-                    append(
-                        " · Always Block"
-                    )
-            }
-
-            if (
-                !policy.enabled
-            ) {
-                append(
-                    " · Disabled"
-                )
-            }
-
-            if (
-                emptySchedule
-            ) {
-                append(
-                    " · Defaults to Allow"
-                )
-            }
-        }
-
-    val row = @Composable {
+    ) {
 
         GroupedListRow(
             primaryText =
-                policy.name.ifBlank {
-                    when {
-                        policy.id ==
-                            "global_default" ->
-                            "Global Access Switch"
-
-                        else ->
-                            "Unnamed Rule"
-                    }
-                },
+                policy.name,
             secondaryText =
-                secondary,
+                subtitle,
             trailingContent = {
 
-                when {
-
-                    toggleable -> {
-                        CupertinoSwitch(
-                            checked =
-                                policy.enabled,
-                            onCheckedChange =
-                                onToggle
-                        )
-                    }
-
-                    policy.id ==
-                        "global_default" -> {
-
-                        StatusPill(
-                            text =
-                                policy.action
-                                    .replaceFirstChar {
-                                        it.uppercase()
-                                    },
-                            tone =
-                                when (
-                                    policy.action
-                                ) {
-                                    "allow" ->
-                                        PillTone.ALLOWED
-
-                                    "block" ->
-                                        PillTone.BLOCKED
-
-                                    else ->
-                                        PillTone.INFO
-                                }
-                        )
-                    }
-
-                    else -> {
-                        StatusPill(
-                            text =
-                                "Temporary",
-                            tone =
-                                PillTone.INFO
-                        )
-                    }
-                }
+                CupertinoSwitch(
+                    checked =
+                        policy.enabled,
+                    onCheckedChange =
+                        onToggle
+                )
             },
             showDivider =
                 showDivider,
             onClick =
-                if (editable) {
-                    onEdit
-                } else {
-                    null
-                }
+                onEdit
         )
     }
-
-    if (
-        editable ||
-        deletable
-    ) {
-
-        HigSwipeRow(
-            leadingAction =
-                if (editable) {
-                    SwipeAction(
-                        icon =
-                            CupertinoIcons
-                                .Outlined
-                                .Pencil,
-                        color =
-                            LiasThemeColors.blue,
-                        onTrigger =
-                            onEdit
-                    )
-                } else {
-                    null
-                },
-            trailingAction =
-                if (deletable) {
-                    SwipeAction(
-                        icon =
-                            CupertinoIcons
-                                .Outlined
-                                .Trash,
-                        color =
-                            LiasThemeColors.red,
-                        onTrigger =
-                            onDelete
-                    )
-                } else {
-                    null
-                }
-        ) {
-            row()
-        }
-
-    } else {
-        row()
-    }
 }
-
-private fun isSystemTemporaryPolicy(
-    policy: Policy
-): Boolean =
-    policy.id.startsWith(
-        "pol_pause_"
-    ) ||
-        policy.id.startsWith(
-            "pol_extend_"
-        ) ||
-        !policy.reasonTag
-            .isNullOrBlank() ||
-        !policy.expiresAt
-            .isNullOrBlank()
