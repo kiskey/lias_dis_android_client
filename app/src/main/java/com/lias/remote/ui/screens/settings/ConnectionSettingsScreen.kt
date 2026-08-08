@@ -1,3 +1,23 @@
+// ====================================================================
+// File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
+// Version: 4.0.0
+//
+// Purpose:
+//   Safely modify an existing LIAS connection.
+//
+// Important:
+//   "Save" is now transactional.
+//
+//   Existing working connection:
+//       remains persisted while a replacement connection is tested.
+//
+//   Replacement server:
+//       is persisted only after /health succeeds.
+//
+//   This prevents a typo or temporarily unavailable server from
+//   destroying an otherwise valid configuration.
+// ====================================================================
+
 package com.lias.remote.ui.screens.settings
 
 import androidx.compose.foundation.background
@@ -18,8 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.lias.remote.ui.SettingsUiState
 import com.lias.remote.ui.SettingsViewModel
+import com.lias.remote.ui.components.ConnectionFeedback
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
@@ -37,94 +57,237 @@ fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
-    val state: SettingsUiState by viewModel.uiState.collectAsState()
-    var tempUrl by remember(state.serverUrl) { mutableStateOf(state.serverUrl) }
-    var tempToken by remember(state.authToken) { mutableStateOf(state.authToken) }
+    val state by
+        viewModel.uiState.collectAsState()
 
-    val statusSuccessColor = LiasThemeColors.green
-    val statusErrorColor = LiasThemeColors.red
+    var tempUrl by
+        remember(state.savedServerUrl) {
+            mutableStateOf(
+                state.savedServerUrl
+            )
+        }
+
+    var tempToken by
+        remember(state.authToken) {
+            mutableStateOf(
+                state.authToken
+            )
+        }
+
+    val hasChanges =
+        tempUrl.trim() !=
+            state.savedServerUrl.trim() ||
+            tempToken != state.authToken
+
+    val canTest =
+        tempUrl.isNotBlank() &&
+            !state.isTesting &&
+            !state.isApplyingConnection
 
     CupertinoScaffold(
+
         topBar = {
+
             CupertinoTopAppBar(
-                title = { CupertinoText("Connection") },
+
+                title = {
+                    CupertinoText(
+                        "Connection"
+                    )
+                },
+
                 navigationIcon = {
+
                     CupertinoButton(
                         onClick = onBack,
-                        colors = CupertinoButtonDefaults.plainButtonColors()
+                        colors =
+                            CupertinoButtonDefaults
+                                .plainButtonColors()
                     ) {
-                        CupertinoText("‹ Settings")
+                        CupertinoText(
+                            "‹ Settings"
+                        )
                     }
                 },
+
                 actions = {
+
                     CupertinoButton(
                         onClick = {
-                            viewModel.updateServerUrl(tempUrl)
-                            viewModel.updateAuthToken(tempToken)
-                            viewModel.saveSettings()
-                            onBack()
+
+                            if (
+                                !hasChanges
+                            ) {
+                                onBack()
+                                return@CupertinoButton
+                            }
+
+                            viewModel.updateServerUrl(
+                                tempUrl
+                            )
+
+                            viewModel.updateAuthToken(
+                                tempToken
+                            )
+
+                            viewModel.connect(
+                                onSuccess = onBack
+                            )
                         },
-                        colors = CupertinoButtonDefaults.plainButtonColors()
+
+                        enabled =
+                            canTest,
+
+                        colors =
+                            CupertinoButtonDefaults
+                                .plainButtonColors()
                     ) {
-                        CupertinoText("Save")
+
+                        CupertinoText(
+                            when {
+
+                                state.isTesting ||
+                                    state.isApplyingConnection ->
+                                    "Checking…"
+
+                                hasChanges ->
+                                    "Save"
+
+                                else ->
+                                    "Done"
+                            }
+                        )
                     }
                 }
             )
         }
+
     ) { innerPadding ->
+
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(LiasThemeColors.background)
-                .padding(innerPadding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            GroupedListCard {
-                HigField(
-                    value = tempUrl,
-                    onValueChange = { tempUrl = it },
-                    label = "Server URL",
-                    placeholder = "http://192.168.1.1:8081"
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        LiasThemeColors.background
+                    )
+                    .padding(
+                        innerPadding
+                    )
+                    .padding(
+                        horizontal = 16.dp
+                    )
+                    .verticalScroll(
+                        rememberScrollState()
+                    ),
+
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    16.dp
                 )
+        ) {
+
+            GroupedListCard {
+
                 HigField(
-                    value = tempToken,
-                    onValueChange = { tempToken = it },
-                    label = "Auth Token (Optional)",
-                    visualTransformation = PasswordVisualTransformation()
+                    value =
+                        tempUrl,
+                    onValueChange = {
+                        tempUrl = it
+                    },
+                    label =
+                        "Server URL",
+                    placeholder =
+                        "http://192.168.1.1:8081"
+                )
+
+                HigField(
+                    value =
+                        tempToken,
+                    onValueChange = {
+                        tempToken = it
+                    },
+                    label =
+                        "Auth Token (Optional)",
+                    visualTransformation =
+                        PasswordVisualTransformation()
                 )
             }
 
             HigButton(
-                text = "Test Connection",
+                text =
+                    when {
+
+                        state.isApplyingConnection ->
+                            "Applying…"
+
+                        state.isTesting ->
+                            "Testing…"
+
+                        else ->
+                            "Test Connection"
+                    },
+
                 onClick = {
-                    viewModel.updateServerUrl(tempUrl)
-                    viewModel.updateAuthToken(tempToken)
+
+                    viewModel.updateServerUrl(
+                        tempUrl
+                    )
+
+                    viewModel.updateAuthToken(
+                        tempToken
+                    )
+
                     viewModel.testConnection()
                 },
-                style = HigButtonStyle.Secondary,
-                modifier = Modifier.fillMaxWidth()
+
+                enabled =
+                    canTest,
+
+                style =
+                    HigButtonStyle.Secondary,
+
+                modifier =
+                    Modifier.fillMaxWidth()
             )
 
-            if (state.isTesting) {
+            ConnectionFeedback(
+                message =
+                    state.testResult,
+                verified =
+                    state.connectionVerified
+            )
+
+            if (
+                hasChanges &&
+                !state.isTesting &&
+                !state.isApplyingConnection &&
+                state.testResult.isNullOrBlank()
+            ) {
+
                 CupertinoText(
-                    text = "Testing connection...",
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    style = HigTypography.subheadline,
-                    color = LiasThemeColors.secondaryLabel
+                    text =
+                        "Your current connection stays unchanged until the new server is verified.",
+                    style =
+                        HigTypography.caption,
+                    color =
+                        LiasThemeColors.tertiaryLabel,
+                    modifier =
+                        Modifier.align(
+                            Alignment.CenterHorizontally
+                        )
                 )
             }
 
-            state.testResult?.let { resultText ->
-                val isSuccess = resultText.startsWith("Connection successful", ignoreCase = true) || 
-                                resultText.startsWith("Settings saved", ignoreCase = true)
-                CupertinoText(
-                    text = resultText,
-                    color = if (isSuccess) statusSuccessColor else statusErrorColor,
-                    style = HigTypography.subheadline
-                )
-            }
+            CupertinoText(
+                text =
+                    "LIAS checks the server before applying a new connection.",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
+            )
         }
     }
 }
