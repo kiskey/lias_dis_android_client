@@ -13,7 +13,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
-import com.lias.remote.repositories.* // Wildcard import resolves all repository extension functions
+import com.lias.remote.repositories.*
 import com.lias.remote.ui.components.UndoState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +40,7 @@ class LiasViewModel(
             eventRepository.uiEvents.collect { event ->
                 if (event is UiEvent.ShowSecurityAlert) {
                     _pendingSecurityAlert.value = SecurityAlertPayload(
-                        alertType = "Anomaly Detected",
+                        alertType = "mac_spoof_detected",
                         details = event.details,
                         pdid = "",
                         timestamp = Instant.now().toString()
@@ -48,6 +48,15 @@ class LiasViewModel(
                 }
             }
         }
+    }
+
+    fun triggerSecurityAlert() {
+        _pendingSecurityAlert.value = SecurityAlertPayload(
+            alertType = "mac_spoof_detected",
+            details = "Potential MAC spoofing detected via Netlink monitoring.",
+            pdid = state.value.devices.firstOrNull()?.pdid ?: "",
+            timestamp = Instant.now().toString()
+        )
     }
 
     fun dismissSecurityAlert() { _pendingSecurityAlert.value = null }
@@ -114,7 +123,7 @@ class LiasViewModel(
         viewModelScope.launch {
             val result = eventRepository.renameDevice(pdid, newName)
             if (result is ApiResult.Success) {
-                _undoState.value = UndoState("Device renamed") {
+                _undoState.value = UndoState("Device renamed to '$newName'") {
                     viewModelScope.launch { eventRepository.renameDevice(pdid, prevName) }
                 }
             }
@@ -127,6 +136,10 @@ class LiasViewModel(
 
     fun createUser(user: User) {
         viewModelScope.launch { eventRepository.createUser(user) }
+    }
+
+    fun toggleVacationMode(enabled: Boolean) {
+        viewModelScope.launch { eventRepository.toggleVacationMode(enabled) }
     }
 
     fun exportPolicies() {
