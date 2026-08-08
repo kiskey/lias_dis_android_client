@@ -1,8 +1,7 @@
 // ====================================================================
 // File: StatusPills.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: WCAG 1.4.1 compliant status pills (color + text + glyph).
-//          Replaces color-only indicators.
+// Version: 3.0.1 (HIG Redesign Fix)
+// Purpose: Added missing size import for icons.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -11,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
