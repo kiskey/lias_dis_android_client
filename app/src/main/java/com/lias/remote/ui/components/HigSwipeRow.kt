@@ -113,7 +113,7 @@ fun HigSwipeRow(
                         // Cupertino Cancel 'X' Button (Opposite End / Right side)
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -145,7 +145,7 @@ fun HigSwipeRow(
                         // Cupertino Cancel 'X' Button (Opposite End / Left side)
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
