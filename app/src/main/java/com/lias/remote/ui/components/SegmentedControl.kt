@@ -60,7 +60,7 @@ fun SegmentedControl(
             label = "segmentThumb"
         )
 
-        // Sliding Spring Thumb Container
+        // Sliding Spring Thumb
         Box(
             modifier = Modifier
                 .offset(x = animatedOffset)
@@ -76,7 +76,7 @@ fun SegmentedControl(
                 )
         )
 
-        // Segment Options Row
+        // Segment Options Text Row
         Row(modifier = Modifier.fillMaxSize()) {
             options.forEachIndexed { index, option ->
                 val isSelected = index == selectedIndex
