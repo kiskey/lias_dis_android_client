@@ -25,21 +25,27 @@ import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
+import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.MiniWeekStrip
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Pencil
+import io.github.alexzhirkevich.cupertino.icons.outlined.Trash
 
 @Composable
 fun SchedulesScreen(viewModel: LiasViewModel) {
@@ -48,6 +54,7 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
     
     var showEditor by remember { mutableStateOf(false) }
     var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
+    var scheduleToDelete by remember { mutableStateOf<Schedule?>(null) }
 
     HigLargeTitleScaffold(
         title = "Schedules",
@@ -61,35 +68,73 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             
             items(state.schedules, key = { it.id }) { schedule ->
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                CupertinoText(
-                                    text = if (schedule.name == "Bedtime") "🛏 Bedtime" else if (schedule.name == "Homework") "📚 Homework" else schedule.name,
-                                    style = HigTypography.headline,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                CupertinoText("${schedule.mode.uppercase()} · ${schedule.timezone}", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel)
-                            }
-                            StatusPill(
-                                text = schedule.mode,
-                                tone = if (schedule.mode == "downtime") PillTone.BLOCKED else PillTone.ALLOWED
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        MiniWeekStrip(schedules = listOf(schedule))
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        CupertinoText(
-                            text = "Used by policies · Weekly recurring window",
-                            style = HigTypography.caption,
-                            color = LiasThemeColors.tertiaryLabel
+                    HigSwipeRow(
+                        leadingAction = SwipeAction(
+                            icon = CupertinoIcons.Outlined.Pencil,
+                            color = LiasThemeColors.blue,
+                            onTrigger = { editingSchedule = schedule; showEditor = true }
+                        ),
+                        trailingAction = SwipeAction(
+                            icon = CupertinoIcons.Outlined.Trash,
+                            color = LiasThemeColors.red,
+                            onTrigger = { scheduleToDelete = schedule }
                         )
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    CupertinoText(
+                                        text = if (schedule.name == "Bedtime") "🛏 Bedtime" else if (schedule.name == "Homework") "📚 Homework" else schedule.name,
+                                        style = HigTypography.headline,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    CupertinoText("${schedule.mode.uppercase()} · ${schedule.timezone}", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel)
+                                }
+                                StatusPill(
+                                    text = schedule.mode,
+                                    tone = if (schedule.mode == "downtime") PillTone.BLOCKED else PillTone.ALLOWED
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            MiniWeekStrip(schedules = listOf(schedule))
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CupertinoText(
+                                    text = "Used by policies · Weekly recurring window",
+                                    style = HigTypography.caption,
+                                    color = LiasThemeColors.tertiaryLabel
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    HigTextButton(
+                                        text = "Copy",
+                                        onClick = {
+                                            editingSchedule = schedule.copy(
+                                                id = "",
+                                                name = "Copy of ${schedule.name}"
+                                            )
+                                            showEditor = true
+                                        }
+                                    )
+                                    HigTextButton(
+                                        text = "Edit",
+                                        onClick = {
+                                            editingSchedule = schedule
+                                            showEditor = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -101,6 +146,17 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
             initialSchedule = editingSchedule,
             onDismiss = { showEditor = false },
             onSave = { viewModel.saveSchedule(it); showEditor = false }
+        )
+    }
+
+    scheduleToDelete?.let { schedule ->
+        HigAlertDialog(
+            onDismissRequest = { scheduleToDelete = null },
+            title = "Delete Schedule",
+            message = "Are you sure you want to delete the schedule '${schedule.name}'? Active rules using this schedule will default to open.",
+            confirmText = "Delete",
+            onConfirm = { viewModel.deleteSchedule(schedule.id) },
+            isDestructive = true
         )
     }
 }
