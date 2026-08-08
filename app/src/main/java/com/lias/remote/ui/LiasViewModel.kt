@@ -1,8 +1,8 @@
 // ====================================================================
 // File: LiasViewModel.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Integrated UndoState, SecurityAlert state, and Variable
-//          Pause using existing POST /policies contract.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Added missing getDeviceLogs suspend function to resolve
+//          DeviceDetailScreen compilation error.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -10,6 +10,7 @@ package com.lias.remote.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.models.EffectiveStatus
+import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.SecurityAlertPayload
@@ -25,6 +26,7 @@ import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
 import com.lias.remote.repositories.extendDeviceAccess
+import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.pauseDeviceInternet
 import com.lias.remote.repositories.renameDevice
 import com.lias.remote.repositories.savePolicy
@@ -177,5 +179,9 @@ class LiasViewModel(
 
     fun deleteTag(tagId: String) {
         viewModelScope.launch { eventRepository.deleteTag(tagId) }
+    }
+
+    suspend fun getDeviceLogs(pdid: String): ApiResult<List<FlowLog>> {
+        return eventRepository.getDeviceLogs(pdid)
     }
 }
