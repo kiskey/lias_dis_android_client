@@ -1,18 +1,18 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 6.0.0
+// Version: 11.0.0
 //
 // Purpose:
-//   Device inventory and lightweight device actions.
+//   Authoritative device/tag access-management screen.
 //
-// UX corrections:
-//   - Loading != empty != failure != stale.
-//   - Search-empty state is distinct from inventory-empty state.
-//   - Untagged/unknown tag devices remain visible.
-//   - Effective status may be unknown while loading.
-//   - Device cards no longer claim "Allowed" simply because an
-//     effective-status request has not completed.
-//   - Infrastructure immunity remains visible and immutable.
+// Batch 11 corrections:
+//   - Zero pol_pause_* inference.
+//   - Device buttons use EffectiveStatus availability.
+//   - Active Pause and Extend countdowns are authoritative.
+//   - Tag-level Extend All is implemented.
+//   - Tag extension cancellation is implemented.
+//   - Infrastructure remains immutable.
+//   - Search/loading/stale/empty behavior retained from Batch 6.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -29,12 +29,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,22 +42,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.models.TemporaryAccessKind
+import com.lias.remote.core.models.temporaryAccessKind
+import com.lias.remote.core.util.EffectiveAccessFormatter
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
-import com.lias.remote.ui.components.HigModalSheet
-import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
@@ -68,21 +63,24 @@ import com.lias.remote.ui.components.ScreenStateView
 import com.lias.remote.ui.components.StaleDataNotice
 import com.lias.remote.ui.components.StatusDot
 import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.components.formatTemporaryDuration
+import com.lias.remote.ui.components.rememberTemporaryMinutesLeft
 import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoButton
-import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
 import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun DevicesScreen(
     viewModel: LiasViewModel,
-    onNavigateToDeviceDetail: (String) -> Unit
+    onNavigateToDeviceDetail:
+        (String) -> Unit
 ) {
+
     val state by
-        viewModel.state.collectAsState()
+        viewModel.state
+            .collectAsState()
 
     val scrollState =
         rememberLazyListState()
@@ -99,22 +97,37 @@ fun DevicesScreen(
 
     var editingTag by
         remember {
-            mutableStateOf<Tag?>(null)
+            mutableStateOf<Tag?>(
+                null
+            )
         }
 
     var activeDeviceForExtend by
         remember {
-            mutableStateOf<Device?>(null)
+            mutableStateOf<Device?>(
+                null
+            )
         }
 
     var activeDeviceForPause by
         remember {
-            mutableStateOf<Device?>(null)
+            mutableStateOf<Device?>(
+                null
+            )
         }
 
     var activeDeviceForRename by
         remember {
-            mutableStateOf<Device?>(null)
+            mutableStateOf<Device?>(
+                null
+            )
+        }
+
+    var activeTagForExtend by
+        remember {
+            mutableStateOf<Tag?>(
+                null
+            )
         }
 
     val filteredDevices =
@@ -122,51 +135,61 @@ fun DevicesScreen(
             state.devices,
             searchQuery
         ) {
+
             val query =
                 searchQuery.trim()
 
-            if (query.isBlank()) {
+            if (
+                query.isBlank()
+            ) {
                 state.devices
             } else {
-                state.devices.filter { device ->
-                    device.displayName.contains(
-                        query,
-                        ignoreCase = true
-                    ) ||
-                        device.currentMAC.contains(
-                            query,
-                            ignoreCase = true
-                        ) ||
-                        device.currentIP.contains(
-                            query,
-                            ignoreCase = true
-                        ) ||
-                        device.hostname.contains(
-                            query,
-                            ignoreCase = true
-                        ) ||
-                        device.vendor.contains(
-                            query,
-                            ignoreCase = true
-                        ) ||
-                        device.manufacturer.contains(
-                            query,
-                            ignoreCase = true
-                        )
-                }
+
+                state.devices
+                    .filter { device ->
+
+                        device.displayName
+                            .contains(
+                                query,
+                                true
+                            ) ||
+                            device.currentMAC
+                                .contains(
+                                    query,
+                                    true
+                                ) ||
+                            device.currentIP
+                                .contains(
+                                    query,
+                                    true
+                                ) ||
+                            device.hostname
+                                .contains(
+                                    query,
+                                    true
+                                ) ||
+                            device.vendor
+                                .contains(
+                                    query,
+                                    true
+                                ) ||
+                            device.manufacturer
+                                .contains(
+                                    query,
+                                    true
+                                )
+                    }
             }
         }
 
-    val displayGroups =
+    val groups =
         remember(
             filteredDevices,
             state.tags
         ) {
             buildDeviceGroups(
-                devices =
-                    filteredDevices,
-                tags =
-                    state.tags
+                filteredDevices,
+                state.tags
             )
         }
 
@@ -180,9 +203,11 @@ fun DevicesScreen(
         searchQuery =
             searchQuery,
         onSearchQueryChanged = {
-            searchQuery = it
+            searchQuery =
+                it
         },
         navTrailing = {
+
             HigTextButton(
                 text =
                     "＋ Tag",
@@ -213,15 +238,17 @@ fun DevicesScreen(
 
                 SyncState.Idle,
                 SyncState.Loading -> {
+
                     if (
                         !state.isInitialLoaded
                     ) {
+
                         item {
                             ScreenStateView(
                                 title =
                                     "Loading Devices",
                                 message =
-                                    "Synchronizing the device inventory from LIAS."
+                                    "Synchronizing device and access state from LIAS."
                             )
                         }
 
@@ -230,6 +257,7 @@ fun DevicesScreen(
                 }
 
                 is SyncState.Failed -> {
+
                     item {
                         ScreenStateView(
                             title =
@@ -249,6 +277,7 @@ fun DevicesScreen(
                 }
 
                 is SyncState.Stale -> {
+
                     item {
                         StaleDataNotice(
                             message =
@@ -264,8 +293,10 @@ fun DevicesScreen(
             }
 
             if (
-                state.devices.isEmpty()
+                state.devices
+                    .isEmpty()
             ) {
+
                 item {
                     ScreenStateView(
                         title =
@@ -283,8 +314,10 @@ fun DevicesScreen(
             }
 
             if (
-                filteredDevices.isEmpty()
+                filteredDevices
+                    .isEmpty()
             ) {
+
                 item {
                     ScreenStateView(
                         title =
@@ -294,7 +327,8 @@ fun DevicesScreen(
                         actionText =
                             "Clear Search",
                         onAction = {
-                            searchQuery = ""
+                            searchQuery =
+                                ""
                         }
                     )
                 }
@@ -304,7 +338,7 @@ fun DevicesScreen(
 
             item {
                 ListSectionHeader(
-                    "${filteredDevices.size} " +
+                    "${filteredDevices.size} ${
                         if (
                             filteredDevices.size ==
                             1
@@ -312,8 +346,10 @@ fun DevicesScreen(
                             "Device"
                         } else {
                             "Devices"
-                        },
+                        }
+                    }",
                     trailingAction = {
+
                         HigTextButton(
                             text =
                                 if (
@@ -330,14 +366,46 @@ fun DevicesScreen(
                 )
             }
 
-            displayGroups.forEach { group ->
+            groups.forEach { group ->
 
                 item(
                     key =
                         "header_${group.id}"
                 ) {
-                    ListSectionHeader(
-                        "${group.name} · ${group.devices.size}"
+
+                    val tag =
+                        state.tags.find {
+                            it.id ==
+                                group.id
+                        }
+
+                    val tagStatus =
+                        viewModel
+                            .tagEffectiveStatusFor(
+                                group.id
+                            )
+
+                    DeviceGroupHeader(
+                        group =
+                            group,
+                        tag =
+                            tag,
+                        status =
+                            tagStatus,
+                        onExtend = {
+                            if (
+                                tag != null
+                            ) {
+                                activeTagForExtend =
+                                    tag
+                            }
+                        },
+                        onCancelExtension = {
+                            viewModel
+                                .cancelTagExtension(
+                                    group.id
+                                )
+                        }
                     )
                 }
 
@@ -349,25 +417,14 @@ fun DevicesScreen(
                     }
                 ) { device ->
 
-                    val isPaused =
-                        state.policies.any {
-                            it.id ==
-                                "pol_pause_${device.pdid}" &&
-                                it.enabled
-                        }
-
-                    val status =
-                        viewModel.effectiveStatusFor(
-                            device.pdid
-                        )
-
                     DeviceCardItem(
                         device =
                             device,
-                        isPaused =
-                            isPaused,
                         effectiveStatus =
-                            status,
+                            viewModel
+                                .effectiveStatusFor(
+                                    device.pdid
+                                ),
                         onExtend = {
                             activeDeviceForExtend =
                                 device
@@ -375,6 +432,18 @@ fun DevicesScreen(
                         onPause = {
                             activeDeviceForPause =
                                 device
+                        },
+                        onResume = {
+                            viewModel
+                                .unpauseDeviceInternet(
+                                    device.pdid
+                                )
+                        },
+                        onCancelExtension = {
+                            viewModel
+                                .cancelDeviceExtension(
+                                    device.pdid
+                                )
                         },
                         onRename = {
                             activeDeviceForRename =
@@ -394,6 +463,7 @@ fun DevicesScreen(
     if (
         showTagEditor
     ) {
+
         TagEditorSheet(
             initialTag =
                 editingTag,
@@ -407,13 +477,15 @@ fun DevicesScreen(
                     editingTag ==
                     null
                 ) {
-                    viewModel.createTag(
-                        tag
-                    )
+                    viewModel
+                        .createTag(
+                            tag
+                        )
                 } else {
-                    viewModel.updateTag(
-                        tag
-                    )
+                    viewModel
+                        .updateTag(
+                            tag
+                        )
                 }
 
                 showTagEditor =
@@ -426,9 +498,10 @@ fun DevicesScreen(
         ?.let { device ->
 
             val status =
-                viewModel.effectiveStatusFor(
-                    device.pdid
-                )
+                viewModel
+                    .effectiveStatusFor(
+                        device.pdid
+                    )
 
             ExtendAccessSheet(
                 targetLabel =
@@ -439,24 +512,31 @@ fun DevicesScreen(
                             device.pdid
                         },
                 currentExtension =
-                    status?.activeExtension,
+                    status
+                        ?.activeExtension
+                        ?.takeIf {
+                            status.temporaryAccessKind ==
+                                TemporaryAccessKind.EXTEND
+                        },
                 onDismiss = {
                     activeDeviceForExtend =
                         null
                 },
                 onConfirm = { minutes ->
-                    viewModel.extendDeviceAccess(
-                        device.pdid,
-                        minutes
-                    )
+
+                    viewModel
+                        .extendDeviceAccess(
+                            device.pdid,
+                            minutes
+                        )
 
                     activeDeviceForExtend =
                         null
                 },
                 onCancelExtension =
                     if (
-                        status?.activeExtension !=
-                        null
+                        status?.temporaryAccessKind ==
+                        TemporaryAccessKind.EXTEND
                     ) {
                         {
                             viewModel
@@ -475,6 +555,7 @@ fun DevicesScreen(
 
     activeDeviceForPause
         ?.let { device ->
+
             PauseSheet(
                 targetLabel =
                     device.displayName,
@@ -483,10 +564,12 @@ fun DevicesScreen(
                         null
                 },
                 onConfirm = { minutes ->
-                    viewModel.pauseDeviceInternet(
-                        device.pdid,
-                        minutes
-                    )
+
+                    viewModel
+                        .pauseDeviceInternet(
+                            device.pdid,
+                            minutes
+                        )
 
                     activeDeviceForPause =
                         null
@@ -496,7 +579,8 @@ fun DevicesScreen(
 
     activeDeviceForRename
         ?.let { device ->
-            RenameDeviceDialog(
+
+            DeviceRenameDialog(
                 currentName =
                     device.displayName,
                 onDismiss = {
@@ -504,6 +588,7 @@ fun DevicesScreen(
                         null
                 },
                 onConfirm = { newName ->
+
                     viewModel.renameDevice(
                         device.pdid,
                         newName
@@ -512,6 +597,63 @@ fun DevicesScreen(
                     activeDeviceForRename =
                         null
                 }
+            )
+        }
+
+    activeTagForExtend
+        ?.let { tag ->
+
+            val status =
+                viewModel
+                    .tagEffectiveStatusFor(
+                        tag.id
+                    )
+
+            ExtendAccessSheet(
+                targetLabel =
+                    tag.name,
+                targetSubtitle =
+                    "All devices using this tag",
+                currentExtension =
+                    status
+                        ?.activeExtension
+                        ?.takeIf {
+                            status.temporaryAccessKind ==
+                                TemporaryAccessKind.EXTEND
+                        },
+                onDismiss = {
+                    activeTagForExtend =
+                        null
+                },
+                onConfirm = { minutes ->
+
+                    viewModel
+                        .extendTagAccess(
+                            tag.id,
+                            tag.name,
+                            minutes
+                        )
+
+                    activeTagForExtend =
+                        null
+                },
+                onCancelExtension =
+                    if (
+                        status?.temporaryAccessKind ==
+                        TemporaryAccessKind.EXTEND
+                    ) {
+                        {
+                            viewModel
+                                .cancelTagExtension(
+                                    tag.id
+                                )
+
+                            activeTagForExtend =
+                                null
+                        }
+                    } else {
+                        null
+                    }
             )
         }
 }
@@ -526,12 +668,13 @@ private fun buildDeviceGroups(
     devices: List<Device>,
     tags: List<Tag>
 ): List<DeviceGroup> {
-    val tagById =
+
+    val knownTags =
         tags.associateBy {
             it.id
         }
 
-    val map =
+    val grouped =
         linkedMapOf<
             String,
             MutableList<Device>
@@ -539,17 +682,20 @@ private fun buildDeviceGroups(
 
     devices.forEach { device ->
 
-        val assignedTags =
+        val ids =
             device.safeTags
                 .filter {
                     it.isNotBlank()
                 }
                 .ifEmpty {
-                    listOf("generic")
+                    listOf(
+                        "generic"
+                    )
                 }
 
-        assignedTags.forEach { tagId ->
-            map.getOrPut(
+        ids.forEach { tagId ->
+
+            grouped.getOrPut(
                 tagId
             ) {
                 mutableListOf()
@@ -559,114 +705,162 @@ private fun buildDeviceGroups(
         }
     }
 
-    return map.map { (tagId, grouped) ->
+    return grouped
+        .map { (tagId, members) ->
 
-        val name =
-            tagById[tagId]
-                ?.name
-                ?: when (tagId) {
-                    "generic" ->
-                        "Other Devices"
-
-                    "infrastructure" ->
-                        "Infrastructure"
-
-                    else ->
+            DeviceGroup(
+                id =
+                    tagId,
+                name =
+                    knownTags[
                         tagId
-                            .replace(
-                                "_",
-                                " "
-                            )
-                            .replaceFirstChar {
-                                if (
-                                    it.isLowerCase()
-                                ) {
-                                    it.titlecase()
-                                } else {
-                                    it.toString()
-                                }
-                            }
+                    ]?.name
+                        ?: when (
+                            tagId
+                        ) {
+                            "generic" ->
+                                "Other Devices"
+
+                            "infrastructure" ->
+                                "Infrastructure"
+
+                            else ->
+                                tagId
+                        },
+                devices =
+                    members
+                        .distinctBy {
+                            it.pdid
+                        }
+            )
+        }
+}
+
+@Composable
+private fun DeviceGroupHeader(
+    group: DeviceGroup,
+    tag: Tag?,
+    status: EffectiveStatus?,
+    onExtend: () -> Unit,
+    onCancelExtension: () -> Unit
+) {
+
+    val isInfrastructure =
+        group.id ==
+            "infrastructure"
+
+    val temporaryKind =
+        status
+            ?.temporaryAccessKind
+            ?: TemporaryAccessKind.NONE
+
+    val minutesLeft =
+        rememberTemporaryMinutesLeft(
+            status?.activeExtension
+        )
+
+    ListSectionHeader(
+        text =
+            "${group.name} · ${group.devices.size}",
+        trailingAction = {
+
+            when {
+
+                isInfrastructure -> {
+
+                    CupertinoText(
+                        text =
+                            "IMMUNE",
+                        style =
+                            HigTypography.caption,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color =
+                            LiasThemeColors.secondaryLabel
+                    )
                 }
 
-        DeviceGroup(
-            id =
-                tagId,
-            name =
-                name,
-            devices =
-                grouped.distinctBy {
-                    it.pdid
+                temporaryKind ==
+                    TemporaryAccessKind.EXTEND -> {
+
+                    HigTextButton(
+                        text =
+                            if (
+                                minutesLeft !=
+                                    null &&
+                                minutesLeft > 0
+                            ) {
+                                "Cancel · ${
+                                    formatTemporaryDuration(
+                                        minutesLeft
+                                    )
+                                }"
+                            } else {
+                                "Cancel Extension"
+                            },
+                        onClick =
+                            onCancelExtension,
+                        isDestructive =
+                            true
+                    )
                 }
-        )
-    }
+
+                status?.action
+                    ?.equals(
+                        "block",
+                        true
+                    ) == true &&
+                    status.extendAvailable -> {
+
+                    HigTextButton(
+                        text =
+                            "Extend All",
+                        onClick =
+                            onExtend
+                    )
+                }
+
+                else ->
+                    Unit
+            }
+        }
+    )
 }
 
 @Composable
 private fun DeviceCardItem(
     device: Device,
-    isPaused: Boolean,
     effectiveStatus: EffectiveStatus?,
     onExtend: () -> Unit,
     onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancelExtension: () -> Unit,
     onRename: () -> Unit,
     onDetail: () -> Unit
 ) {
+
     val isInfrastructure =
-        device.safeTags.contains(
-            "infrastructure"
+        device.safeTags
+            .contains(
+                "infrastructure"
+            )
+
+    val presentation =
+        EffectiveAccessFormatter
+            .present(
+                effectiveStatus
+            )
+
+    val temporaryKind =
+        effectiveStatus
+            ?.temporaryAccessKind
+            ?: TemporaryAccessKind.NONE
+
+    val minutesLeft =
+        rememberTemporaryMinutesLeft(
+            effectiveStatus
+                ?.activeExtension
         )
-
-    val statusAction =
-        effectiveStatus?.action
-            ?.lowercase()
-
-    val isBlocked =
-        statusAction ==
-            "block"
-
-    val statusText =
-        when {
-            isInfrastructure ->
-                "Immune"
-
-            isPaused ->
-                "Paused"
-
-            effectiveStatus == null ->
-                "Checking"
-
-            isBlocked ->
-                "Blocked"
-
-            statusAction ==
-                "allow" ->
-                "Allowed"
-
-            else ->
-                "Unknown"
-        }
-
-    val statusTone =
-        when {
-            isInfrastructure ->
-                PillTone.INFO
-
-            isPaused ->
-                PillTone.PAUSED
-
-            effectiveStatus == null ->
-                PillTone.INFO
-
-            isBlocked ->
-                PillTone.BLOCKED
-
-            statusAction ==
-                "allow" ->
-                PillTone.ALLOWED
-
-            else ->
-                PillTone.INFO
-        }
 
     Box(
         modifier =
@@ -682,17 +876,15 @@ private fun DeviceCardItem(
                     )
                 )
                 .background(
-                    LiasThemeColors.secondaryBackground
+                    LiasThemeColors
+                        .secondaryBackground
                 )
                 .border(
-                    width =
-                        0.5.dp,
-                    color =
-                        LiasThemeColors.separator,
-                    shape =
-                        RoundedCornerShape(
-                            14.dp
-                        )
+                    0.5.dp,
+                    LiasThemeColors.separator,
+                    RoundedCornerShape(
+                        14.dp
+                    )
                 )
                 .clickable {
                     onDetail()
@@ -701,7 +893,9 @@ private fun DeviceCardItem(
                     14.dp
                 )
     ) {
+
         Column {
+
             Row(
                 modifier =
                     Modifier.fillMaxWidth(),
@@ -710,21 +904,25 @@ private fun DeviceCardItem(
                 verticalAlignment =
                     Alignment.Top
             ) {
+
                 Column(
                     modifier =
                         Modifier.weight(
                             1f
                         )
                 ) {
+
                     Row(
                         verticalAlignment =
                             Alignment.CenterVertically
                     ) {
+
                         StatusDot(
                             isOnline =
                                 device.online,
                             isPaused =
-                                isPaused
+                                temporaryKind ==
+                                    TemporaryAccessKind.PAUSE
                         )
 
                         Spacer(
@@ -759,22 +957,69 @@ private fun DeviceCardItem(
                         style =
                             HigTypography.caption,
                         color =
-                            LiasThemeColors.tertiaryLabel
+                            LiasThemeColors
+                                .tertiaryLabel
                     )
-                }
 
-                Spacer(
-                    modifier =
-                        Modifier.width(
-                            8.dp
+                    if (
+                        presentation.detail !=
+                        null
+                    ) {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    2.dp
+                                )
                         )
-                )
+
+                        CupertinoText(
+                            text =
+                                presentation.detail,
+                            style =
+                                HigTypography.caption,
+                            color =
+                                LiasThemeColors
+                                    .secondaryLabel
+                        )
+                    }
+                }
 
                 StatusPill(
                     text =
-                        statusText,
+                        statusText(
+                            isInfrastructure =
+                                isInfrastructure,
+                            presentationTitle =
+                                presentation.title,
+                            minutesLeft =
+                                minutesLeft,
+                            temporaryKind =
+                                temporaryKind
+                        ),
                     tone =
-                        statusTone
+                        when {
+
+                            isInfrastructure ->
+                                PillTone.INFO
+
+                            temporaryKind ==
+                                TemporaryAccessKind.PAUSE ->
+                                PillTone.PAUSED
+
+                            temporaryKind ==
+                                TemporaryAccessKind.EXTEND ->
+                                PillTone.ALLOWED
+
+                            presentation.isBlocked ->
+                                PillTone.BLOCKED
+
+                            presentation.isAllowed ->
+                                PillTone.ALLOWED
+
+                            else ->
+                                PillTone.INFO
+                        }
                 )
             }
 
@@ -785,74 +1030,54 @@ private fun DeviceCardItem(
                     )
             )
 
-            if (
-                isInfrastructure
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        6.dp
+                    )
             ) {
-                Row(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            6.dp
+
+                when {
+
+                    isInfrastructure -> {
+
+                        HigButton(
+                            text =
+                                "View Details",
+                            onClick =
+                                onDetail,
+                            style =
+                                HigButtonStyle.Gray,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
                         )
-                ) {
-                    HigButton(
-                        text =
-                            "View Details",
-                        onClick =
-                            onDetail,
-                        style =
-                            HigButtonStyle.Gray,
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
+                    }
 
-                    HigButton(
-                        text =
-                            "Rename",
-                        onClick =
-                            onRename,
-                        style =
-                            HigButtonStyle.Gray,
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-                }
+                    temporaryKind ==
+                        TemporaryAccessKind.PAUSE -> {
 
-            } else {
-                Row(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            6.dp
+                        HigButton(
+                            text =
+                                "Resume",
+                            onClick =
+                                onResume,
+                            style =
+                                HigButtonStyle.Primary,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
                         )
-                ) {
-                    when {
-                        isPaused -> {
-                            HigButton(
-                                text =
-                                    "Resume",
-                                onClick = {
-                                    /*
-                                     * Existing ViewModel exposes resume
-                                     * independently from the card callbacks.
-                                     * Detail screen remains the canonical
-                                     * resume control until this card receives
-                                     * its dedicated callback in a later pass.
-                                     */
-                                    onDetail()
-                                },
-                                style =
-                                    HigButtonStyle.Primary,
-                                modifier =
-                                    Modifier.weight(
-                                        1f
-                                    )
-                            )
-                        }
 
-                        isBlocked -> {
+                        if (
+                            presentation
+                                .canExtend
+                        ) {
+
                             HigButton(
                                 text =
                                     "Extend",
@@ -866,47 +1091,143 @@ private fun DeviceCardItem(
                                     )
                             )
                         }
-
-                        else -> {
-                            HigButton(
-                                text =
-                                    "Pause",
-                                onClick =
-                                    onPause,
-                                style =
-                                    HigButtonStyle.Gray,
-                                enabled =
-                                    effectiveStatus !=
-                                        null,
-                                modifier =
-                                    Modifier.weight(
-                                        1f
-                                    )
-                            )
-                        }
                     }
 
-                    HigButton(
-                        text =
-                            "Rename",
-                        onClick =
-                            onRename,
-                        style =
-                            HigButtonStyle.Gray,
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
+                    temporaryKind ==
+                        TemporaryAccessKind.EXTEND -> {
+
+                        HigButton(
+                            text =
+                                "Cancel Extension",
+                            onClick =
+                                onCancelExtension,
+                            style =
+                                HigButtonStyle.Gray,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        )
+                    }
+
+                    presentation
+                        .canExtend -> {
+
+                        HigButton(
+                            text =
+                                "Extend",
+                            onClick =
+                                onExtend,
+                            style =
+                                HigButtonStyle.Secondary,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        )
+                    }
+
+                    presentation
+                        .canPause -> {
+
+                        HigButton(
+                            text =
+                                "Pause",
+                            onClick =
+                                onPause,
+                            style =
+                                HigButtonStyle.Gray,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        )
+                    }
+
+                    else -> {
+
+                        HigButton(
+                            text =
+                                "View Details",
+                            onClick =
+                                onDetail,
+                            style =
+                                HigButtonStyle.Gray,
+                            modifier =
+                                Modifier.weight(
+                                    1f
+                                )
+                        )
+                    }
                 }
+
+                HigButton(
+                    text =
+                        "Rename",
+                    onClick =
+                        onRename,
+                    style =
+                        HigButtonStyle.Gray,
+                    modifier =
+                        Modifier.weight(
+                            1f
+                        )
+                )
             }
         }
     }
 }
 
+private fun statusText(
+    isInfrastructure: Boolean,
+    presentationTitle: String,
+    minutesLeft: Int?,
+    temporaryKind: TemporaryAccessKind
+): String {
+
+    if (
+        isInfrastructure
+    ) {
+        return "Immune"
+    }
+
+    if (
+        temporaryKind ==
+        TemporaryAccessKind.PAUSE
+    ) {
+        return if (
+            minutesLeft !=
+                null &&
+            minutesLeft > 0
+        ) {
+            "Paused · ${formatTemporaryDuration(minutesLeft)}"
+        } else {
+            "Paused"
+        }
+    }
+
+    if (
+        temporaryKind ==
+        TemporaryAccessKind.EXTEND
+    ) {
+        return if (
+            minutesLeft !=
+                null &&
+            minutesLeft > 0
+        ) {
+            "Extended · ${formatTemporaryDuration(minutesLeft)}"
+        } else {
+            "Extended"
+        }
+    }
+
+    return presentationTitle
+}
+
 private fun buildDeviceSubtitle(
     device: Device
 ): String {
+
     val network =
         device.currentIP
             .ifBlank {
@@ -932,270 +1253,4 @@ private fun buildDeviceSubtitle(
             }
 
     return "$network · $vendor"
-}
-
-@Composable
-fun RenameDeviceDialog(
-    currentName: String,
-    onDismiss: () -> Unit,
-    onConfirm: (newName: String) -> Unit
-) {
-    var text by
-        remember(
-            currentName
-        ) {
-            mutableStateOf(
-                currentName
-            )
-        }
-
-    HigAlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title =
-            "Rename Device",
-        message =
-            "Choose a friendly name for this device.",
-        confirmText =
-            "Save",
-        onConfirm = {
-            val normalized =
-                text.trim()
-
-            if (
-                normalized.isNotBlank()
-            ) {
-                onConfirm(
-                    normalized
-                )
-            }
-        }
-    )
-
-    /*
-     * HigAlertDialog's current API does not expose arbitrary dialog
-     * content. Retaining the existing dialog contract here prevents
-     * introducing an incompatible custom Material dialog. The field
-     * itself will move into the HIG dialog component when that component
-     * receives editable-content support in the component-system pass.
-     */
-}
-
-@Composable
-fun TagEditorSheet(
-    initialTag: Tag?,
-    onDismiss: () -> Unit,
-    onSave: (Tag) -> Unit
-) {
-    var name by
-        remember(
-            initialTag
-        ) {
-            mutableStateOf(
-                initialTag?.name
-                    ?: ""
-            )
-        }
-
-    var selectedColor by
-        remember(
-            initialTag
-        ) {
-            mutableStateOf(
-                initialTag?.color
-                    ?: "#0A84FF"
-            )
-        }
-
-    val presetColors =
-        listOf(
-            "#0A84FF",
-            "#5856D6",
-            "#FF9500",
-            "#FF2D55",
-            "#00C7BE",
-            "#30D158",
-            "#FFCC00",
-            "#8E8E93"
-        )
-
-    HigModalSheet(
-        onDismiss =
-            onDismiss
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal =
-                            24.dp,
-                        vertical =
-                            16.dp
-                    ),
-            verticalArrangement =
-                Arrangement.spacedBy(
-                    16.dp
-                )
-        ) {
-            HigSheetHeader(
-                title =
-                    if (
-                        initialTag ==
-                        null
-                    ) {
-                        "New Tag"
-                    } else {
-                        "Edit Tag"
-                    },
-                onCancel =
-                    onDismiss,
-                trailingAction = {
-                    CupertinoButton(
-                        onClick = {
-                            val normalizedName =
-                                name.trim()
-
-                            if (
-                                normalizedName.isBlank()
-                            ) {
-                                return@CupertinoButton
-                            }
-
-                            val id =
-                                initialTag?.id
-                                    ?: normalizedName
-                                        .lowercase()
-                                        .replace(
-                                            Regex(
-                                                "[^a-z0-9]+"
-                                            ),
-                                            "_"
-                                        )
-                                        .trim('_')
-
-                            onSave(
-                                Tag(
-                                    id =
-                                        id,
-                                    name =
-                                        normalizedName,
-                                    color =
-                                        selectedColor,
-                                    precedence =
-                                        initialTag
-                                            ?.precedence
-                                            ?: 50,
-                                    builtin =
-                                        initialTag
-                                            ?.builtin
-                                            ?: false
-                                )
-                            )
-                        },
-                        colors =
-                            CupertinoButtonDefaults
-                                .plainButtonColors()
-                    ) {
-                        CupertinoText(
-                            text =
-                                "Save",
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-                    }
-                }
-            )
-
-            HigField(
-                value =
-                    name,
-                onValueChange = {
-                    name = it
-                },
-                label =
-                    "Tag Name",
-                placeholder =
-                    "e.g. Kids"
-            )
-
-            Column(
-                modifier =
-                    Modifier.fillMaxWidth()
-            ) {
-                CupertinoText(
-                    text =
-                        "BADGE COLOR",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors.tertiaryLabel,
-                    modifier =
-                        Modifier.padding(
-                            bottom = 8.dp
-                        )
-                )
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            12.dp
-                        )
-                ) {
-                    presetColors.forEach { colorHex ->
-
-                        val selected =
-                            selectedColor.equals(
-                                colorHex,
-                                ignoreCase = true
-                            )
-
-                        val color =
-                            Color(
-                                android.graphics.Color
-                                    .parseColor(
-                                        colorHex
-                                    )
-                            )
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(
-                                        36.dp
-                                    )
-                                    .clip(
-                                        CircleShape
-                                    )
-                                    .background(
-                                        color
-                                    )
-                                    .then(
-                                        if (
-                                            selected
-                                        ) {
-                                            Modifier.border(
-                                                width =
-                                                    2.dp,
-                                                color =
-                                                    LiasThemeColors.label,
-                                                shape =
-                                                    CircleShape
-                                            )
-                                        } else {
-                                            Modifier
-                                        }
-                                    )
-                                    .clickable {
-                                        selectedColor =
-                                            colorHex
-                                    }
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
