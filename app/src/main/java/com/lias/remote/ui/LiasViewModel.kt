@@ -1,22 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 24.0.0
-//
-// Purpose:
-//   UI orchestration over server-authoritative EventRepository state.
-//
-// Batch 24:
-//   - No client-generated Pause Policy.
-//   - Pause calls LIAS dedicated endpoint.
-//   - EffectiveStatus is the only pause/extension UI authority.
-//   - Adds tag effective-status access used by Batch 19.
-//   - Adds refresh() used by modern inventory screens.
-//   - Removes emoji status messaging.
-//   - Uses Batch 22 error presentation.
-//   - Compatibility overload prevents stale callers from silently
-//     requesting unsupported custom pause durations.
-// ====================================================================
-
 package com.lias.remote.ui
 
 import androidx.lifecycle.ViewModel
@@ -35,24 +16,24 @@ import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
-import com.lias.remote.repositories.cancelDeviceExtension
-import com.lias.remote.repositories.cancelTagExtension
+import com.lias.remote.repositories.cancelDeviceExtensionAuthoritatively
+import com.lias.remote.repositories.cancelTagExtensionAuthoritatively
 import com.lias.remote.repositories.createTag
 import com.lias.remote.repositories.createUser
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
 import com.lias.remote.repositories.exportPolicies
-import com.lias.remote.repositories.extendDeviceAccess
-import com.lias.remote.repositories.extendTagAccess
+import com.lias.remote.repositories.extendDeviceAuthoritatively
+import com.lias.remote.repositories.extendTagAuthoritatively
 import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.importPolicies
-import com.lias.remote.repositories.pauseDeviceInternet
+import com.lias.remote.repositories.pauseDeviceAuthoritatively
 import com.lias.remote.repositories.renameDevice
+import com.lias.remote.repositories.resumeDeviceAuthoritatively
 import com.lias.remote.repositories.savePolicy
 import com.lias.remote.repositories.saveSchedule
 import com.lias.remote.repositories.toggleVacationMode
-import com.lias.remote.repositories.unpauseDeviceInternet
 import com.lias.remote.repositories.updateTag
 import com.lias.remote.ui.components.UndoState
 import java.time.Instant
@@ -61,13 +42,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * UI orchestration over server-authoritative EventRepository state.
+ *
+ * This ViewModel does not construct enforcement rules or infer access
+ * state from policy IDs.
+ */
 class LiasViewModel(
-    private val eventRepository:
-        EventRepository
+    private val eventRepository: EventRepository
 ) : ViewModel() {
 
-    val state:
-        StateFlow<UiState> =
+    val state: StateFlow<UiState> =
         eventRepository.state
 
     val uiEvents =
@@ -81,9 +66,7 @@ class LiasViewModel(
         )
 
     val pendingSecurityAlert:
-        StateFlow<
-            SecurityAlertPayload?
-        > =
+        StateFlow<SecurityAlertPayload?> =
         _pendingSecurityAlert
             .asStateFlow()
 
@@ -95,9 +78,7 @@ class LiasViewModel(
         )
 
     val undoState:
-        StateFlow<
-            UndoState?
-        > =
+        StateFlow<UndoState?> =
         _undoState
             .asStateFlow()
 
@@ -107,8 +88,7 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            eventRepository
-                .uiEvents
+            eventRepository.uiEvents
                 .collect {
                     event ->
 
@@ -138,8 +118,7 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            eventRepository
-                .refreshAll()
+            eventRepository.refreshAll()
         }
     }
 
@@ -155,10 +134,6 @@ class LiasViewModel(
             null
     }
 
-    /**
-     * Kept only for the existing diagnostic/demo trigger in the
-     * supplied Settings UI.
-     */
     fun triggerSecurityAlert() {
 
         _pendingSecurityAlert.value =
@@ -180,15 +155,9 @@ class LiasViewModel(
     }
 
     // ----------------------------------------------------------------
-    // Effective status
+    // EffectiveStatus
     // ----------------------------------------------------------------
 
-    /**
-     * Non-actionable fallback.
-     *
-     * Never fabricate "blocked + extend available" while status is
-     * still loading.
-     */
     fun effectiveStatusFor(
         pdid: String
     ): EffectiveStatus =
@@ -233,17 +202,13 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
+            presentResult(
                 eventRepository
-                    .extendDeviceAccess(
+                    .extendDeviceAuthoritatively(
                         pdid,
                         minutes
-                    )
-
-            presentResult(
-                result,
-                successMessage =
-                    "Access extended for $minutes minutes"
+                    ),
+                "Access extended for $minutes minutes"
             )
         }
     }
@@ -254,16 +219,12 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .cancelDeviceExtension(
-                        pdid
-                    )
-
             presentResult(
-                result,
-                successMessage =
-                    "Access extension cancelled"
+                eventRepository
+                    .cancelDeviceExtensionAuthoritatively(
+                        pdid
+                    ),
+                "Access extension cancelled"
             )
         }
     }
@@ -276,17 +237,13 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
+            presentResult(
                 eventRepository
-                    .extendTagAccess(
+                    .extendTagAuthoritatively(
                         tagId,
                         minutes
-                    )
-
-            presentResult(
-                result,
-                successMessage =
-                    "$tagName access extended for $minutes minutes"
+                    ),
+                "$tagName access extended for $minutes minutes"
             )
         }
     }
@@ -297,22 +254,18 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .cancelTagExtension(
-                        tagId
-                    )
-
             presentResult(
-                result,
-                successMessage =
-                    "Group extension cancelled"
+                eventRepository
+                    .cancelTagExtensionAuthoritatively(
+                        tagId
+                    ),
+                "Group extension cancelled"
             )
         }
     }
 
     /**
-     * LIAS currently implements Pause as a fixed one-hour action.
+     * LIAS currently owns Pause duration as one hour.
      */
     fun pauseDeviceInternet(
         pdid: String
@@ -320,57 +273,14 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .pauseDeviceInternet(
-                        pdid
-                    )
-
             presentResult(
-                result,
-                successMessage =
-                    "Internet paused for 1 hour"
+                eventRepository
+                    .pauseDeviceAuthoritatively(
+                        pdid
+                    ),
+                "Internet paused for 1 hour"
             )
         }
-    }
-
-    /**
-     * Compatibility bridge for a stale caller from pre-Batch-24 UI.
-     *
-     * It deliberately rejects unsupported durations instead of
-     * silently turning "15 minutes" into the backend's one-hour pause.
-     */
-    @Deprecated(
-        message =
-            "LIAS Pause is server-defined as one hour. Use pauseDeviceInternet(pdid)."
-    )
-    fun pauseDeviceInternet(
-        pdid: String,
-        minutes: Int
-    ) {
-
-        if (
-            minutes !=
-            60
-        ) {
-
-            viewModelScope.launch {
-
-                eventRepository
-                    ._uiEvents
-                    .emit(
-                        UiEvent.ShowSnackbarError(
-                            "LIAS currently supports a one-hour Pause only."
-                        )
-                    )
-            }
-
-            return
-        }
-
-        pauseDeviceInternet(
-            pdid
-        )
     }
 
     fun unpauseDeviceInternet(
@@ -379,16 +289,12 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .unpauseDeviceInternet(
-                        pdid
-                    )
-
             presentResult(
-                result,
-                successMessage =
-                    "Internet resumed"
+                eventRepository
+                    .resumeDeviceAuthoritatively(
+                        pdid
+                    ),
+                "Internet resumed"
             )
         }
     }
@@ -522,8 +428,7 @@ class LiasViewModel(
                         pdid,
                         userId
                     ),
-                successMessage =
-                    "User assignment updated"
+                "User assignment updated"
             )
         }
     }
@@ -539,8 +444,7 @@ class LiasViewModel(
                     .createUser(
                         user
                     ),
-                successMessage =
-                    "User created"
+                "User created"
             )
         }
     }
@@ -555,23 +459,19 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
+            presentResult(
                 eventRepository
                     .savePolicy(
                         policy
-                    )
-
-            presentResult(
-                result,
-                successMessage =
-                    if (
-                        policy.id ==
-                        "global_default"
-                    ) {
-                        "Global access mode updated"
-                    } else {
-                        "Rule saved"
-                    }
+                    ),
+                if (
+                    policy.id ==
+                    "global_default"
+                ) {
+                    "Global access mode updated"
+                } else {
+                    "Rule saved"
+                }
             )
         }
     }
@@ -603,22 +503,17 @@ class LiasViewModel(
 
                             viewModelScope.launch {
 
+                                /*
+                                 * Undo is a CREATE, not an UPDATE of a
+                                 * deleted identity.
+                                 *
+                                 * LIAS generates the canonical ID.
+                                 */
                                 eventRepository
                                     .savePolicy(
                                         policy.copy(
-                                            /*
-                                             * Restoring a previously
-                                             * deleted policy should
-                                             * recreate it if LIAS does
-                                             * not permit reuse of the
-                                             * deleted identifier.
-                                             *
-                                             * Existing backend currently
-                                             * accepts supplied IDs, so
-                                             * preserve it here.
-                                             */
                                             id =
-                                                policy.id
+                                                ""
                                         )
                                     )
                             }
@@ -638,14 +533,10 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .exportPolicies()
-
             presentResult(
-                result,
-                successMessage =
-                    "Policies exported"
+                eventRepository
+                    .exportPolicies(),
+                "Policies exported"
             )
         }
     }
@@ -661,8 +552,7 @@ class LiasViewModel(
                     .importPolicies(
                         payload
                     ),
-                successMessage =
-                    "Policies imported"
+                "Policies imported"
             )
         }
     }
@@ -682,8 +572,7 @@ class LiasViewModel(
                     .saveSchedule(
                         schedule
                     ),
-                successMessage =
-                    "Schedule saved"
+                "Schedule saved"
             )
         }
     }
@@ -699,8 +588,7 @@ class LiasViewModel(
                     .deleteSchedule(
                         scheduleId
                     ),
-                successMessage =
-                    "Schedule deleted"
+                "Schedule deleted"
             )
         }
     }
@@ -720,8 +608,7 @@ class LiasViewModel(
                     .createTag(
                         tag
                     ),
-                successMessage =
-                    "Tag created"
+                "Tag created"
             )
         }
     }
@@ -737,8 +624,7 @@ class LiasViewModel(
                     .updateTag(
                         tag
                     ),
-                successMessage =
-                    "Tag updated"
+                "Tag updated"
             )
         }
     }
@@ -754,14 +640,13 @@ class LiasViewModel(
                     .deleteTag(
                         tagId
                     ),
-                successMessage =
-                    "Tag deleted"
+                "Tag deleted"
             )
         }
     }
 
     // ----------------------------------------------------------------
-    // Global utilities
+    // Global controls
     // ----------------------------------------------------------------
 
     fun toggleVacationMode(
@@ -776,6 +661,11 @@ class LiasViewModel(
                         enabled
                     )
 
+            /*
+             * GlobalControlMutations emits its own authoritative
+             * success message because it knows the resulting global
+             * access semantics.
+             */
             if (
                 result !is
                 ApiResult.Success
@@ -797,7 +687,7 @@ class LiasViewModel(
             )
 
     // ----------------------------------------------------------------
-    // Messaging
+    // Messages
     // ----------------------------------------------------------------
 
     private suspend fun presentResult(
