@@ -1,21 +1,26 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 7.0.0
+// Version: 20.0.0
 //
 // Purpose:
-//   Primary application navigation shell.
+//   Application navigation root.
 //
-// Integration:
-//   - Batch 3 typed routes.
-//   - Batch 4 verified connection gate.
-//   - Batch 5/7 transport + synchronization banner.
-//   - Batch 6 Home/Devices state-aware screens.
-//   - Device-detail deep-link safety.
-//   - Tab state restoration.
+// Batch 20 guarantees:
+//   - No Connect-screen flash while DataStore hydrates.
+//   - Configured != currently connected.
+//   - Server outage does not destroy navigation state.
+//   - Tab stacks use saveState/restoreState.
+//   - External deep links survive configuration gating.
+//   - Device deep links wait for initial inventory hydration.
+//   - Deleted/unknown device deep links reach DeviceDetailScreen's
+//     explicit "Device Unavailable" state.
+//   - Deep-link device details have Devices as logical parent.
+//   - New Intents can be consumed while Activity is alive.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
 
+import android.net.Uri
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,7 +46,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -51,9 +62,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
-import com.lias.remote.ui.components.ConnectionStatusBanner
 import com.lias.remote.ui.components.UndoToast
 import com.lias.remote.ui.screens.OnboardingSheet
 import com.lias.remote.ui.screens.SecurityAlertSheet
@@ -72,14 +83,89 @@ import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoScaffold
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
+import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
+import io.github.alexzhirkevich.cupertino.icons.outlined.House
+import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
+import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
+
+sealed class LiasScreen(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+) {
+
+    data object Home :
+        LiasScreen(
+            NavigationRoutes.HOME,
+            "Home",
+            CupertinoIcons
+                .Outlined
+                .House
+        )
+
+    data object Devices :
+        LiasScreen(
+            NavigationRoutes.DEVICES,
+            "Devices",
+            CupertinoIcons
+                .Outlined
+                .Iphone
+        )
+
+    data object Schedules :
+        LiasScreen(
+            NavigationRoutes.SCHEDULES,
+            "Schedules",
+            CupertinoIcons
+                .Outlined
+                .Clock
+        )
+
+    data object Rules :
+        LiasScreen(
+            NavigationRoutes.RULES,
+            "Rules",
+            CupertinoIcons
+                .Outlined
+                .Shield
+        )
+
+    data object Settings :
+        LiasScreen(
+            NavigationRoutes.SETTINGS,
+            "Settings",
+            CupertinoIcons
+                .Outlined
+                .Gear
+        )
+}
+
+private val rootTabs =
+    listOf(
+        LiasScreen.Home,
+        LiasScreen.Devices,
+        LiasScreen.Schedules,
+        LiasScreen.Rules,
+        LiasScreen.Settings
+    )
 
 @Composable
 fun LiasNavHost(
     liasViewModel: LiasViewModel,
     settingsViewModel: SettingsViewModel,
-    pendingDeepLink: LiasDeepLink? = null,
-    onDeepLinkConsumed: () -> Unit = {}
+    externalDeepLink: String? = null,
+    onExternalDeepLinkConsumed:
+        () -> Unit = {}
 ) {
+
+    /*
+     * Keep NavController above all gates.
+     *
+     * A temporary configuration/connection presentation must not
+     * create a second controller or discard restored tab stacks.
+     */
     val navController =
         rememberNavController()
 
@@ -104,82 +190,102 @@ fun LiasNavHost(
             .collectAsState()
 
     /*
-     * Since Batch 4, savedServerUrl means a configuration that has
-     * successfully passed the /health verification flow.
+     * DataStore has not hydrated yet.
+     *
+     * Do NOT infer "not configured" from the initial blank fields.
      */
-    val hasConfiguration =
-        settingsState
-            .savedServerUrl
-            .isNotBlank()
+    if (
+        !settingsState
+            .isConfigurationLoaded
+    ) {
 
-    if (!hasConfiguration) {
+        LaunchLoadingScreen()
+
+        return
+    }
+
+    /*
+     * Configuration gate.
+     *
+     * externalDeepLink remains unconsumed here. After a successful
+     * Connect, this same composable proceeds and handles it.
+     */
+    if (
+        !settingsState
+            .isConfigured
+    ) {
+
         ConnectScreen(
             viewModel =
                 settingsViewModel,
-            onConnected = {}
+            onConnected = {
+                /*
+                 * No explicit navigation required.
+                 *
+                 * savedServerUrl changing makes isConfigured=true,
+                 * revealing the already-owned NavController.
+                 */
+            }
         )
 
         return
     }
 
-    // ----------------------------------------------------------------
-    // External navigation
-    // ----------------------------------------------------------------
-
+    /*
+     * Handle an external URI only when configuration exists.
+     *
+     * For device destinations, wait until the first inventory load
+     * completes. This prevents a valid device deep link from being
+     * declared missing merely because REST hydration is unfinished.
+     */
     LaunchedEffect(
-        pendingDeepLink
+        externalDeepLink,
+        settingsState.isConfigured,
+        uiState.isInitialLoaded
     ) {
-        when (
-            val link =
-                pendingDeepLink
+
+        val raw =
+            externalDeepLink
+                ?: return@LaunchedEffect
+
+        val destination =
+            LiasDeepLinks.parse(
+                raw
+            )
+
+        if (
+            destination ==
+            null
         ) {
 
-            is LiasDeepLink.Device -> {
-                navController.navigate(
-                    LiasRoute
-                        .DeviceDetail
-                        .create(
-                            link.pdid
-                        )
-                ) {
-                    launchSingleTop =
-                        true
-                }
+            onExternalDeepLinkConsumed()
 
-                onDeepLinkConsumed()
-            }
-
-            LiasDeepLink.Home -> {
-                navigateToTab(
-                    navController,
-                    LiasTab.HOME
-                )
-
-                onDeepLinkConsumed()
-            }
-
-            LiasDeepLink.Devices -> {
-                navigateToTab(
-                    navController,
-                    LiasTab.DEVICES
-                )
-
-                onDeepLinkConsumed()
-            }
-
-            null ->
-                Unit
+            return@LaunchedEffect
         }
-    }
 
-    // ----------------------------------------------------------------
-    // Onboarding
-    // ----------------------------------------------------------------
+        if (
+            destination is
+                ExternalDestination.Device &&
+            !uiState.isInitialLoaded
+        ) {
+            return@LaunchedEffect
+        }
+
+        navigateExternalDestination(
+            navController =
+                navController,
+            destination =
+                destination
+        )
+
+        onExternalDeepLinkConsumed()
+    }
 
     if (
         !settingsState
             .isOnboarded
     ) {
+
         OnboardingSheet(
             onComplete = {
                 settingsViewModel
@@ -188,171 +294,86 @@ fun LiasNavHost(
         )
     }
 
-    // ----------------------------------------------------------------
-    // Security alert
-    // ----------------------------------------------------------------
+    securityAlert
+        ?.let {
+            alert ->
 
-    securityAlert?.let { alert ->
+            SecurityAlertSheet(
+                alert =
+                    alert,
+                onDismiss = {
+                    liasViewModel
+                        .dismissSecurityAlert()
+                },
+                onBlock = {
+                    /*
+                     * Security response behavior remains outside
+                     * navigation scope.
+                     */
+                    liasViewModel
+                        .dismissSecurityAlert()
+                },
+                onTrust = {
+                    liasViewModel
+                        .dismissSecurityAlert()
+                }
+            )
+        }
 
-        SecurityAlertSheet(
-            alert =
-                alert,
-            onDismiss = {
-                liasViewModel
-                    .dismissSecurityAlert()
-            },
-            onBlock = {
-                /*
-                 * No backend security-alert disposition endpoint exists
-                 * in the supplied API contract, so do not fabricate a
-                 * network mutation here.
-                 */
-                liasViewModel
-                    .dismissSecurityAlert()
-            },
-            onTrust = {
-                /*
-                 * Same reasoning as onBlock: presentation only until
-                 * the backend exposes an authoritative disposition API.
-                 */
-                liasViewModel
-                    .dismissSecurityAlert()
-            }
-        )
-    }
-
-    val backStackEntry by
+    val navBackStackEntry by
         navController
             .currentBackStackEntryAsState()
 
     val currentDestination =
-        backStackEntry
+        navBackStackEntry
             ?.destination
 
     CupertinoScaffold(
-
         topBar = {
+
             Column {
 
                 CupertinoTopAppBar(
                     title = {
                         CupertinoText(
-                            text =
-                                "LIAS Remote"
+                            "LIAS Remote"
                         )
                     }
                 )
 
-                ConnectionStatusBanner(
-                    connectionState =
-                        uiState.connectionState,
-                    syncState =
-                        uiState.syncState
-                )
-            }
-        },
+                if (
+                    uiState.connectionState !=
+                    ConnectionState.CONNECTED
+                ) {
 
-        bottomBar = {
+                    ConnectionBanner(
+                        connectionState =
+                            uiState.connectionState,
+                        onClick = {
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(
-                            HigSpec.TabBarHeight
-                        )
-                        .background(
-                            LiasThemeColors.secondaryBackground
-                        )
-                        .padding(
-                            top = 4.dp,
-                            bottom = 4.dp
-                        ),
-                horizontalArrangement =
-                    Arrangement.SpaceAround,
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                LiasTab.all.forEach { tab ->
-
-                    val selected =
-                        currentDestination
-                            ?.hierarchy
-                            ?.any {
-                                it.route ==
-                                    tab.route
-                            } == true
-
-                    val tint =
-                        if (selected) {
-                            LiasThemeColors.blue
-                        } else {
-                            LiasThemeColors.tertiaryLabel
+                            navController.navigate(
+                                NavigationRoutes
+                                    .CONNECTION_SETTINGS
+                            ) {
+                                launchSingleTop =
+                                    true
+                            }
                         }
-
-                    val interactionSource =
-                        remember {
-                            MutableInteractionSource()
-                        }
-
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(
-                                    1f
-                                )
-                                .clickable(
-                                    interactionSource =
-                                        interactionSource,
-                                    indication =
-                                        null
-                                ) {
-                                    navigateToTab(
-                                        navController,
-                                        tab
-                                    )
-                                },
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally,
-                        verticalArrangement =
-                            Arrangement.Center
-                    ) {
-
-                        CupertinoIcon(
-                            imageVector =
-                                tab.icon,
-                            contentDescription =
-                                tab.label,
-                            tint =
-                                tint,
-                            modifier =
-                                Modifier.size(
-                                    HigSpec.IconSizeM
-                                )
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(
-                                    2.dp
-                                )
-                        )
-
-                        CupertinoText(
-                            text =
-                                tab.label,
-                            style =
-                                HigTypography.tabLabel,
-                            color =
-                                tint
-                        )
-                    }
+                    )
                 }
             }
-        }
+        },
+        bottomBar = {
 
-    ) { innerPadding ->
+            LiasTabBar(
+                navController =
+                    navController,
+                currentDestination =
+                    currentDestination
+            )
+        }
+    ) {
+        innerPadding ->
 
         Box(
             modifier =
@@ -363,122 +384,107 @@ fun LiasNavHost(
                 navController =
                     navController,
                 startDestination =
-                    LiasRoute.Home.route,
+                    NavigationRoutes.HOME,
                 modifier =
                     Modifier.padding(
                         innerPadding
                     ),
-
                 enterTransition = {
+
                     fadeIn(
                         tween(
-                            durationMillis = 180
+                            180
                         )
                     ) +
                         slideInHorizontally(
                             tween(
-                                durationMillis = 180
+                                180
                             )
                         ) {
-                            it / 5
+                            it / 6
                         }
                 },
-
                 exitTransition = {
+
                     fadeOut(
                         tween(
-                            durationMillis = 150
+                            160
                         )
-                    ) +
-                        slideOutHorizontally(
-                            tween(
-                                durationMillis = 150
-                            )
-                        ) {
-                            -it / 5
-                        }
+                    )
                 },
-
                 popEnterTransition = {
+
                     fadeIn(
                         tween(
-                            durationMillis = 180
+                            180
                         )
                     ) +
                         slideInHorizontally(
                             tween(
-                                durationMillis = 180
+                                180
                             )
                         ) {
-                            -it / 5
+                            -it / 6
                         }
                 },
-
                 popExitTransition = {
+
                     fadeOut(
                         tween(
-                            durationMillis = 150
+                            160
                         )
                     ) +
                         slideOutHorizontally(
                             tween(
-                                durationMillis = 150
+                                160
                             )
                         ) {
-                            it / 5
+                            it / 6
                         }
                 }
-
             ) {
 
-                // ----------------------------------------------------
-                // Home
-                // ----------------------------------------------------
-
                 composable(
-                    route =
-                        LiasRoute.Home.route
+                    NavigationRoutes.HOME
                 ) {
+
                     HomeScreen(
                         viewModel =
                             liasViewModel,
+                        onNavigateToDeviceDetail = {
+                            pdid ->
 
-                        onNavigateToDeviceDetail = { pdid ->
                             navController.navigate(
-                                LiasRoute
-                                    .DeviceDetail
-                                    .create(
+                                NavigationRoutes
+                                    .deviceDetail(
                                         pdid
                                     )
                             )
                         },
+                        onNavigateToTab = {
+                            screen ->
 
-                        onNavigateToTab = { tab ->
-                            navigateToTab(
+                            navigateTab(
                                 navController,
-                                tab
+                                screen.route
                             )
                         }
                     )
                 }
 
-                // ----------------------------------------------------
-                // Devices
-                // ----------------------------------------------------
-
                 composable(
-                    route =
-                        LiasRoute.Devices.route
+                    NavigationRoutes.DEVICES
                 ) {
+
                     DevicesScreen(
                         viewModel =
                             liasViewModel,
+                        onNavigateToDeviceDetail = {
+                            pdid ->
 
-                        onNavigateToDeviceDetail = { pdid ->
                             navController.navigate(
-                                LiasRoute
-                                    .DeviceDetail
-                                    .create(
+                                NavigationRoutes
+                                    .deviceDetail(
                                         pdid
                                     )
                             )
@@ -488,31 +494,31 @@ fun LiasNavHost(
 
                 composable(
                     route =
-                        LiasRoute
-                            .DeviceDetail
-                            .route,
-
+                        NavigationRoutes
+                            .DEVICE_DETAIL,
                     arguments =
                         listOf(
                             navArgument(
-                                LiasRoute
-                                    .DeviceDetail
-                                    .ARG_PDID
+                                "pdid"
                             ) {
                                 type =
                                     NavType.StringType
                             }
                         )
-                ) { destination ->
+                ) {
+                    backStackEntry ->
 
                     val pdid =
-                        destination
+                        backStackEntry
                             .arguments
                             ?.getString(
-                                LiasRoute
-                                    .DeviceDetail
-                                    .ARG_PDID
+                                "pdid"
                             )
+                            ?.let {
+                                Uri.decode(
+                                    it
+                                )
+                            }
                             .orEmpty()
 
                     DeviceDetailScreen(
@@ -521,71 +527,74 @@ fun LiasNavHost(
                         viewModel =
                             liasViewModel,
                         onBack = {
-                            navController
-                                .popBackStack()
+
+                            val popped =
+                                navController
+                                    .popBackStack()
+
+                            if (
+                                !popped
+                            ) {
+
+                                navigateTab(
+                                    navController,
+                                    NavigationRoutes.DEVICES
+                                )
+                            }
                         }
                     )
                 }
 
-                // ----------------------------------------------------
-                // Schedules
-                // ----------------------------------------------------
-
                 composable(
-                    route =
-                        LiasRoute.Schedules.route
+                    NavigationRoutes.SCHEDULES
                 ) {
+
                     SchedulesScreen(
                         viewModel =
                             liasViewModel
                     )
                 }
 
-                // ----------------------------------------------------
-                // Rules
-                // ----------------------------------------------------
-
                 composable(
-                    route =
-                        LiasRoute.Rules.route
+                    NavigationRoutes.RULES
                 ) {
+
                     RulesScreen(
                         viewModel =
                             liasViewModel
                     )
                 }
 
-                // ----------------------------------------------------
-                // Settings
-                // ----------------------------------------------------
-
                 composable(
-                    route =
-                        LiasRoute.Settings.route
+                    NavigationRoutes.SETTINGS
                 ) {
+
                     SettingsScreen(
                         viewModel =
                             settingsViewModel,
                         onNavigateToConnection = {
+
                             navController.navigate(
-                                LiasRoute
-                                    .ConnectionSettings
-                                    .route
-                            )
+                                NavigationRoutes
+                                    .CONNECTION_SETTINGS
+                            ) {
+                                launchSingleTop =
+                                    true
+                            }
                         }
                     )
                 }
 
                 composable(
-                    route =
-                        LiasRoute
-                            .ConnectionSettings
-                            .route
+                    NavigationRoutes
+                        .CONNECTION_SETTINGS
                 ) {
+
                     ConnectionSettingsScreen(
                         viewModel =
                             settingsViewModel,
                         onBack = {
+
                             navController
                                 .popBackStack()
                         }
@@ -597,6 +606,7 @@ fun LiasNavHost(
                 undoState =
                     undoState,
                 onDismiss = {
+
                     liasViewModel
                         .clearUndo()
                 },
@@ -607,7 +617,8 @@ fun LiasNavHost(
                         )
                         .padding(
                             bottom =
-                                HigSpec.BottomNavPadding +
+                                HigSpec
+                                    .BottomNavPadding +
                                     12.dp
                         )
             )
@@ -615,17 +626,221 @@ fun LiasNavHost(
     }
 }
 
-private fun navigateToTab(
-    navController: NavHostController,
-    tab: LiasTab
+@Composable
+private fun LaunchLoadingScreen() {
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    LiasThemeColors.background
+                ),
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        CupertinoText(
+            text =
+                "Loading LIAS…",
+            style =
+                HigTypography.body,
+            color =
+                LiasThemeColors.secondaryLabel
+        )
+    }
+}
+
+@Composable
+private fun ConnectionBanner(
+    connectionState: ConnectionState,
+    onClick: () -> Unit
 ) {
+
+    val message =
+        when (
+            connectionState
+        ) {
+
+            ConnectionState.CONNECTING ->
+                "Connecting to LIAS…"
+
+            ConnectionState.RECONNECTING ->
+                "Connection interrupted · Reconnecting…"
+
+            ConnectionState.DISCONNECTED ->
+                "LIAS is offline · Tap for connection settings"
+
+            ConnectionState.CONNECTED ->
+                ""
+        }
+
+    if (
+        message.isBlank()
+    ) {
+        return
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    LiasThemeColors.orange
+                )
+                .clickable {
+                    onClick()
+                }
+                .padding(
+                    vertical = 7.dp,
+                    horizontal = 16.dp
+                ),
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        CupertinoText(
+            text =
+                message,
+            style =
+                HigTypography.subheadline,
+            color =
+                LiasThemeColors.label,
+            textAlign =
+                TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun LiasTabBar(
+    navController: NavHostController,
+    currentDestination: NavDestination?
+) {
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    HigSpec.TabBarHeight
+                )
+                .background(
+                    LiasThemeColors.secondaryBackground
+                )
+                .padding(
+                    top = 4.dp,
+                    bottom = 4.dp
+                ),
+        horizontalArrangement =
+            Arrangement.SpaceAround,
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        rootTabs.forEach {
+            screen ->
+
+            val selected =
+                currentDestination
+                    ?.hierarchy
+                    ?.any {
+                        destination ->
+
+                        destination.route ==
+                            screen.route
+                    } ==
+                    true
+
+            val tint =
+                if (
+                    selected
+                ) {
+                    LiasThemeColors.blue
+                } else {
+                    LiasThemeColors.tertiaryLabel
+                }
+
+            val interactionSource =
+                remember {
+                    MutableInteractionSource()
+                }
+
+            Column(
+                modifier =
+                    Modifier
+                        .weight(
+                            1f
+                        )
+                        .semantics {
+                            role =
+                                Role.Tab
+                        }
+                        .clickable(
+                            interactionSource =
+                                interactionSource,
+                            indication =
+                                null
+                        ) {
+
+                            navigateTab(
+                                navController,
+                                screen.route
+                            )
+                        }
+                        .padding(
+                            vertical = 4.dp
+                        ),
+                horizontalAlignment =
+                    Alignment.CenterHorizontally,
+                verticalArrangement =
+                    Arrangement.Center
+            ) {
+
+                CupertinoIcon(
+                    imageVector =
+                        screen.icon,
+                    contentDescription =
+                        screen.label,
+                    tint =
+                        tint,
+                    modifier =
+                        Modifier.size(
+                            HigSpec.IconSizeM
+                        )
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            2.dp
+                        )
+                )
+
+                CupertinoText(
+                    text =
+                        screen.label,
+                    style =
+                        HigTypography.tabLabel,
+                    color =
+                        tint
+                )
+            }
+        }
+    }
+}
+
+private fun navigateTab(
+    navController: NavHostController,
+    route: String
+) {
+
     navController.navigate(
-        tab.route
+        route
     ) {
 
         popUpTo(
-            navController
-                .graph
+            navController.graph
                 .findStartDestination()
                 .id
         ) {
@@ -638,5 +853,79 @@ private fun navigateToTab(
 
         restoreState =
             true
+    }
+}
+
+private fun navigateExternalDestination(
+    navController: NavHostController,
+    destination: ExternalDestination
+) {
+
+    when (
+        destination
+    ) {
+
+        ExternalDestination.Home ->
+
+            navigateTab(
+                navController,
+                NavigationRoutes.HOME
+            )
+
+        ExternalDestination.Devices ->
+
+            navigateTab(
+                navController,
+                NavigationRoutes.DEVICES
+            )
+
+        ExternalDestination.Schedules ->
+
+            navigateTab(
+                navController,
+                NavigationRoutes.SCHEDULES
+            )
+
+        ExternalDestination.Rules ->
+
+            navigateTab(
+                navController,
+                NavigationRoutes.RULES
+            )
+
+        ExternalDestination.Settings ->
+
+            navigateTab(
+                navController,
+                NavigationRoutes.SETTINGS
+            )
+
+        is ExternalDestination.Device -> {
+
+            /*
+             * External device navigation gets a predictable parent:
+             *
+             * Devices
+             *    ↓
+             * Device Detail
+             *
+             * Back therefore leads to inventory rather than whatever
+             * arbitrary tab happened to be visible previously.
+             */
+            navigateTab(
+                navController,
+                NavigationRoutes.DEVICES
+            )
+
+            navController.navigate(
+                NavigationRoutes
+                    .deviceDetail(
+                        destination.pdid
+                    )
+            ) {
+                launchSingleTop =
+                    true
+            }
+        }
     }
 }
