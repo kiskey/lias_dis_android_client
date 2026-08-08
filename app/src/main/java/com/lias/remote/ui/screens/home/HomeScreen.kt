@@ -1,25 +1,45 @@
 // ====================================================================
 // File: HomeScreen.kt
 // Version: 3.1.0 (HIG Redesign)
-// Purpose: Integrated GlobalSwitchSheet to replace inline dialogs.
+// Purpose: Home Dashboard. Hero status card, Active Enforcements list.
+//          Integrated GlobalSwitchSheet.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.*
+import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.screens.GlobalSwitchSheet
 
 @Composable
 fun HomeScreen(
@@ -34,15 +54,22 @@ fun HomeScreen(
         id = "global_default", name = "Global Access Switch", type = "global", action = "schedule"
     )
 
+    val total = state.devices.size
+    val online = state.devices.count { it.online }
+
     HigLargeTitleScaffold(title = "Home", scrollState = scrollState) {
-        LazyColumn(state = scrollState, modifier = Modifier.fillMaxSize(), contentPadding = it) {
-            // Hero Card
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = it
+        ) {
             item {
                 Column(modifier = Modifier.padding(16.dp)) {
                     GroupedListCard {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("NETWORK STATUS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${state.devices.count { it.online }} devices online", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text("$online devices online", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text("$total total · ${state.policies.size} rules active", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             
                             HigButton(
                                 text = "Manage Global Switch",
@@ -55,7 +82,6 @@ fun HomeScreen(
                 }
             }
 
-            // Active Enforcements
             item { ListSectionHeader("Active Enforcements") }
             item {
                 GroupedListCard {
@@ -76,7 +102,6 @@ fun HomeScreen(
                 }
             }
 
-            // Recent Devices
             item { ListSectionHeader("Recent Devices") }
             item {
                 GroupedListCard {
