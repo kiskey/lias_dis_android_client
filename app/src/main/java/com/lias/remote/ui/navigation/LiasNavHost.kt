@@ -1,3 +1,20 @@
+// ====================================================================
+// File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
+// Version: 3.0.0
+//
+// Purpose:
+//   Primary Cupertino navigation host.
+//
+// Changes:
+//   - Uses canonical LiasRoute definitions.
+//   - Uses canonical LiasTab definitions.
+//   - Device routes are generated through LiasRoute.DeviceDetail.create().
+//   - Dynamic PDID arguments are URI-safe.
+//   - Deep links are handled at the navigation boundary.
+//   - Connection state no longer requires a fake navigation destination.
+//   - Cupertino navigation remains the visual system.
+// ====================================================================
+
 package com.lias.remote.ui.navigation
 
 import androidx.compose.animation.core.tween
@@ -19,6 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -56,203 +74,509 @@ import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoScaffold
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
-import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
-import io.github.alexzhirkevich.cupertino.icons.outlined.House
-import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
-import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
-
-sealed class LiasScreen(
-    val route: String,
-    val label: String,
-    val icon: ImageVector
-) {
-    data object Home : LiasScreen("home", "Home", CupertinoIcons.Outlined.House)
-    data object Devices : LiasScreen("devices", "Devices", CupertinoIcons.Outlined.Iphone)
-    data object Schedules : LiasScreen("schedules", "Schedules", CupertinoIcons.Outlined.Clock)
-    data object Rules : LiasScreen("rules", "Rules", CupertinoIcons.Outlined.Shield)
-    data object Settings : LiasScreen("settings", "Settings", CupertinoIcons.Outlined.Gear)
-}
 
 @Composable
 fun LiasNavHost(
     liasViewModel: LiasViewModel,
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    pendingDeepLink: LiasDeepLink? = null,
+    onDeepLinkConsumed: () -> Unit = {}
 ) {
-    val navController = rememberNavController()
-    val items = listOf(LiasScreen.Home, LiasScreen.Devices, LiasScreen.Schedules, LiasScreen.Rules, LiasScreen.Settings)
-    val settingsState by settingsViewModel.uiState.collectAsState()
-    val uiState by liasViewModel.state.collectAsState()
-    val isConnected = settingsState.savedServerUrl.isNotBlank()
+    val navController =
+        rememberNavController()
 
-    val undoState by liasViewModel.undoState.collectAsState()
-    val securityAlert by liasViewModel.pendingSecurityAlert.collectAsState()
+    val settingsState by
+        settingsViewModel.uiState.collectAsState()
 
+    val uiState by
+        liasViewModel.state.collectAsState()
+
+    val undoState by
+        liasViewModel.undoState.collectAsState()
+
+    val securityAlert by
+        liasViewModel.pendingSecurityAlert.collectAsState()
+
+    val isConnected =
+        settingsState.savedServerUrl.isNotBlank()
+
+    /*
+     * Connection is configuration state, not a navigation destination.
+     *
+     * This prevents the previous architecture where the NavController
+     * could contain a stale "main" destination while the application
+     * was actually showing ConnectScreen.
+     */
     if (!isConnected) {
-        ConnectScreen(viewModel = settingsViewModel, onConnected = {})
+        ConnectScreen(
+            viewModel = settingsViewModel,
+            onConnected = {}
+        )
         return
     }
 
-    if (!settingsState.isOnboarded) {
-        OnboardingSheet(onComplete = { settingsViewModel.completeOnboarding() })
+    LaunchedEffect(
+        pendingDeepLink
+    ) {
+        when (
+            val deepLink =
+                pendingDeepLink
+        ) {
+            is LiasDeepLink.Device -> {
+                navController.navigate(
+                    LiasRoute.DeviceDetail.create(
+                        deepLink.pdid
+                    )
+                ) {
+                    launchSingleTop = true
+                }
+
+                onDeepLinkConsumed()
+            }
+
+            LiasDeepLink.Home -> {
+                navigateToTab(
+                    navController,
+                    LiasTab.HOME
+                )
+
+                onDeepLinkConsumed()
+            }
+
+            LiasDeepLink.Devices -> {
+                navigateToTab(
+                    navController,
+                    LiasTab.DEVICES
+                )
+
+                onDeepLinkConsumed()
+            }
+
+            null -> Unit
+        }
     }
 
-    securityAlert?.let { alert ->
-        SecurityAlertSheet(
-            alert = alert,
-            onDismiss = { liasViewModel.dismissSecurityAlert() },
-            onBlock = { liasViewModel.dismissSecurityAlert() },
-            onTrust = { liasViewModel.dismissSecurityAlert() }
+    if (!settingsState.isOnboarded) {
+        OnboardingSheet(
+            onComplete = {
+                settingsViewModel.completeOnboarding()
+            }
         )
     }
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
+    securityAlert?.let { alert ->
+
+        SecurityAlertSheet(
+            alert = alert,
+            onDismiss = {
+                liasViewModel.dismissSecurityAlert()
+            },
+            onBlock = {
+                liasViewModel.dismissSecurityAlert()
+            },
+            onTrust = {
+                liasViewModel.dismissSecurityAlert()
+            }
+        )
+    }
+
+    val navBackStackEntry by
+        navController.currentBackStackEntryAsState()
+
+    val currentDestination =
+        navBackStackEntry?.destination
 
     CupertinoScaffold(
+
         topBar = {
             Column {
+
                 CupertinoTopAppBar(
-                    title = { CupertinoText("LIAS Remote") }
+                    title = {
+                        CupertinoText(
+                            "LIAS Remote"
+                        )
+                    }
                 )
-                // Connection Banner appears ONLY when actively connecting/reconnecting/disconnected
-                if (uiState.connectionState != ConnectionState.CONNECTED) {
+
+                if (
+                    uiState.connectionState !=
+                    ConnectionState.CONNECTED
+                ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(LiasThemeColors.orange)
-                            .padding(vertical = 6.dp, horizontal = 16.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    LiasThemeColors.orange
+                                )
+                                .padding(
+                                    vertical = 6.dp,
+                                    horizontal = 16.dp
+                                ),
+                        contentAlignment =
+                            Alignment.Center
                     ) {
                         CupertinoText(
-                            text = when (uiState.connectionState) {
-                                ConnectionState.CONNECTING -> "Connecting to Server…"
-                                ConnectionState.RECONNECTING -> "Reconnecting to Server…"
-                                else -> "Server Disconnected"
-                            },
-                            style = HigTypography.subheadline,
-                            color = LiasThemeColors.label,
-                            textAlign = TextAlign.Center
+                            text =
+                                connectionLabel(
+                                    uiState.connectionState
+                                ),
+                            style =
+                                HigTypography.subheadline,
+                            color =
+                                LiasThemeColors.label,
+                            textAlign =
+                                TextAlign.Center
                         )
                     }
                 }
             }
         },
+
         bottomBar = {
+
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(HigSpec.TabBarHeight)
-                    .background(LiasThemeColors.secondaryBackground)
-                    .padding(top = 4.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(
+                            HigSpec.TabBarHeight
+                        )
+                        .background(
+                            LiasThemeColors.secondaryBackground
+                        )
+                        .padding(
+                            top = 4.dp,
+                            bottom = 4.dp
+                        ),
+                horizontalArrangement =
+                    Arrangement.SpaceAround,
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
-                items.forEach { screen ->
-                    val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                    val color = if (isSelected) LiasThemeColors.blue else LiasThemeColors.tertiaryLabel
-                    val interactionSource = remember { MutableInteractionSource() }
+
+                LiasTab.all.forEach { tab ->
+
+                    val isSelected =
+                        currentDestination
+                            ?.hierarchy
+                            ?.any {
+                                it.route ==
+                                    tab.route
+                            } == true
+
+                    val color =
+                        if (isSelected) {
+                            LiasThemeColors.blue
+                        } else {
+                            LiasThemeColors.tertiaryLabel
+                        }
+
+                    val interactionSource =
+                        remember {
+                            MutableInteractionSource()
+                        }
 
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null
-                            ) {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clickable(
+                                    interactionSource =
+                                        interactionSource,
+                                    indication = null
+                                ) {
+                                    navigateToTab(
+                                        navController,
+                                        tab
+                                    )
+                                },
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally,
+                        verticalArrangement =
+                            Arrangement.Center
                     ) {
+
                         CupertinoIcon(
-                            imageVector = screen.icon,
-                            contentDescription = screen.label,
+                            imageVector =
+                                tab.icon,
+                            contentDescription =
+                                tab.label,
                             tint = color,
-                            modifier = Modifier.size(HigSpec.IconSizeM)
+                            modifier =
+                                Modifier.size(
+                                    HigSpec.IconSizeM
+                                )
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    2.dp
+                                )
+                        )
+
                         CupertinoText(
-                            text = screen.label,
-                            style = HigTypography.tabLabel,
+                            text = tab.label,
+                            style =
+                                HigTypography.tabLabel,
                             color = color
                         )
                     }
                 }
             }
         }
+
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+
+        Box(
+            modifier =
+                Modifier.fillMaxSize()
+        ) {
+
             NavHost(
-                navController = navController,
-                startDestination = LiasScreen.Home.route,
-                modifier = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(tween(200)) + slideInHorizontally(tween(200)) { it / 4 } },
-                exitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 4 } },
-                popEnterTransition = { fadeIn(tween(200)) + slideInHorizontally(tween(200)) { -it / 4 } },
-                popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { it / 4 } }
+                navController =
+                    navController,
+                startDestination =
+                    LiasRoute.Home.route,
+                modifier =
+                    Modifier.padding(
+                        innerPadding
+                    ),
+
+                enterTransition = {
+                    fadeIn(
+                        tween(180)
+                    ) +
+                        slideInHorizontally(
+                            tween(180)
+                        ) {
+                            it / 5
+                        }
+                },
+
+                exitTransition = {
+                    fadeOut(
+                        tween(150)
+                    ) +
+                        slideOutHorizontally(
+                            tween(150)
+                        ) {
+                            -it / 5
+                        }
+                },
+
+                popEnterTransition = {
+                    fadeIn(
+                        tween(180)
+                    ) +
+                        slideInHorizontally(
+                            tween(180)
+                        ) {
+                            -it / 5
+                        }
+                },
+
+                popExitTransition = {
+                    fadeOut(
+                        tween(150)
+                    ) +
+                        slideOutHorizontally(
+                            tween(150)
+                        ) {
+                            it / 5
+                        }
+                }
+
             ) {
-                composable(LiasScreen.Home.route) {
+
+                composable(
+                    route =
+                        LiasRoute.Home.route
+                ) {
                     HomeScreen(
-                        viewModel = liasViewModel,
-                        onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") },
-                        onNavigateToTab = { screen ->
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                        viewModel =
+                            liasViewModel,
+
+                        onNavigateToDeviceDetail = {
+                            pdid ->
+                            navController.navigate(
+                                LiasRoute.DeviceDetail.create(
+                                    pdid
+                                )
+                            )
+                        },
+
+                        onNavigateToTab = {
+                            tab ->
+                            navigateToTab(
+                                navController,
+                                tab
+                            )
                         }
                     )
                 }
-                composable(LiasScreen.Devices.route) {
+
+                composable(
+                    route =
+                        LiasRoute.Devices.route
+                ) {
                     DevicesScreen(
-                        viewModel = liasViewModel,
-                        onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") }
+                        viewModel =
+                            liasViewModel,
+
+                        onNavigateToDeviceDetail = {
+                            pdid ->
+                            navController.navigate(
+                                LiasRoute.DeviceDetail.create(
+                                    pdid
+                                )
+                            )
+                        }
                     )
                 }
+
                 composable(
-                    route = "device_detail/{pdid}",
-                    arguments = listOf(navArgument("pdid") { type = NavType.StringType })
+                    route =
+                        LiasRoute.DeviceDetail.route,
+
+                    arguments =
+                        listOf(
+                            navArgument(
+                                LiasRoute.DeviceDetail.ARG_PDID
+                            ) {
+                                type =
+                                    NavType.StringType
+                            }
+                        )
                 ) { backStackEntry ->
-                    val pdid = backStackEntry.arguments?.getString("pdid") ?: ""
+
+                    val pdid =
+                        backStackEntry
+                            .arguments
+                            ?.getString(
+                                LiasRoute.DeviceDetail.ARG_PDID
+                            )
+                            .orEmpty()
+
                     DeviceDetailScreen(
                         pdid = pdid,
-                        viewModel = liasViewModel,
-                        onBack = { navController.popBackStack() }
+                        viewModel =
+                            liasViewModel,
+                        onBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
-                composable(LiasScreen.Schedules.route) { SchedulesScreen(viewModel = liasViewModel) }
-                composable(LiasScreen.Rules.route) { RulesScreen(viewModel = liasViewModel) }
-                composable(LiasScreen.Settings.route) {
+
+                composable(
+                    route =
+                        LiasRoute.Schedules.route
+                ) {
+                    SchedulesScreen(
+                        viewModel =
+                            liasViewModel
+                    )
+                }
+
+                composable(
+                    route =
+                        LiasRoute.Rules.route
+                ) {
+                    RulesScreen(
+                        viewModel =
+                            liasViewModel
+                    )
+                }
+
+                composable(
+                    route =
+                        LiasRoute.Settings.route
+                ) {
                     SettingsScreen(
-                        viewModel = settingsViewModel,
-                        onNavigateToConnection = { navController.navigate("connection_settings") }
+                        viewModel =
+                            settingsViewModel,
+                        onNavigateToConnection = {
+                            navController.navigate(
+                                LiasRoute.ConnectionSettings.route
+                            )
+                        }
                     )
                 }
-                composable("connection_settings") {
+
+                composable(
+                    route =
+                        LiasRoute.ConnectionSettings.route
+                ) {
                     ConnectionSettingsScreen(
-                        viewModel = settingsViewModel,
-                        onBack = { navController.popBackStack() }
+                        viewModel =
+                            settingsViewModel,
+                        onBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
             }
 
-            // Transient Action Undo Banner
             UndoToast(
-                undoState = undoState,
-                onDismiss = { liasViewModel.clearUndo() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = HigSpec.BottomNavPadding + 12.dp)
+                undoState =
+                    undoState,
+
+                onDismiss = {
+                    liasViewModel.clearUndo()
+                },
+
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.BottomCenter
+                        )
+                        .padding(
+                            bottom =
+                                HigSpec.BottomNavPadding +
+                                    12.dp
+                        )
             )
         }
     }
 }
+
+private fun navigateToTab(
+    navController:
+        androidx.navigation.NavHostController,
+    tab: LiasTab
+) {
+    navController.navigate(
+        tab.route
+    ) {
+        popUpTo(
+            navController.graph
+                .findStartDestination()
+                .id
+        ) {
+            saveState = true
+        }
+
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private fun connectionLabel(
+    state: ConnectionState
+): String =
+    when (state) {
+
+        ConnectionState.CONNECTING ->
+            "Connecting to Server…"
+
+        ConnectionState.RECONNECTING ->
+            "Reconnecting to Server…"
+
+        ConnectionState.CONNECTED ->
+            ""
+
+        ConnectionState.DISCONNECTED ->
+            "Server Disconnected"
+    }
