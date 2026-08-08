@@ -1,18 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt
-// Version: 8.0.0
+// Version: 16.0.0
 //
 // Purpose:
-//   Browse, create, copy, edit and delete LIAS schedules.
+//   Dependency-aware LIAS schedule management.
 //
-// Corrections:
-//   - No emoji-based special-casing for Bedtime/Homework.
-//   - Accurately reports policy usage.
-//   - Loading / empty / failure / stale are distinct.
-//   - Delete warning reflects actual policy references.
-//   - Does not incorrectly claim every deletion defaults policies open.
-//   - New/copy schedule IDs remain empty so LIAS generates them.
-//   - Mode behavior and actual windows are visible.
+// Batch 16:
+//   - Exact policy usage is displayed.
+//   - Referenced schedules open a dependency sheet.
+//   - Delete is disabled until all references are removed.
+//   - Removes false "defaults to open" wording.
+//   - Editing/copying behavior from Batch 8 retained.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -39,17 +37,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
+import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.core.util.ScheduleFormatting
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
-import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.MiniWeekStrip
 import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.ScheduleDeleteSheet
 import com.lias.remote.ui.components.ScreenStateTone
 import com.lias.remote.ui.components.ScreenStateView
 import com.lias.remote.ui.components.StaleDataNotice
@@ -66,8 +65,10 @@ import io.github.alexzhirkevich.cupertino.icons.outlined.Trash
 fun SchedulesScreen(
     viewModel: LiasViewModel
 ) {
+
     val state by
-        viewModel.state.collectAsState()
+        viewModel.state
+            .collectAsState()
 
     val scrollState =
         rememberLazyListState()
@@ -87,49 +88,25 @@ fun SchedulesScreen(
             mutableStateOf<Schedule?>(null)
         }
 
-    val usageCounts =
-        remember(
-            state.policies,
-            state.schedules
-        ) {
-            state.schedules
-                .associate { schedule ->
-
-                    schedule.id to
-                        state.policies.count { policy ->
-                            schedule.id in
-                                policy.resolveScheduleIDs()
-                        }
-                }
-        }
-
     HigLargeTitleScaffold(
-        title =
-            "Schedules",
-        scrollState =
-            scrollState,
+        title = "Schedules",
+        scrollState = scrollState,
         navTrailing = {
-            HigTextButton(
-                text =
-                    "＋",
-                onClick = {
-                    editingSchedule =
-                        null
 
-                    showEditor =
-                        true
+            HigTextButton(
+                text = "＋",
+                onClick = {
+                    editingSchedule = null
+                    showEditor = true
                 }
             )
         }
     ) { padding ->
 
         LazyColumn(
-            state =
-                scrollState,
-            modifier =
-                Modifier.fillMaxSize(),
-            contentPadding =
-                padding
+            state = scrollState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = padding
         ) {
 
             when (
@@ -143,10 +120,11 @@ fun SchedulesScreen(
                     if (
                         !state.isInitialLoaded
                     ) {
+
                         item {
+
                             ScreenStateView(
-                                title =
-                                    "Loading Schedules",
+                                title = "Loading Schedules",
                                 message =
                                     "Synchronizing schedule definitions from LIAS."
                             )
@@ -159,6 +137,7 @@ fun SchedulesScreen(
                 is SyncState.Failed -> {
 
                     item {
+
                         ScreenStateView(
                             title =
                                 "Unable to Load Schedules",
@@ -179,6 +158,7 @@ fun SchedulesScreen(
                 is SyncState.Stale -> {
 
                     item {
+
                         StaleDataNotice(
                             message =
                                 sync.message,
@@ -193,23 +173,20 @@ fun SchedulesScreen(
             }
 
             if (
-                state.schedules
-                    .isEmpty()
+                state.schedules.isEmpty()
             ) {
+
                 item {
+
                     ScreenStateView(
-                        title =
-                            "No Schedules",
+                        title = "No Schedules",
                         message =
                             "Create reusable time windows, then attach them to rules.",
                         actionText =
                             "Create Schedule",
                         onAction = {
-                            editingSchedule =
-                                null
-
-                            showEditor =
-                                true
+                            editingSchedule = null
+                            showEditor = true
                         }
                     )
                 }
@@ -218,6 +195,7 @@ fun SchedulesScreen(
             }
 
             item {
+
                 ListSectionHeader(
                     "${state.schedules.size} Configured"
                 )
@@ -231,10 +209,20 @@ fun SchedulesScreen(
                 }
             ) { schedule ->
 
-                val usageCount =
-                    usageCounts[
-                        schedule.id
-                    ] ?: 0
+                val impact =
+                    remember(
+                        schedule,
+                        state.policies
+                    ) {
+
+                        ConfigurationSafety
+                            .scheduleImpact(
+                                schedule =
+                                    schedule,
+                                policies =
+                                    state.policies
+                            )
+                    }
 
                 GroupedListCard(
                     modifier =
@@ -268,7 +256,13 @@ fun SchedulesScreen(
                                         .Outlined
                                         .Trash,
                                 color =
-                                    LiasThemeColors.red,
+                                    if (
+                                        impact.canDeleteSafely
+                                    ) {
+                                        LiasThemeColors.red
+                                    } else {
+                                        LiasThemeColors.orange
+                                    },
                                 onTrigger = {
                                     scheduleToDelete =
                                         schedule
@@ -298,12 +292,12 @@ fun SchedulesScreen(
                                             1f
                                         )
                                 ) {
+
                                     CupertinoText(
                                         text =
-                                            schedule.name
-                                                .ifBlank {
-                                                    "Unnamed Schedule"
-                                                },
+                                            schedule.name.ifBlank {
+                                                "Unnamed Schedule"
+                                            },
                                         style =
                                             HigTypography.headline,
                                         fontWeight =
@@ -312,19 +306,11 @@ fun SchedulesScreen(
                                             LiasThemeColors.label
                                     )
 
-                                    Spacer(
-                                        modifier =
-                                            Modifier.height(
-                                                2.dp
-                                            )
-                                    )
-
                                     CupertinoText(
                                         text =
-                                            schedule.timezone
-                                                .ifBlank {
-                                                    "Invalid timezone"
-                                                },
+                                            schedule.timezone.ifBlank {
+                                                "Invalid timezone"
+                                            },
                                         style =
                                             HigTypography.caption,
                                         color =
@@ -340,11 +326,10 @@ fun SchedulesScreen(
                                             ),
                                     tone =
                                         if (
-                                            schedule.mode
-                                                .equals(
-                                                    "whitelist",
-                                                    ignoreCase = true
-                                                )
+                                            schedule.mode.equals(
+                                                "whitelist",
+                                                true
+                                            )
                                         ) {
                                             PillTone.ALLOWED
                                         } else {
@@ -397,7 +382,7 @@ fun SchedulesScreen(
                                 .take(
                                     3
                                 )
-                                .forEachIndexed { index, rule ->
+                                .forEach { rule ->
 
                                     CupertinoText(
                                         text =
@@ -411,20 +396,7 @@ fun SchedulesScreen(
                                             LiasThemeColors.secondaryLabel,
                                         modifier =
                                             Modifier.padding(
-                                                bottom =
-                                                    if (
-                                                        index ==
-                                                        minOf(
-                                                            2,
-                                                            schedule
-                                                                .safeRules
-                                                                .lastIndex
-                                                        )
-                                                    ) {
-                                                        0.dp
-                                                    } else {
-                                                        3.dp
-                                                    }
+                                                bottom = 3.dp
                                             )
                                     )
                                 }
@@ -433,13 +405,58 @@ fun SchedulesScreen(
                                 schedule.safeRules.size >
                                 3
                             ) {
+
                                 CupertinoText(
                                     text =
                                         "+${schedule.safeRules.size - 3} more windows",
                                     style =
                                         HigTypography.caption,
                                     color =
-                                        LiasThemeColors.tertiaryLabel,
+                                        LiasThemeColors.tertiaryLabel
+                                )
+                            }
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(
+                                        8.dp
+                                    )
+                            )
+
+                            CupertinoText(
+                                text =
+                                    impact.summary,
+                                style =
+                                    HigTypography.caption,
+                                color =
+                                    if (
+                                        impact.hasDependencies
+                                    ) {
+                                        LiasThemeColors.orange
+                                    } else {
+                                        LiasThemeColors.tertiaryLabel
+                                    }
+                            )
+
+                            if (
+                                impact.referencingPolicies
+                                    .isNotEmpty()
+                            ) {
+
+                                CupertinoText(
+                                    text =
+                                        impact.referencingPolicies
+                                            .joinToString(
+                                                separator = " · "
+                                            ) {
+                                                it.name.ifBlank {
+                                                    it.id
+                                                }
+                                            },
+                                    style =
+                                        HigTypography.caption,
+                                    color =
+                                        LiasThemeColors.secondaryLabel,
                                     modifier =
                                         Modifier.padding(
                                             top = 3.dp
@@ -450,7 +467,7 @@ fun SchedulesScreen(
                             Spacer(
                                 modifier =
                                     Modifier.height(
-                                        10.dp
+                                        8.dp
                                     )
                             )
 
@@ -458,69 +475,53 @@ fun SchedulesScreen(
                                 modifier =
                                     Modifier.fillMaxWidth(),
                                 horizontalArrangement =
-                                    Arrangement.SpaceBetween,
-                                verticalAlignment =
-                                    Alignment.CenterVertically
+                                    Arrangement.End
                             ) {
 
-                                CupertinoText(
-                                    text =
-                                        ScheduleFormatting
-                                            .policyUsageText(
-                                                usageCount
-                                            ),
-                                    style =
-                                        HigTypography.caption,
-                                    color =
-                                        if (
-                                            usageCount > 0
-                                        ) {
-                                            LiasThemeColors.blue
-                                        } else {
-                                            LiasThemeColors.tertiaryLabel
-                                        }
+                                HigTextButton(
+                                    text = "Copy",
+                                    onClick = {
+
+                                        editingSchedule =
+                                            schedule.copy(
+                                                id = "",
+                                                name =
+                                                    "Copy of ${schedule.name}"
+                                            )
+
+                                        showEditor =
+                                            true
+                                    }
                                 )
 
-                                Row(
-                                    horizontalArrangement =
-                                        Arrangement.spacedBy(
-                                            8.dp
-                                        )
-                                ) {
+                                HigTextButton(
+                                    text = "Edit",
+                                    onClick = {
 
-                                    HigTextButton(
-                                        text =
-                                            "Copy",
-                                        onClick = {
+                                        editingSchedule =
+                                            schedule
 
-                                            /*
-                                             * Empty ID is deliberate.
-                                             * LIAS generates a canonical ID.
-                                             */
-                                            editingSchedule =
-                                                schedule.copy(
-                                                    id = "",
-                                                    name =
-                                                        "Copy of ${schedule.name}"
-                                                )
+                                        showEditor =
+                                            true
+                                    }
+                                )
 
-                                            showEditor =
-                                                true
-                                        }
-                                    )
-
-                                    HigTextButton(
-                                        text =
-                                            "Edit",
-                                        onClick = {
-                                            editingSchedule =
-                                                schedule
-
-                                            showEditor =
-                                                true
-                                        }
-                                    )
-                                }
+                                HigTextButton(
+                                    text =
+                                        if (
+                                            impact.canDeleteSafely
+                                        ) {
+                                            "Delete"
+                                        } else {
+                                            "Dependencies"
+                                        },
+                                    onClick = {
+                                        scheduleToDelete =
+                                            schedule
+                                    },
+                                    isDestructive =
+                                        impact.canDeleteSafely
+                                )
                             }
                         }
                     }
@@ -529,11 +530,15 @@ fun SchedulesScreen(
         }
     }
 
-    if (showEditor) {
+    if (
+        showEditor
+    ) {
+
         ScheduleEditorSheet(
             initialSchedule =
                 editingSchedule,
             onDismiss = {
+
                 showEditor =
                     false
 
@@ -541,6 +546,7 @@ fun SchedulesScreen(
                     null
             },
             onSave = { schedule ->
+
                 viewModel.saveSchedule(
                     schedule
                 )
@@ -557,40 +563,31 @@ fun SchedulesScreen(
     scheduleToDelete
         ?.let { schedule ->
 
-            val usageCount =
-                usageCounts[
-                    schedule.id
-                ] ?: 0
+            val impact =
+                ConfigurationSafety
+                    .scheduleImpact(
+                        schedule =
+                            schedule,
+                        policies =
+                            state.policies
+                    )
 
-            HigAlertDialog(
-                onDismissRequest = {
+            ScheduleDeleteSheet(
+                impact =
+                    impact,
+                onDismiss = {
                     scheduleToDelete =
                         null
                 },
-                title =
-                    "Delete Schedule",
-                message =
-                    if (
-                        usageCount == 0
-                    ) {
-                        "Delete “${schedule.name}”? This schedule is not currently referenced by any rule."
-                    } else {
-                        "“${schedule.name}” is referenced by $usageCount ${if (usageCount == 1) "rule" else "rules"}. Delete it only after removing those references."
-                    },
-                confirmText =
-                    "Delete",
-                confirmEnabled =
-                    usageCount == 0,
-                onConfirm = {
+                onDelete = {
+
                     viewModel.deleteSchedule(
                         schedule.id
                     )
 
                     scheduleToDelete =
                         null
-                },
-                isDestructive =
-                    true
+                }
             )
         }
 }
