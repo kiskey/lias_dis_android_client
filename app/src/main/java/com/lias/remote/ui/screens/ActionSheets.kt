@@ -37,8 +37,13 @@ import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemIndigoDark
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoSlider
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.ExclamationmarkTriangle
+import io.github.alexzhirkevich.cupertino.icons.outlined.Globe
+import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 
 @Composable
 fun OnboardingSheet(onComplete: () -> Unit) {
@@ -49,10 +54,19 @@ fun OnboardingSheet(onComplete: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(
-                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp))
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(Brush.linearGradient(listOf(SystemBlueDark, SystemIndigoDark))),
                 contentAlignment = Alignment.Center
-            ) { CupertinoText("🛡", style = HigTypography.title1, color = Color.White) }
+            ) {
+                CupertinoIcon(
+                    imageVector = CupertinoIcons.Outlined.Shield,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
 
             CupertinoText("Welcome to LIAS", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
             CupertinoText("Secure your family's internet in 3 simple steps.", style = HigTypography.body, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
@@ -69,8 +83,11 @@ fun OnboardingSheet(onComplete: () -> Unit) {
 @Composable
 private fun OnboardingStep(num: String, title: String, desc: String) {
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(LiasThemeColors.tertiaryBackground)
+            .padding(16.dp)
     ) {
         CupertinoText(num.uppercase(), style = HigTypography.caption, color = LiasThemeColors.blue, fontWeight = FontWeight.Bold)
         CupertinoText(title, style = HigTypography.headline, color = LiasThemeColors.label, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
@@ -86,13 +103,21 @@ fun SecurityAlertSheet(alert: SecurityAlertPayload, onDismiss: () -> Unit, onBlo
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CupertinoText("🚨", style = HigTypography.largeTitle)
+            CupertinoIcon(
+                imageVector = CupertinoIcons.Outlined.ExclamationmarkTriangle,
+                contentDescription = "Alert",
+                tint = LiasThemeColors.red,
+                modifier = Modifier.size(48.dp)
+            )
             CupertinoText("Security Alert", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
             CupertinoText(alert.alertType.replace("_", " ").replaceFirstChar { it.uppercase() }, style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LiasThemeColors.tertiaryBackground)
+                    .padding(16.dp)
             ) {
                 CupertinoText("DETAILS", style = HigTypography.caption, color = LiasThemeColors.secondaryLabel, fontWeight = FontWeight.SemiBold)
                 CupertinoText(alert.details, style = HigTypography.body, color = LiasThemeColors.label, modifier = Modifier.padding(top = 6.dp))
@@ -117,13 +142,21 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CupertinoText("🌐", style = HigTypography.largeTitle)
+            CupertinoIcon(
+                imageVector = CupertinoIcons.Outlined.Globe,
+                contentDescription = null,
+                tint = LiasThemeColors.blue,
+                modifier = Modifier.size(48.dp)
+            )
             CupertinoText("Global Access Switch", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
             CupertinoText("Controls every non-infrastructure device on your network.", style = HigTypography.body, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LiasThemeColors.tertiaryBackground)
+                    .padding(16.dp)
             ) {
                 CupertinoText("CHOOSE MODE", style = HigTypography.caption, color = LiasThemeColors.secondaryLabel, fontWeight = FontWeight.SemiBold)
                 SegmentedControl(
@@ -139,8 +172,11 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
 
             if (selectedAction == "block") {
                 Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .background(LiasThemeColors.red.copy(alpha = 0.12f)).padding(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(LiasThemeColors.red.copy(alpha = 0.12f))
+                        .padding(12.dp)
                 ) {
                     CupertinoText("⚠️ Block All requires confirmation and will disconnect all family devices immediately.", style = HigTypography.subheadline, color = LiasThemeColors.red, fontWeight = FontWeight.Medium)
                 }
