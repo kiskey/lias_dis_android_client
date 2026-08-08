@@ -1,8 +1,8 @@
 // ====================================================================
 // File: DevicesScreen.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Device inventory grouped by tags. Integrated PauseSheet,
-//          ExtendAccessSheet, and TagEditorSheet.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Fixed mutableStateOf type inference. Uses CupertinoSection
+//          for grouped lists.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
@@ -61,6 +60,10 @@ import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigSpec
+import io.github.alexzhirkevich.cupertino.CupertinoButton
+import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.section.CupertinoSection
 
 @Composable
 fun DevicesScreen(
@@ -109,7 +112,7 @@ fun DevicesScreen(
                 if (devicesInTag.isNotEmpty()) {
                     item(key = "header_${tag.id}") { ListSectionHeader("${tag.name} · ${devicesInTag.size}") }
                     item(key = "card_${tag.id}") {
-                        GroupedListCard {
+                        CupertinoSection {
                             devicesInTag.forEachIndexed { index, device ->
                                 val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
                                 
@@ -194,13 +197,15 @@ fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Uni
                 title = if (initialTag == null) "New Tag" else "Edit Tag",
                 onCancel = onDismiss,
                 trailingAction = {
-                    HigTextButton(
-                        text = "Save",
+                    CupertinoButton(
                         onClick = {
                             val finalId = initialTag?.id ?: name.lowercase().replace(" ", "_")
                             onSave(Tag(id = finalId, name = name, color = selectedColor, precedence = initialTag?.precedence ?: 50, builtin = initialTag?.builtin ?: false))
-                        }
-                    )
+                        },
+                        colors = CupertinoButtonDefaults.plainButtonColors()
+                    ) {
+                        CupertinoText("Save")
+                    }
                 }
             )
 
