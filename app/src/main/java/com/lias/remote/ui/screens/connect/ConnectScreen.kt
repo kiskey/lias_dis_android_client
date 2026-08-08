@@ -1,11 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
-// Version: 3.0.0
-// Purpose: Native iOS Connect Onboarding Screen.
-// Audit Fixes:
-//   1. Formatted onboarding screen with native iOS gradient shield and HigField inputs.
-// ====================================================================
-
 package com.lias.remote.ui.screens.connect
 
 import android.widget.Toast
@@ -21,11 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,8 +30,14 @@ import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemIndigoDark
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 
 @Composable
 fun ConnectScreen(
@@ -57,11 +50,12 @@ fun ConnectScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(LiasThemeColors.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Diagonal Gradient Shield Icon Container (84dp x 84dp, 22dp corner radius)
+        // Gradient Shield Icon Container
         Box(
             modifier = Modifier
                 .size(84.dp)
@@ -74,8 +68,8 @@ fun ConnectScreen(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Shield,
+            CupertinoIcon(
+                imageVector = CupertinoIcons.Outlined.Shield,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(44.dp)
@@ -84,19 +78,20 @@ fun ConnectScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
+        CupertinoText(
             text = "Connect to LIAS",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.W800,
+            style = HigTypography.title1,
+            fontWeight = FontWeight.ExtraBold,
+            color = LiasThemeColors.label,
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
+        CupertinoText(
             text = "Enter your home server address to start managing devices, schedules and rules.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = HigTypography.body,
+            color = LiasThemeColors.secondaryLabel,
             textAlign = TextAlign.Center
         )
 
@@ -130,15 +125,16 @@ fun ConnectScreen(
                 onConnected()
             },
             enabled = state.serverUrl.isNotBlank(),
-            style = HigButtonStyle.Primary
+            style = HigButtonStyle.Primary,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
+        CupertinoText(
             text = "Scan QR code from LIAS dashboard",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelLarge,
+            color = LiasThemeColors.blue,
+            style = HigTypography.subheadline,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable {
                 Toast.makeText(context, "QR Scanner feature coming soon", Toast.LENGTH_SHORT).show()
