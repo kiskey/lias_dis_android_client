@@ -68,7 +68,11 @@ fun SchedulesScreen(viewModel: LiasViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                CupertinoText(schedule.name, style = HigTypography.headline, fontWeight = FontWeight.Bold)
+                                CupertinoText(
+                                    text = if (schedule.name == "Bedtime") "🛏 Bedtime" else if (schedule.name == "Homework") "📚 Homework" else schedule.name,
+                                    style = HigTypography.headline,
+                                    fontWeight = FontWeight.Bold
+                                )
                                 CupertinoText("${schedule.mode.uppercase()} · ${schedule.timezone}", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel)
                             }
                             StatusPill(
