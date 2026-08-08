@@ -1,16 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/connect/ConnectScreen.kt
-// Version: 4.0.0
+// Version: 20.0.0
 //
 // Purpose:
-//   First-launch LIAS connection experience.
+//   First-run LIAS connection gate.
 //
-// Behavioral contract:
-//   - Connect never saves an unverified server.
-//   - Connection is established through /health.
-//   - Errors stay on the screen.
-//   - No Toast is used for important connection state.
-//   - The existing Cupertino visual language is preserved.
+// Batch 20:
+//   - Connect means "verify AND persist", not merely "save URL".
+//   - Wrong token stays on Connect screen.
+//   - Unreachable server stays on Connect screen.
+//   - User-visible error remains actionable.
+//   - No fake QR scanner action.
 // ====================================================================
 
 package com.lias.remote.ui.screens.connect
@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,7 +41,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
-import com.lias.remote.ui.components.ConnectionFeedback
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
@@ -57,13 +58,10 @@ fun ConnectScreen(
     viewModel: SettingsViewModel,
     onConnected: () -> Unit
 ) {
-    val state by
-        viewModel.uiState.collectAsState()
 
-    val canConnect =
-        state.serverUrl.isNotBlank() &&
-            !state.isTesting &&
-            !state.isApplyingConnection
+    val state by
+        viewModel.uiState
+            .collectAsState()
 
     Column(
         modifier =
@@ -72,8 +70,12 @@ fun ConnectScreen(
                 .background(
                     LiasThemeColors.background
                 )
+                .verticalScroll(
+                    rememberScrollState()
+                )
                 .padding(
-                    horizontal = 24.dp
+                    horizontal = 24.dp,
+                    vertical = 32.dp
                 ),
         horizontalAlignment =
             Alignment.CenterHorizontally,
@@ -84,9 +86,12 @@ fun ConnectScreen(
         Box(
             modifier =
                 Modifier
-                    .size(84.dp)
+                    .size(
+                        84.dp
+                    )
                     .shadow(
-                        elevation = 12.dp,
+                        elevation =
+                            12.dp,
                         shape =
                             RoundedCornerShape(
                                 22.dp
@@ -112,27 +117,34 @@ fun ConnectScreen(
 
             CupertinoIcon(
                 imageVector =
-                    CupertinoIcons.Outlined.Shield,
+                    CupertinoIcons
+                        .Outlined
+                        .Shield,
                 contentDescription =
                     "LIAS",
                 tint =
                     Color.White,
                 modifier =
-                    Modifier.size(44.dp)
+                    Modifier.size(
+                        44.dp
+                    )
             )
         }
 
         Spacer(
             modifier =
-                Modifier.height(24.dp)
+                Modifier.height(
+                    24.dp
+                )
         )
 
         CupertinoText(
-            text = "Connect to LIAS",
+            text =
+                "Connect to LIAS",
             style =
                 HigTypography.title1,
             fontWeight =
-                FontWeight.ExtraBold,
+                FontWeight.Bold,
             color =
                 LiasThemeColors.label,
             textAlign =
@@ -141,12 +153,14 @@ fun ConnectScreen(
 
         Spacer(
             modifier =
-                Modifier.height(8.dp)
+                Modifier.height(
+                    8.dp
+                )
         )
 
         CupertinoText(
             text =
-                "Enter your home server address to manage devices, schedules and rules.",
+                "Enter the address and authentication token for your LIAS server.",
             style =
                 HigTypography.body,
             color =
@@ -157,14 +171,18 @@ fun ConnectScreen(
 
         Spacer(
             modifier =
-                Modifier.height(28.dp)
+                Modifier.height(
+                    28.dp
+                )
         )
 
         Column(
             modifier =
                 Modifier.fillMaxWidth(),
             verticalArrangement =
-                Arrangement.spacedBy(12.dp)
+                Arrangement.spacedBy(
+                    12.dp
+                )
         ) {
 
             HigField(
@@ -173,7 +191,7 @@ fun ConnectScreen(
                 onValueChange =
                     viewModel::updateServerUrl,
                 label =
-                    "Server URL",
+                    "LIAS Server",
                 placeholder =
                     "http://192.168.1.1:8081"
             )
@@ -184,52 +202,108 @@ fun ConnectScreen(
                 onValueChange =
                     viewModel::updateAuthToken,
                 label =
-                    "Auth Token (Optional)",
+                    "Auth Token",
+                placeholder =
+                    "Optional if LIAS authentication is disabled",
                 visualTransformation =
                     PasswordVisualTransformation()
             )
         }
 
+        state.connectionError
+            ?.let {
+                error ->
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
+                        )
+                )
+
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color =
+                                    LiasThemeColors.red
+                                        .copy(
+                                            alpha =
+                                                0.10f
+                                        ),
+                                shape =
+                                    RoundedCornerShape(
+                                        12.dp
+                                    )
+                            )
+                            .padding(
+                                12.dp
+                            )
+                ) {
+
+                    CupertinoText(
+                        text =
+                            error,
+                        style =
+                            HigTypography.subheadline,
+                        color =
+                            LiasThemeColors.red
+                    )
+                }
+            }
+
+        state.testResult
+            ?.let {
+                message ->
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
+                        )
+                )
+
+                CupertinoText(
+                    text =
+                        message,
+                    style =
+                        HigTypography.subheadline,
+                    color =
+                        LiasThemeColors.green,
+                    textAlign =
+                        TextAlign.Center
+                )
+            }
+
         Spacer(
             modifier =
-                Modifier.height(16.dp)
+                Modifier.height(
+                    24.dp
+                )
         )
-
-        ConnectionFeedback(
-            message =
-                state.testResult,
-            verified =
-                state.connectionVerified
-        )
-
-        if (
-            state.testResult != null
-        ) {
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
-        }
 
         HigButton(
             text =
-                when {
-                    state.isApplyingConnection ->
-                        "Connecting…"
-
-                    state.isTesting ->
-                        "Checking Server…"
-
-                    else ->
-                        "Connect"
+                if (
+                    state.isConnecting
+                ) {
+                    "Connecting…"
+                } else {
+                    "Connect"
                 },
             onClick = {
-                viewModel.connect(
-                    onSuccess = onConnected
-                )
+
+                viewModel
+                    .connectAndSave(
+                        onConnected =
+                            onConnected
+                    )
             },
             enabled =
-                canConnect,
+                state.serverUrl
+                    .isNotBlank() &&
+                    !state.isConnecting,
             style =
                 HigButtonStyle.Primary,
             modifier =
@@ -238,12 +312,14 @@ fun ConnectScreen(
 
         Spacer(
             modifier =
-                Modifier.height(12.dp)
+                Modifier.height(
+                    18.dp
+                )
         )
 
         CupertinoText(
             text =
-                "You can also configure this later in Settings.",
+                "Your token is stored locally with the app configuration and is never included in LIAS navigation links.",
             style =
                 HigTypography.caption,
             color =
