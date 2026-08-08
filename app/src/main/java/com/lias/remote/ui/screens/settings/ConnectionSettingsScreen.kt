@@ -1,16 +1,24 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/ConnectionSettingsScreen.kt
-// Version: 12.0.0
+// Version: 22.0.0
 //
 // Purpose:
-//   Transaction-safe LIAS connection editor.
+//   Safe connection editing + advanced diagnostics.
 //
-// Safety:
-//   - Test never changes the active connection.
-//   - Save always verifies before persistence.
-//   - Existing saved connection survives a failed replacement.
-//   - Token remains obscured on screen.
-//   - Clearly explains secure credential persistence.
+// UX tiers:
+//
+//   Normal:
+//     LIAS Server
+//     Auth Token
+//     Test
+//     Save
+//
+//   Advanced:
+//     live SSE state
+//     sanitized endpoint
+//     recent diagnostic events
+//
+// Technical detail is deliberately collapsed by default.
 // ====================================================================
 
 package com.lias.remote.ui.screens.settings
@@ -18,6 +26,7 @@ package com.lias.remote.ui.screens.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,26 +39,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.diagnostics.ErrorPresentation
+import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.ui.SettingsViewModel
-import com.lias.remote.ui.components.ConnectionFeedback
 import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigTextButton
+import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoButton
-import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
 import io.github.alexzhirkevich.cupertino.CupertinoScaffold
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
 
 @Composable
 fun ConnectionSettingsScreen(
-    viewModel:
-        SettingsViewModel,
+    viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
 
@@ -57,137 +69,89 @@ fun ConnectionSettingsScreen(
         viewModel.uiState
             .collectAsState()
 
-    var tempUrl by
-        remember(
-            state.savedServerUrl
-        ) {
+    var showDiagnostics by
+        remember {
             mutableStateOf(
-                state.savedServerUrl
+                false
             )
         }
-
-    var tempToken by
-        remember(
-            state.authToken
-        ) {
-            mutableStateOf(
-                state.authToken
-            )
-        }
-
-    val hasChanges =
-        tempUrl.trim() !=
-            state.savedServerUrl
-                .trim() ||
-            tempToken !=
-                state.authToken
-
-    val busy =
-        state.isTesting ||
-            state.isApplyingConnection
 
     CupertinoScaffold(
-
         topBar = {
 
             CupertinoTopAppBar(
-
                 title = {
+
                     CupertinoText(
                         "Connection"
                     )
                 },
-
                 navigationIcon = {
 
-                    CupertinoButton(
-                        onClick =
-                            onBack,
-                        colors =
-                            CupertinoButtonDefaults
-                                .plainButtonColors()
-                    ) {
-
-                        CupertinoText(
-                            "‹ Settings"
-                        )
-                    }
-                },
-
-                actions = {
-
-                    CupertinoButton(
+                    HigTextButton(
+                        text =
+                            "‹ Settings",
                         onClick = {
 
                             if (
-                                !hasChanges
+                                state.hasConnectionDraftChanges
                             ) {
-                                onBack()
-                                return@CupertinoButton
+                                viewModel
+                                    .revertConnectionDraft()
                             }
 
-                            viewModel.updateServerUrl(
-                                tempUrl
-                            )
+                            onBack()
+                        }
+                    )
+                },
+                actions = {
 
-                            viewModel.updateAuthToken(
-                                tempToken
-                            )
-
-                            viewModel.connect(
-                                onSuccess =
-                                    onBack
-                            )
-                        },
-                        enabled =
-                            !busy &&
-                                (
-                                    !hasChanges ||
-                                        tempUrl
-                                            .isNotBlank()
-                                    ),
-                        colors =
-                            CupertinoButtonDefaults
-                                .plainButtonColors()
-                    ) {
-
-                        CupertinoText(
+                    HigTextButton(
+                        text =
                             when {
 
-                                busy ->
-                                    "Checking…"
-
-                                hasChanges ->
-                                    "Save"
+                                state.isSavingConnection ->
+                                    "Saving…"
 
                                 else ->
-                                    "Done"
-                            }
-                        )
-                    }
+                                    "Save"
+                            },
+                        onClick = {
+
+                            viewModel
+                                .saveSettings(
+                                    onSaved =
+                                        onBack
+                                )
+                        },
+                        enabled =
+                            !state.isSavingConnection &&
+                                !state.isTesting
+                    )
                 }
             )
         }
-
-    ) { innerPadding ->
+    ) {
+        innerPadding ->
 
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(
-                        LiasThemeColors
-                            .background
+                        LiasThemeColors.background
                     )
                     .padding(
                         innerPadding
                     )
-                    .padding(
-                        horizontal =
-                            16.dp
-                    )
                     .verticalScroll(
                         rememberScrollState()
+                    )
+                    .padding(
+                        horizontal =
+                            16.dp,
+                        vertical =
+                            16.dp
                     ),
             verticalArrangement =
                 Arrangement.spacedBy(
@@ -197,165 +161,357 @@ fun ConnectionSettingsScreen(
 
             GroupedListCard {
 
-                Column(
-                    modifier =
-                        Modifier.padding(
-                            16.dp
-                        ),
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            14.dp
-                        )
-                ) {
+                HigField(
+                    value =
+                        state.serverUrl,
+                    onValueChange =
+                        viewModel::updateServerUrl,
+                    label =
+                        "LIAS Server",
+                    placeholder =
+                        "http://192.168.1.1:8081"
+                )
 
-                    HigField(
-                        value =
-                            tempUrl,
-                        onValueChange = {
-                            tempUrl =
-                                it
-                        },
-                        label =
-                            "Server URL",
-                        placeholder =
-                            "http://192.168.1.1:8081"
-                    )
-
-                    HigField(
-                        value =
-                            tempToken,
-                        onValueChange = {
-                            tempToken =
-                                it
-                        },
-                        label =
-                            "Authentication Token",
-                        placeholder =
-                            "Optional",
-                        visualTransformation =
-                            PasswordVisualTransformation()
-                    )
-                }
+                HigField(
+                    value =
+                        state.authToken,
+                    onValueChange =
+                        viewModel::updateAuthToken,
+                    label =
+                        "Auth Token",
+                    placeholder =
+                        "Optional",
+                    visualTransformation =
+                        PasswordVisualTransformation()
+                )
             }
 
             CupertinoText(
                 text =
-                    "The authentication token is stored using an Android Keystore-backed encryption key.",
+                    "Changes are verified against LIAS before replacing the current working connection.",
                 style =
                     HigTypography.caption,
                 color =
-                    LiasThemeColors
-                        .secondaryLabel,
-                modifier =
-                    Modifier.padding(
-                        horizontal =
-                            4.dp
-                    )
+                    LiasThemeColors.secondaryLabel
             )
 
             HigButton(
                 text =
-                    when {
-
-                        state.isTesting ->
-                            "Testing…"
-
-                        else ->
-                            "Test Connection"
+                    if (
+                        state.isTesting
+                    ) {
+                        "Testing…"
+                    } else {
+                        "Test Connection"
                     },
-                onClick = {
-
-                    viewModel.updateServerUrl(
-                        tempUrl
-                    )
-
-                    viewModel.updateAuthToken(
-                        tempToken
-                    )
-
-                    viewModel.testConnection()
-                },
+                onClick =
+                    viewModel::testConnection,
                 enabled =
-                    !busy &&
-                        tempUrl
-                            .isNotBlank(),
+                    !state.isTesting &&
+                        !state.isSavingConnection,
                 style =
                     HigButtonStyle.Secondary,
                 modifier =
                     Modifier.fillMaxWidth()
             )
 
-            ConnectionFeedback(
-                message =
-                    state.testResult,
-                verified =
-                    state.connectionVerified
+            state.testResult
+                ?.let {
+                    result ->
+
+                    CupertinoText(
+                        text =
+                            result,
+                        style =
+                            HigTypography.subheadline,
+                        color =
+                            LiasThemeColors.green
+                    )
+                }
+
+            state.connectionError
+                ?.let {
+                    error ->
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    LiasThemeColors.red
+                                        .copy(
+                                            alpha =
+                                                0.10f
+                                        )
+                                )
+                                .padding(
+                                    12.dp
+                                ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                4.dp
+                            )
+                    ) {
+
+                        CupertinoText(
+                            text =
+                                "Unable to Use This Connection",
+                            style =
+                                HigTypography.headline,
+                            fontWeight =
+                                FontWeight.SemiBold,
+                            color =
+                                LiasThemeColors.red
+                        )
+
+                        CupertinoText(
+                            text =
+                                error,
+                            style =
+                                HigTypography.subheadline,
+                            color =
+                                LiasThemeColors.secondaryLabel
+                        )
+                    }
+                }
+
+            CupertinoText(
+                text =
+                    "CURRENT CONNECTION",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
             )
 
-            if (
-                hasChanges
-            ) {
+            GroupedListCard {
 
-                CupertinoText(
-                    text =
-                        "Your current LIAS connection remains active until the replacement server and credentials have been verified.",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors
-                            .tertiaryLabel,
-                    modifier =
-                        Modifier.padding(
-                            horizontal =
-                                4.dp
+                GroupedListRow(
+                    primaryText =
+                        "Server",
+                    secondaryText =
+                        ErrorPresentation
+                            .safeEndpoint(
+                                state.savedServerUrl
+                            ),
+                    showDivider =
+                        true
+                )
+
+                GroupedListRow(
+                    primaryText =
+                        "Live Updates",
+                    secondaryText =
+                        connectionStateDescription(
+                            state.connectionState
+                        ),
+                    trailingContent = {
+
+                        StatusPill(
+                            text =
+                                connectionStateTitle(
+                                    state.connectionState
+                                ),
+                            tone =
+                                when (
+                                    state.connectionState
+                                ) {
+
+                                    ConnectionState.CONNECTED ->
+                                        PillTone.ALLOWED
+
+                                    ConnectionState.CONNECTING,
+                                    ConnectionState.RECONNECTING ->
+                                        PillTone.SCHEDULED
+
+                                    ConnectionState.DISCONNECTED ->
+                                        PillTone.WARN
+                                }
                         )
+                    }
                 )
             }
 
+            HigButton(
+                text =
+                    if (
+                        showDiagnostics
+                    ) {
+                        "Hide Diagnostics"
+                    } else {
+                        "Show Diagnostics"
+                    },
+                onClick = {
+
+                    showDiagnostics =
+                        !showDiagnostics
+                },
+                style =
+                    HigButtonStyle.Gray,
+                modifier =
+                    Modifier.fillMaxWidth()
+            )
+
             if (
-                state.serverVersion !=
-                    null
+                showDiagnostics
             ) {
 
-                CupertinoText(
-                    text =
-                        buildString {
-
-                            append(
-                                "Last verified LIAS "
-                            )
-
-                            append(
-                                state.serverVersion
-                            )
-
-                            state.healthLatencyMs
-                                ?.let {
-                                    append(
-                                        " · "
-                                    )
-
-                                    append(
-                                        it
-                                    )
-
-                                    append(
-                                        " ms"
-                                    )
-                                }
-                        },
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors
-                            .secondaryLabel,
+                Row(
                     modifier =
-                        Modifier.padding(
-                            horizontal =
-                                4.dp
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween
+                ) {
+
+                    Column(
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            )
+                    ) {
+
+                        CupertinoText(
+                            text =
+                                "Advanced Diagnostics",
+                            style =
+                                HigTypography.headline,
+                            fontWeight =
+                                FontWeight.SemiBold,
+                            color =
+                                LiasThemeColors.label
                         )
-                )
+
+                        CupertinoText(
+                            text =
+                                "Authentication tokens are never included.",
+                            style =
+                                HigTypography.caption,
+                            color =
+                                LiasThemeColors.tertiaryLabel
+                        )
+                    }
+
+                    if (
+                        state.diagnostics
+                            .isNotEmpty()
+                    ) {
+
+                        HigTextButton(
+                            text =
+                                "Clear",
+                            onClick =
+                                viewModel::clearDiagnostics
+                        )
+                    }
+                }
+
+                if (
+                    state.diagnostics
+                        .isEmpty()
+                ) {
+
+                    GroupedListCard {
+
+                        GroupedListRow(
+                            primaryText =
+                                "No diagnostics recorded",
+                            secondaryText =
+                                "Connection and test events will appear here."
+                        )
+                    }
+
+                } else {
+
+                    GroupedListCard {
+
+                        state.diagnostics
+                            .forEachIndexed {
+                                    index,
+                                    record ->
+
+                                GroupedListRow(
+                                    primaryText =
+                                        record.title,
+                                    secondaryText =
+                                        buildString {
+
+                                            append(
+                                                record.summary
+                                            )
+
+                                            record
+                                                .technicalDetail
+                                                ?.takeIf {
+                                                    it.isNotBlank()
+                                                }
+                                                ?.let {
+
+                                                    append(
+                                                        "\n"
+                                                    )
+
+                                                    append(
+                                                        it
+                                                    )
+                                                }
+
+                                            append(
+                                                "\n"
+                                            )
+
+                                            append(
+                                                record.timestamp
+                                            )
+                                        },
+                                    showDivider =
+                                        index <
+                                            state.diagnostics
+                                                .lastIndex
+                                )
+                            }
+                    }
+                }
             }
         }
     }
 }
+
+private fun connectionStateTitle(
+    state: ConnectionState
+): String =
+    when (
+        state
+    ) {
+
+        ConnectionState.CONNECTED ->
+            "Connected"
+
+        ConnectionState.CONNECTING ->
+            "Connecting"
+
+        ConnectionState.RECONNECTING ->
+            "Reconnecting"
+
+        ConnectionState.DISCONNECTED ->
+            "Offline"
+    }
+
+private fun connectionStateDescription(
+    state: ConnectionState
+): String =
+    when (
+        state
+    ) {
+
+        ConnectionState.CONNECTED ->
+            "Real-time LIAS events are active."
+
+        ConnectionState.CONNECTING ->
+            "Opening the real-time event stream."
+
+        ConnectionState.RECONNECTING ->
+            "The event stream was interrupted and is recovering."
+
+        ConnectionState.DISCONNECTED ->
+            "No real-time LIAS event stream is currently active."
+    }
