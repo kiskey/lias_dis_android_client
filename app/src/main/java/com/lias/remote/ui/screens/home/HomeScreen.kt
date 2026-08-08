@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,17 @@ import com.lias.remote.ui.screens.GlobalSwitchSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Airplane
+import io.github.alexzhirkevich.cupertino.icons.outlined.Checkmark
+import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
+import io.github.alexzhirkevich.cupertino.icons.outlined.ExclamationmarkShield
+import io.github.alexzhirkevich.cupertino.icons.outlined.Globe
+import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
+import io.github.alexzhirkevich.cupertino.icons.outlined.Pause
+import io.github.alexzhirkevich.cupertino.icons.outlined.Xmark
 
 @Composable
 fun HomeScreen(
@@ -75,13 +86,19 @@ fun HomeScreen(
         title = "Home",
         scrollState = scrollState,
         navTrailing = {
-            CupertinoText(
-                text = "🚨",
-                style = HigTypography.headline,
-                modifier = Modifier.clickable {
-                    viewModel.triggerSecurityAlert()
-                }
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { viewModel.triggerSecurityAlert() }
+                    .padding(4.dp)
+            ) {
+                CupertinoIcon(
+                    imageVector = CupertinoIcons.Outlined.ExclamationmarkShield,
+                    contentDescription = "Security Alert",
+                    tint = LiasThemeColors.red,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -109,13 +126,22 @@ fun HomeScreen(
                             .padding(20.dp)
                     ) {
                         Column {
-                            CupertinoText(
-                                text = if (isVacationActive) "✈️ VACATION MODE ACTIVE" else "🌐 NETWORK STATUS",
-                                style = HigTypography.caption,
-                                color = if (isVacationActive) LiasThemeColors.orange else LiasThemeColors.secondaryLabel,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CupertinoIcon(
+                                    imageVector = if (isVacationActive) CupertinoIcons.Outlined.Airplane else CupertinoIcons.Outlined.Globe,
+                                    contentDescription = null,
+                                    tint = if (isVacationActive) LiasThemeColors.orange else LiasThemeColors.green,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                CupertinoText(
+                                    text = if (isVacationActive) "VACATION MODE ACTIVE" else "NETWORK STATUS",
+                                    style = HigTypography.caption,
+                                    color = if (isVacationActive) LiasThemeColors.orange else LiasThemeColors.secondaryLabel,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
                             CupertinoText(
                                 text = "$onlineDevices devices online",
                                 style = HigTypography.title1,
@@ -137,7 +163,7 @@ fun HomeScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 HigButton(
-                                    text = if (isVacationActive) "✈️ Vacation ON" else "✈️ Vacation",
+                                    text = if (isVacationActive) "Vacation ON" else "Vacation",
                                     onClick = { viewModel.toggleVacationMode(!isVacationActive) },
                                     style = if (isVacationActive) HigButtonStyle.Danger else HigButtonStyle.Secondary,
                                     modifier = Modifier.weight(1f)
@@ -148,7 +174,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Actions Grid (Fully Interactive)
+            // Quick Actions 4-Tile Grid (Native Cupertino Vectors)
             item {
                 ListSectionHeader("Quick Actions")
                 Row(
@@ -158,7 +184,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     QuickTile(
-                        icon = "📱", 
+                        icon = CupertinoIcons.Outlined.Iphone, 
                         label = "Devices", 
                         color = LiasThemeColors.blue, 
                         modifier = Modifier.weight(1f)
@@ -166,7 +192,7 @@ fun HomeScreen(
                         onNavigateToTab(LiasScreen.Devices)
                     }
                     QuickTile(
-                        icon = "⏱", 
+                        icon = CupertinoIcons.Outlined.Clock, 
                         label = "Extend Access", 
                         color = LiasThemeColors.green, 
                         modifier = Modifier.weight(1f)
@@ -174,7 +200,7 @@ fun HomeScreen(
                         activeDeviceForExtend = state.devices.firstOrNull { !it.safeTags.contains("infrastructure") }
                     }
                     QuickTile(
-                        icon = "⏸", 
+                        icon = CupertinoIcons.Outlined.Pause, 
                         label = "Pause Device", 
                         color = LiasThemeColors.orange, 
                         modifier = Modifier.weight(1f)
@@ -182,7 +208,7 @@ fun HomeScreen(
                         activeDeviceForPause = state.devices.firstOrNull { !it.safeTags.contains("infrastructure") }
                     }
                     QuickTile(
-                        icon = "🕒", 
+                        icon = CupertinoIcons.Outlined.Clock, 
                         label = "Schedule", 
                         color = LiasThemeColors.indigo, 
                         modifier = Modifier.weight(1f)
@@ -199,7 +225,7 @@ fun HomeScreen(
                 })
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                     LiveRow(
-                        icon = "🚫",
+                        icon = CupertinoIcons.Outlined.Xmark,
                         iconBg = LiasThemeColors.red,
                         title = "Kids — Internet Blocked",
                         subtitle = "Bedtime · Mon–Fri 22:00–06:00 · 2h 14m left",
@@ -207,7 +233,7 @@ fun HomeScreen(
                         isLast = false
                     )
                     LiveRow(
-                        icon = "✓",
+                        icon = CupertinoIcons.Outlined.Checkmark,
                         iconBg = LiasThemeColors.green,
                         title = "IoT — Update Window",
                         subtitle = "Allowed until 02:30 · 18m left",
@@ -215,7 +241,7 @@ fun HomeScreen(
                         isLast = false
                     )
                     LiveRow(
-                        icon = "⏸",
+                        icon = CupertinoIcons.Outlined.Pause,
                         iconBg = LiasThemeColors.orange,
                         title = "Xbox — Paused",
                         subtitle = "Manual pause · 43m left",
@@ -285,7 +311,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun QuickTile(icon: String, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun QuickTile(icon: ImageVector, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
@@ -303,7 +329,7 @@ private fun QuickTile(icon: String, label: String, color: Color, modifier: Modif
                 .background(color),
             contentAlignment = Alignment.Center
         ) {
-            CupertinoText(icon, style = HigTypography.headline, color = Color.White)
+            CupertinoIcon(imageVector = icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp))
         }
         Spacer(modifier = Modifier.height(6.dp))
         CupertinoText(
@@ -317,7 +343,7 @@ private fun QuickTile(icon: String, label: String, color: Color, modifier: Modif
 }
 
 @Composable
-private fun LiveRow(icon: String, iconBg: Color, title: String, subtitle: String, tone: PillTone, isLast: Boolean) {
+private fun LiveRow(icon: ImageVector, iconBg: Color, title: String, subtitle: String, tone: PillTone, isLast: Boolean) {
     Column {
         Row(
             modifier = Modifier
@@ -331,7 +357,7 @@ private fun LiveRow(icon: String, iconBg: Color, title: String, subtitle: String
                     .clip(RoundedCornerShape(8.dp))
                     .background(iconBg),
                 contentAlignment = Alignment.Center
-            ) { CupertinoText(icon, color = Color.White) }
+            ) { CupertinoIcon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp)) }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 CupertinoText(title, style = HigTypography.headline, color = LiasThemeColors.label)
