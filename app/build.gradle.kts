@@ -61,10 +61,15 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     
     implementation(libs.androidx.activity.compose)
+    
+    // Explicit Compose BOM and Foundation declarations to fix MutableInteractionSource classpath errors
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.foundation:foundation-layout")
+    
     implementation(libs.androidx.navigation.compose)
     
     implementation(libs.okhttp)
