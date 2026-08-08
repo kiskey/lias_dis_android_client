@@ -1,9 +1,8 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 3.0.0
-// Purpose: Device detail view formatted with native iOS HIG inset grouped cards.
+// Version: 3.1.0
 // Audit Fixes:
-//   1. Formatted device details and service list with iOS inset grouped surface cards.
+//   1. Explicitly ensured getValue delegate imports and typed state delegation.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -52,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.util.ExtendHelper
+import com.lias.remote.repositories.UiState
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
@@ -71,7 +71,7 @@ fun DeviceDetailScreen(
     viewModel: LiasViewModel,
     onBack: () -> Unit
 ) {
-    val state by viewModel.state.collectAsState()
+    val state: UiState by viewModel.state.collectAsState()
     val device = state.devices.find { it.pdid == pdid } ?: return
 
     var logs by remember { mutableStateOf<List<FlowLog>>(emptyList()) }

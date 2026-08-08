@@ -1,15 +1,22 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 3.0.0
+// Version: 3.4.0
 // Audit Fixes:
-//   1. Maintained native iOS CupertinoSearchTextField search bar and inset grouped cards.
+//   1. Added Cupertino StatusPill badge (PAUSED · [X]m) and secondary subtitle cue
+//      when an individual device is in the paused state.
+//   2. Preserved all swipe cancel 'X' options, MoveTagSheet, and Cupertino styling.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -53,6 +61,8 @@ import com.lias.remote.ui.components.HigSearchPill
 import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.MinutePickerSheet
+import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.SystemGreenDark
@@ -67,6 +77,7 @@ fun DevicesScreen(
     var showTagEditor by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var deviceToRename by remember { mutableStateOf<Device?>(null) }
+    var deviceToMoveTag by remember { mutableStateOf<Device?>(null) }
 
     var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
     var activeTagForExtend by remember { mutableStateOf<Tag?>(null) }
@@ -156,7 +167,10 @@ fun DevicesScreen(
                     item(key = "card_${tag.id}") {
                         GroupedListCard {
                             devicesInTag.forEachIndexed { index, device ->
-                                val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+                                val pausePol = state.policies.find { it.id == "pol_pause_${device.pdid}" }
+                                val isPaused = pausePol != null && pausePol.enabled
+                                val pauseMinsLeft = pausePol?.expiresAt?.let { ExtendHelper.minutesUntil(it) } ?: 0
+
                                 val devStatus = viewModel.effectiveStatusFor(device.pdid)
                                 val canExtendDevice = ExtendHelper.isExtendAvailable(devStatus)
 
@@ -166,6 +180,13 @@ fun DevicesScreen(
                                             label = "View Details",
                                             icon = Icons.Default.Visibility,
                                             onClick = { onNavigateToDeviceDetail(device.pdid) }
+                                        )
+                                    )
+                                    add(
+                                        ContextMenuItem(
+                                            label = "Move Tag Group",
+                                            icon = Icons.Default.Sell,
+                                            onClick = { deviceToMoveTag = device }
                                         )
                                     )
                                     if (canExtendDevice) {
@@ -203,12 +224,11 @@ fun DevicesScreen(
                                 ) {
                                     HigSwipeRow(
                                         leadingAction = SwipeAction(
-                                            label = "Edit Tag",
-                                            icon = Icons.Default.Edit,
+                                            label = "Move Tag",
+                                            icon = Icons.Default.Sell,
                                             color = MaterialTheme.colorScheme.primary,
                                             onTrigger = {
-                                                editingTag = tag
-                                                showTagEditor = true
+                                                deviceToMoveTag = device
                                             }
                                         ),
                                         trailingAction = SwipeAction(
@@ -223,7 +243,7 @@ fun DevicesScreen(
                                     ) {
                                         GroupedListRow(
                                             primaryText = device.displayName,
-                                            secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
+                                            secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}${if (isPaused) " · ⏸ Paused" else ""}",
                                             leadingContent = {
                                                 Box(
                                                     modifier = Modifier
@@ -235,7 +255,22 @@ fun DevicesScreen(
                                                 )
                                             },
                                             trailingContent = {
-                                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    if (isPaused) {
+                                                        StatusPill(
+                                                            text = if (pauseMinsLeft > 0) "PAUSED · ${pauseMinsLeft}m" else "PAUSED",
+                                                            tone = PillTone.Blocked
+                                                        )
+                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.ChevronRight,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
                                             },
                                             showDivider = index < devicesInTag.size - 1,
                                             onClick = { onNavigateToDeviceDetail(device.pdid) }
@@ -258,6 +293,18 @@ fun DevicesScreen(
                 if (editingTag == null) viewModel.createTag(tag)
                 else viewModel.updateTag(tag)
                 showTagEditor = false
+            }
+        )
+    }
+
+    deviceToMoveTag?.let { device ->
+        MoveTagSheet(
+            device = device,
+            allTags = state.tags,
+            onDismiss = { deviceToMoveTag = null },
+            onConfirm = { tagIds ->
+                viewModel.assignTags(device.pdid, tagIds)
+                deviceToMoveTag = null
             }
         )
     }
@@ -311,6 +358,7 @@ fun DevicesScreen(
             text = {
                 Column {
                     Text("Enter a new friendly name:")
+                    Spacer(modifier = Modifier.size(8.dp))
                     HigField(
                         value = newName,
                         onValueChange = { newName = it },

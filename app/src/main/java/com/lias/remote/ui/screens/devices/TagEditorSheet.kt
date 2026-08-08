@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Modal bottom sheet for creating/editing tag groups with iOS swatches.
 // Audit Fixes:
-//   1. Formatted tag editor modal sheet with iOS HIG corner specs and HigField.
+//   1. Guarded built-in system tags against name edits to prevent backend rejection.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -56,6 +56,7 @@ fun TagEditorSheet(
 
     var name by remember { mutableStateOf(initialTag?.name ?: "") }
     var selectedColor by remember { mutableStateOf(initialTag?.color ?: "#0A84FF") }
+    val isBuiltin = initialTag?.builtin == true
 
     val presetColors = listOf(
         "#0A84FF", "#5856D6", "#FF9500", "#FF2D55",
@@ -83,7 +84,7 @@ fun TagEditorSheet(
                     Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 }
                 Text(
-                    text = if (initialTag == null) "New Tag" else "Edit Tag",
+                    text = if (initialTag == null) "New Tag" else if (isBuiltin) "Built-in Tag" else "Edit Tag",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -92,10 +93,10 @@ fun TagEditorSheet(
                         val finalId = initialTag?.id ?: name.lowercase().replace(" ", "_")
                         onSave(Tag(
                             id = finalId,
-                            name = name,
+                            name = if (isBuiltin) (initialTag?.name ?: name) else name,
                             color = selectedColor,
                             precedence = initialTag?.precedence ?: 50,
-                            builtin = initialTag?.builtin ?: false
+                            builtin = isBuiltin
                         ))
                     },
                     enabled = name.isNotBlank()
@@ -109,11 +110,27 @@ fun TagEditorSheet(
                 }
             }
 
+            if (isBuiltin) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "🔒 Built-in System Tag: Name is fixed by LIAS core. Badge color can be customized.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             HigField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { if (!isBuiltin) name = it },
                 label = "Tag Name",
-                placeholder = "e.g. Nursery"
+                placeholder = "e.g. Nursery",
+                enabled = !isBuiltin
             )
 
             Spacer(modifier = Modifier.height(4.dp))
