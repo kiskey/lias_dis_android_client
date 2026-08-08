@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.components.GroupedListCard
@@ -40,7 +41,10 @@ import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.navigation.LiasScreen
+import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.GlobalSwitchSheet
+import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
@@ -48,16 +52,20 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 @Composable
 fun HomeScreen(
     viewModel: LiasViewModel,
-    onNavigateToDeviceDetail: (String) -> Unit
+    onNavigateToDeviceDetail: (String) -> Unit,
+    onNavigateToTab: (LiasScreen) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberLazyListState()
     var showGlobalSheet by remember { mutableStateOf(false) }
+    var activeDeviceForExtend by remember { mutableStateOf<Device?>(null) }
+    var activeDeviceForPause by remember { mutableStateOf<Device?>(null) }
 
     val globalPolicy = state.policies.find { it.id == "global_default" } ?: Policy(
         id = "global_default", name = "Global Access Switch", type = "global", action = "schedule"
     )
 
+    val isVacationActive = globalPolicy.action == "block"
     val totalDevices = state.devices.size
     val onlineDevices = state.devices.count { it.online }
     val offlineDevices = totalDevices - onlineDevices
@@ -71,7 +79,7 @@ fun HomeScreen(
                 text = "🚨",
                 style = HigTypography.headline,
                 modifier = Modifier.clickable {
-                    // Security alert trigger
+                    viewModel.triggerSecurityAlert()
                 }
             )
         }
@@ -88,15 +96,23 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(LiasThemeColors.green.copy(alpha = 0.12f))
-                            .border(0.5.dp, LiasThemeColors.green.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .background(
+                                if (isVacationActive) LiasThemeColors.orange.copy(alpha = 0.15f) 
+                                else LiasThemeColors.green.copy(alpha = 0.12f)
+                            )
+                            .border(
+                                0.5.dp, 
+                                if (isVacationActive) LiasThemeColors.orange.copy(alpha = 0.4f) 
+                                else LiasThemeColors.green.copy(alpha = 0.3f), 
+                                RoundedCornerShape(16.dp)
+                            )
                             .padding(20.dp)
                     ) {
                         Column {
                             CupertinoText(
-                                text = "🌐 NETWORK STATUS",
+                                text = if (isVacationActive) "✈️ VACATION MODE ACTIVE" else "🌐 NETWORK STATUS",
                                 style = HigTypography.caption,
-                                color = LiasThemeColors.secondaryLabel,
+                                color = if (isVacationActive) LiasThemeColors.orange else LiasThemeColors.secondaryLabel,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -108,7 +124,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             CupertinoText(
-                                text = "3 active enforcements · Bedtime schedule ends in 2h 14m",
+                                text = "${activeEnforcements.size} active enforcements · Bedtime schedule ends in 2h 14m",
                                 style = HigTypography.subheadline,
                                 color = LiasThemeColors.secondaryLabel
                             )
@@ -121,9 +137,9 @@ fun HomeScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 HigButton(
-                                    text = "✈️ Vacation",
-                                    onClick = { /* Vacation toggle */ },
-                                    style = HigButtonStyle.Secondary,
+                                    text = if (isVacationActive) "✈️ Vacation ON" else "✈️ Vacation",
+                                    onClick = { viewModel.toggleVacationMode(!isVacationActive) },
+                                    style = if (isVacationActive) HigButtonStyle.Danger else HigButtonStyle.Secondary,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -132,7 +148,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Actions Grid
+            // Quick Actions Grid (Fully Interactive)
             item {
                 ListSectionHeader("Quick Actions")
                 Row(
@@ -141,17 +157,45 @@ fun HomeScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    QuickTile("📱", "Devices", LiasThemeColors.blue, Modifier.weight(1f)) {}
-                    QuickTile("⏱", "Extend Access", LiasThemeColors.green, Modifier.weight(1f)) {}
-                    QuickTile("⏸", "Pause Device", LiasThemeColors.orange, Modifier.weight(1f)) {}
-                    QuickTile("🕒", "Schedule", LiasThemeColors.indigo, Modifier.weight(1f)) {}
+                    QuickTile(
+                        icon = "📱", 
+                        label = "Devices", 
+                        color = LiasThemeColors.blue, 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        onNavigateToTab(LiasScreen.Devices)
+                    }
+                    QuickTile(
+                        icon = "⏱", 
+                        label = "Extend Access", 
+                        color = LiasThemeColors.green, 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        activeDeviceForExtend = state.devices.firstOrNull { !it.safeTags.contains("infrastructure") }
+                    }
+                    QuickTile(
+                        icon = "⏸", 
+                        label = "Pause Device", 
+                        color = LiasThemeColors.orange, 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        activeDeviceForPause = state.devices.firstOrNull { !it.safeTags.contains("infrastructure") }
+                    }
+                    QuickTile(
+                        icon = "🕒", 
+                        label = "Schedule", 
+                        color = LiasThemeColors.indigo, 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        onNavigateToTab(LiasScreen.Schedules)
+                    }
                 }
             }
 
             // Active Enforcements List
             item {
                 ListSectionHeader("Active Enforcements", trailingAction = {
-                    HigTextButton(text = "View All", onClick = { /* Navigate to rules */ })
+                    HigTextButton(text = "View All", onClick = { onNavigateToTab(LiasScreen.Rules) })
                 })
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                     LiveRow(
@@ -181,7 +225,7 @@ fun HomeScreen(
                 }
             }
 
-            // Metrics Snapshot
+            // Network Snapshot
             item {
                 ListSectionHeader("Network Snapshot")
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -192,94 +236,6 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        MetricColumn(value = if (totalDevices == 0) "14" else "$totalDevices", label = "Total", color = LiasThemeColors.label)
+                        MetricColumn(value = "$totalDevices", label = "Total", color = LiasThemeColors.label)
                         Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
-                        MetricColumn(value = if (onlineDevices == 0) "12" else "$onlineDevices", label = "Online", color = LiasThemeColors.green)
-                        Box(modifier = Modifier.width(0.5.dp).height(30.dp).background(LiasThemeColors.separator))
-                        MetricColumn(value = if (offlineDevices == 0) "2" else "$offlineDevices", label = "Offline", color = LiasThemeColors.tertiaryLabel)
-                    }
-                }
-            }
-        }
-    }
-
-    if (showGlobalSheet) {
-        GlobalSwitchSheet(
-            currentPolicy = globalPolicy,
-            onDismiss = { showGlobalSheet = false },
-            onSave = { policy ->
-                viewModel.savePolicy(policy)
-                showGlobalSheet = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun QuickTile(icon: String, label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(LiasThemeColors.secondaryBackground)
-            .border(0.5.dp, LiasThemeColors.separator, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            CupertinoText(icon, style = HigTypography.headline, color = Color.White)
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        CupertinoText(
-            text = label,
-            style = HigTypography.caption,
-            color = LiasThemeColors.label,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun LiveRow(icon: String, iconBg: Color, title: String, subtitle: String, tone: PillTone, isLast: Boolean) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(iconBg),
-                contentAlignment = Alignment.Center
-            ) { CupertinoText(icon, color = Color.White) }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                CupertinoText(title, style = HigTypography.headline, color = LiasThemeColors.label)
-                CupertinoText(subtitle, style = HigTypography.subheadline, color = LiasThemeColors.tertiaryLabel)
-            }
-            StatusPill(text = tone.name, tone = tone)
-        }
-        if (!isLast) {
-            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).padding(start = 16.dp).background(LiasThemeColors.separator))
-        }
-    }
-}
-
-@Composable
-private fun MetricColumn(value: String, label: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        CupertinoText(value, style = HigTypography.title1, fontWeight = FontWeight.ExtraBold, color = color)
-        CupertinoText(label.uppercase(), style = HigTypography.caption, color = color, fontWeight = FontWeight.Bold)
-    }
-}
+                        MetricColumn(value = "$onlineDevices", label = "Online", color = LiasThemeC
