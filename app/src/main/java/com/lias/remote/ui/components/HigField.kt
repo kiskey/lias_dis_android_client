@@ -1,11 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/HigField.kt
-// Version: 3.0.0
-// Purpose: iOS field card input component using CupertinoTextField.
-// Audit Fixes:
-//   1. Formatted input field with iOS surface background and label-above-value layout.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
@@ -16,14 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import io.github.robinpcrd.cupertino.CupertinoTextField
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoSearchTextField
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun HigField(
@@ -40,33 +33,33 @@ fun HigField(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .clip(RoundedCornerShape(10.dp))
+            .background(LiasThemeColors.tertiaryBackground)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Text(
+        CupertinoText(
             text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = HigTypography.caption,
+            color = LiasThemeColors.tertiaryLabel
         )
         Spacer(modifier = Modifier.height(2.dp))
-        CupertinoTextField(
+        CupertinoSearchTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = {
                 if (placeholder.isNotBlank()) {
-                    Text(
+                    CupertinoText(
                         text = placeholder,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = HigTypography.body,
+                        color = LiasThemeColors.tertiaryLabel
                     )
                 }
             },
             singleLine = singleLine,
             enabled = enabled && onClick == null,
             visualTransformation = visualTransformation,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            textStyle = HigTypography.body.copy(color = LiasThemeColors.label),
             modifier = Modifier.fillMaxWidth()
         )
     }
