@@ -1,25 +1,26 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt
-// Version: 9.0.0
+// Version: 17.0.0
 //
 // Purpose:
-//   Complete LIAS policy wizard.
+//   Complete LIAS policy editor.
 //
-// Steps:
-//   1. Target
-//   2. Enforcement
-//   3. Schedules + validation
+// Workflow:
+//   1. Who should this rule apply to?
+//   2. What should happen?
+//   3. When should it happen?
 //
-// Corrections:
-//   - Real target selection.
-//   - Real multi-schedule selection.
-//   - New policies use id="" so LIAS generates the canonical ID.
-//   - Arbitrary new global policies are prohibited.
-//   - infrastructure is not selectable.
-//   - Priority language reflects actual device-policy semantics.
-//   - Empty schedule bundle warning is explicit.
-//   - Local projection is validated before server preflight.
-//   - /policies/validate is called before schedule-driven save.
+// Server validation:
+//   POST /api/v1/policies/validate is authoritative before a
+//   schedule-driven policy can be saved.
+//
+// UX:
+//   - New Global policies are impossible.
+//   - infrastructure is absent from selectable targets.
+//   - Priority is shown only for device rules.
+//   - Empty schedule bundle is permitted but clearly described as
+//     unrestricted/default-open.
+//   - Mixed timezones warn but do not fabricate a client-side failure.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +48,11 @@ import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
-import com.lias.remote.core.util.PolicyValidation
+import com.lias.remote.core.policy.PolicyDraft
+import com.lias.remote.core.policy.PolicyPresentation
+import com.lias.remote.core.policy.PolicySemantics
+import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
@@ -55,7 +61,9 @@ import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoSwitch
 import io.github.alexzhirkevich.cupertino.CupertinoText
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -64,19 +72,16 @@ fun PolicyWizardSheet(
     tags: List<Tag>,
     devices: List<Device>,
     schedules: List<Schedule>,
-    existingPolicies: List<Policy>,
-    onValidateSchedules:
+    policies: List<Policy>,
+    validateSchedules:
         suspend (List<String>) ->
-        ApiResult<List<Conflict>>,
+            ApiResult<List<Conflict>>,
     onDismiss: () -> Unit,
     onSave: (Policy) -> Unit
 ) {
-    val coroutineScope =
-        rememberCoroutineScope()
 
-    val isGlobal =
-        initialPolicy?.id ==
-            "global_default"
+    val scope =
+        rememberCoroutineScope()
 
     var step by
         remember(
@@ -87,94 +92,14 @@ fun PolicyWizardSheet(
             )
         }
 
-    var name by
+    var draft by
         remember(
             initialPolicy
         ) {
             mutableStateOf(
-                initialPolicy
-                    ?.name
-                    ?: ""
-            )
-        }
-
-    var type by
-        remember(
-            initialPolicy
-        ) {
-            mutableStateOf(
-                if (isGlobal) {
-                    "global"
-                } else {
+                PolicyDraft.fromPolicy(
                     initialPolicy
-                        ?.type
-                        ?.takeIf {
-                            it ==
-                                "tag" ||
-                                it ==
-                                "device"
-                        }
-                        ?: "tag"
-                }
-            )
-        }
-
-    var targetId by
-        remember(
-            initialPolicy
-        ) {
-            mutableStateOf(
-                initialPolicy
-                    ?.targetID
-                    ?: ""
-            )
-        }
-
-    var action by
-        remember(
-            initialPolicy
-        ) {
-            mutableStateOf(
-                initialPolicy
-                    ?.action
-                    ?: "schedule"
-            )
-        }
-
-    var priorityText by
-        remember(
-            initialPolicy
-        ) {
-            mutableStateOf(
-                (
-                    initialPolicy
-                        ?.priority
-                        ?: if (isGlobal) {
-                            0
-                        } else {
-                            50
-                        }
-                    )
-                    .toString()
-            )
-        }
-
-    var selectedScheduleIds by
-        remember(
-            initialPolicy
-        ) {
-            mutableStateOf(
-                initialPolicy
-                    ?.resolveScheduleIDs()
-                    ?.distinct()
-                    ?: emptyList()
-            )
-        }
-
-    var isValidatingServer by
-        remember {
-            mutableStateOf(
-                false
+                )
             )
         }
 
@@ -187,190 +112,277 @@ fun PolicyWizardSheet(
             )
         }
 
-    var serverError by
+    var validationError by
         remember {
             mutableStateOf<String?>(
                 null
             )
         }
 
-    val priority =
-        priorityText
-            .toIntOrNull()
-            ?: 50
+    var isValidating by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
-    val candidate =
-        Policy(
-            id =
-                initialPolicy
-                    ?.id
-                    ?: "",
-            name =
-                name.trim(),
-            type =
-                if (isGlobal) {
-                    "global"
-                } else {
-                    type
-                },
-            targetID =
-                if (isGlobal) {
-                    ""
-                } else {
-                    targetId
-                },
-            action =
-                action,
-            scheduleIDs =
-                if (
-                    action ==
-                    "schedule"
-                ) {
-                    selectedScheduleIds
-                        .distinct()
-                } else {
-                    emptyList()
-                },
-            scheduleID =
-                null,
-            priority =
-                if (isGlobal) {
-                    0
-                } else {
-                    priority
-                },
-            enabled =
-                if (isGlobal) {
-                    true
-                } else {
-                    initialPolicy
-                        ?.enabled
-                        ?: true
-                },
-            createdAt =
-                initialPolicy
-                    ?.createdAt
-                    ?: "",
-            updatedAt =
-                initialPolicy
-                    ?.updatedAt
-                    ?: "",
-            expiresAt =
-                initialPolicy
-                    ?.expiresAt,
-            reasonTag =
-                initialPolicy
-                    ?.reasonTag
-        )
+    val availableTags =
+        remember(
+            tags
+        ) {
+            PolicySemantics.availableTags(
+                tags
+            )
+        }
 
-    val validation =
-        PolicyValidation.validate(
-            policy =
-                candidate,
-            schedules =
-                schedules,
+    val availableDevices =
+        remember(
+            devices
+        ) {
+            PolicySemantics.availableDevices(
+                devices
+            )
+        }
+
+    val selectedSchedules =
+        remember(
+            draft.scheduleIds,
+            schedules
+        ) {
+            PolicySemantics.selectedSchedules(
+                draft.scheduleIds,
+                schedules
+            )
+        }
+
+    val localConflicts =
+        remember(
+            draft.scheduleIds,
+            schedules
+        ) {
+            PolicySemantics.localConflicts(
+                draft.scheduleIds,
+                schedules
+            )
+        }
+
+    val timezones =
+        remember(
+            draft.scheduleIds,
+            schedules
+        ) {
+            PolicySemantics.selectedTimezones(
+                draft.scheduleIds,
+                schedules
+            )
+        }
+
+    val semanticResult =
+        PolicySemantics.validateDraft(
+            draft =
+                draft,
+            initialPolicy =
+                initialPolicy,
             tags =
                 tags,
             devices =
                 devices,
-            existingPolicies =
-                existingPolicies
+            schedules =
+                schedules
         )
 
-    fun submit() {
+    val shadowWarning =
+        PolicySemantics.shadowWarning(
+            draft =
+                draft,
+            initialPolicy =
+                initialPolicy,
+            policies =
+                policies
+        )
 
-        if (
-            !validation.isValid ||
-            isValidatingServer
-        ) {
-            return
-        }
+    /*
+     * Server validation is authoritative.
+     *
+     * Debounce slightly because schedule selection can be changed
+     * repeatedly in quick succession.
+     */
+    LaunchedEffect(
+        draft.action,
+        draft.scheduleIds
+    ) {
 
         serverConflicts =
             emptyList()
 
-        serverError =
+        validationError =
             null
 
         if (
-            candidate.action !=
-                "schedule" ||
-            candidate
-                .resolveScheduleIDs()
+            draft.action !=
+            "schedule"
+        ) {
+            isValidating =
+                false
+
+            return@LaunchedEffect
+        }
+
+        /*
+         * Empty schedule bundle is intentionally valid and evaluates
+         * ALLOW according to LIAS. No server merge is necessary.
+         */
+        if (
+            draft.scheduleIds
                 .isEmpty()
         ) {
-            onSave(
-                candidate
+            isValidating =
+                false
+
+            return@LaunchedEffect
+        }
+
+        delay(
+            200L
+        )
+
+        isValidating =
+            true
+
+        when (
+            val result =
+                validateSchedules(
+                    draft.scheduleIds
+                        .toList()
+                )
+        ) {
+
+            is ApiResult.Success -> {
+
+                serverConflicts =
+                    result.data
+
+                validationError =
+                    null
+            }
+
+            is ApiResult.AuthenticationError -> {
+
+                validationError =
+                    result.message
+            }
+
+            is ApiResult.HttpError -> {
+
+                validationError =
+                    result.message
+            }
+
+            is ApiResult.ConflictError -> {
+
+                serverConflicts =
+                    result.conflicts
+
+                validationError =
+                    result.message
+            }
+
+            is ApiResult.NetworkError -> {
+
+                validationError =
+                    "Unable to validate this schedule bundle with LIAS."
+            }
+
+            is ApiResult.SerializationError -> {
+
+                validationError =
+                    "LIAS returned an invalid validation response."
+            }
+        }
+
+        isValidating =
+            false
+    }
+
+    fun selectType(
+        newType: String
+    ) {
+
+        if (
+            initialPolicy?.id ==
+            PolicySemantics.GLOBAL_POLICY_ID
+        ) {
+            return
+        }
+
+        val target =
+            when (
+                newType
+            ) {
+
+                "tag" ->
+                    availableTags
+                        .firstOrNull()
+                        ?.id
+                        .orEmpty()
+
+                "device" ->
+                    availableDevices
+                        .firstOrNull()
+                        ?.pdid
+                        .orEmpty()
+
+                else ->
+                    ""
+            }
+
+        draft =
+            draft.copy(
+                type =
+                    newType,
+                targetId =
+                    target
             )
+    }
+
+    fun save() {
+
+        val currentValidation =
+            PolicySemantics.validateDraft(
+                draft,
+                initialPolicy,
+                tags,
+                devices,
+                schedules
+            )
+
+        if (
+            !currentValidation.valid
+        ) {
+            validationError =
+                currentValidation.error
 
             return
         }
 
-        coroutineScope.launch {
-
-            isValidatingServer =
-                true
-
-            when (
-                val result =
-                    onValidateSchedules(
-                        candidate
-                            .resolveScheduleIDs()
-                    )
-            ) {
-
-                is ApiResult.Success -> {
-
-                    if (
-                        result.data
-                            .isEmpty()
-                    ) {
-                        onSave(
-                            candidate
-                        )
-                    } else {
-                        serverConflicts =
-                            result.data
-                    }
-                }
-
-                is ApiResult.AuthenticationError -> {
-                    serverError =
-                        result.message
-                }
-
-                is ApiResult.HttpError -> {
-                    serverError =
-                        result.message
-                }
-
-                is ApiResult.ConflictError -> {
-                    serverConflicts =
-                        result.conflicts
-
-                    serverError =
-                        result.message
-                }
-
-                is ApiResult.NetworkError -> {
-                    serverError =
-                        result.cause
-                            .message
-                            ?.takeIf {
-                                it.isNotBlank()
-                            }
-                            ?: "Unable to validate the rule with LIAS."
-                }
-
-                is ApiResult.SerializationError -> {
-                    serverError =
-                        "LIAS returned an invalid validation response."
-                }
-            }
-
-            isValidatingServer =
-                false
+        if (
+            draft.action ==
+                "schedule" &&
+            (
+                isValidating ||
+                    localConflicts.isNotEmpty() ||
+                    serverConflicts.isNotEmpty() ||
+                    validationError != null
+                )
+        ) {
+            return
         }
+
+        onSave(
+            draft.toPolicy(
+                initialPolicy
+            )
+        )
     }
 
     HigModalSheet(
@@ -383,10 +395,8 @@ fun PolicyWizardSheet(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        horizontal =
-                            24.dp,
-                        vertical =
-                            16.dp
+                        horizontal = 24.dp,
+                        vertical = 16.dp
                     )
                     .verticalScroll(
                         rememberScrollState()
@@ -399,17 +409,18 @@ fun PolicyWizardSheet(
 
             HigSheetHeader(
                 title =
-                    if (
-                        initialPolicy ==
-                        null
-                    ) {
-                        "New Rule"
-                    } else if (
-                        isGlobal
-                    ) {
-                        "Global Access"
-                    } else {
-                        "Edit Rule"
+                    when {
+
+                        initialPolicy?.id ==
+                            PolicySemantics
+                                .GLOBAL_POLICY_ID ->
+                            "Global Access"
+
+                        initialPolicy == null ->
+                            "New Access Rule"
+
+                        else ->
+                            "Edit Access Rule"
                     },
                 onCancel =
                     onDismiss
@@ -417,162 +428,103 @@ fun PolicyWizardSheet(
 
             CupertinoText(
                 text =
-                    "Step $step of ${if (action == "schedule") 3 else 2}",
+                    when (
+                        step
+                    ) {
+                        1 ->
+                            "1 of 3 · Applies To"
+
+                        2 ->
+                            "2 of 3 · Access"
+
+                        else ->
+                            "3 of 3 · Schedules"
+                    },
                 style =
                     HigTypography.caption,
                 color =
                     LiasThemeColors.tertiaryLabel
             )
 
-            when (step) {
-
-                // ====================================================
-                // STEP 1 — TARGET
-                // ====================================================
+            when (
+                step
+            ) {
 
                 1 -> {
 
-                    HigField(
-                        value =
-                            name,
-                        onValueChange = {
-                            name = it
+                    StepTarget(
+                        draft =
+                            draft,
+                        initialPolicy =
+                            initialPolicy,
+                        availableTags =
+                            availableTags,
+                        availableDevices =
+                            availableDevices,
+                        shadowWarning =
+                            shadowWarning?.message,
+                        onNameChange = {
+
+                            draft =
+                                draft.copy(
+                                    name =
+                                        it
+                                )
                         },
-                        label =
-                            "Rule Name",
-                        placeholder =
-                            if (isGlobal) {
-                                "Global Access Switch"
-                            } else {
-                                "e.g. Kids Internet Rules"
-                            }
+                        onTypeChange =
+                            ::selectType,
+                        onTargetChange = {
+
+                            draft =
+                                draft.copy(
+                                    targetId =
+                                        it
+                                )
+                        }
                     )
 
-                    if (isGlobal) {
+                    validationError
+                        ?.let {
 
-                        CupertinoText(
-                            text =
-                                "GLOBAL SCOPE",
-                            style =
-                                HigTypography.caption,
-                            color =
-                                LiasThemeColors.tertiaryLabel
-                        )
-
-                        PolicyTargetSelector(
-                            type =
-                                "global",
-                            selectedTargetId =
-                                "",
-                            tags =
-                                tags,
-                            devices =
-                                devices,
-                            onTargetSelected = {}
-                        )
-
-                    } else {
-
-                        Column {
-                            CupertinoText(
-                                text =
-                                    "TARGET SCOPE",
-                                style =
-                                    HigTypography.caption,
-                                color =
-                                    LiasThemeColors.tertiaryLabel
-                            )
-
-                            SegmentedControl(
-                                options =
-                                    listOf(
-                                        "Tag",
-                                        "Device"
-                                    ),
-                                selectedOption =
-                                    if (
-                                        type ==
-                                        "device"
-                                    ) {
-                                        "Device"
-                                    } else {
-                                        "Tag"
-                                    },
-                                onOptionSelected = {
-                                    val newType =
-                                        it.lowercase()
-
-                                    if (
-                                        newType !=
-                                        type
-                                    ) {
-                                        type =
-                                            newType
-
-                                        targetId =
-                                            ""
-                                    }
-                                },
-                                modifier =
-                                    Modifier.padding(
-                                        top = 8.dp
-                                    )
-                            )
-                        }
-
-                        PolicyTargetSelector(
-                            type =
-                                type,
-                            selectedTargetId =
-                                targetId,
-                            tags =
-                                tags,
-                            devices =
-                                devices,
-                            onTargetSelected = {
-                                targetId =
-                                    it
-                            }
-                        )
-                    }
-
-                    validation.warnings
-                        .filter {
-                            it.contains(
-                                "already has",
-                                ignoreCase =
-                                    true
-                            )
-                        }
-                        .forEach {
-                            PolicyCallout(
-                                title =
-                                    "Precedence",
-                                text =
-                                    it,
-                                error =
-                                    false
+                            ErrorText(
+                                it
                             )
                         }
 
                     HigButton(
-                        text =
-                            "Next",
+                        text = "Continue",
                         onClick = {
-                            step =
-                                2
 
-                            serverError =
-                                null
+                            val result =
+                                PolicySemantics
+                                    .validateDraft(
+                                        draft,
+                                        initialPolicy,
+                                        tags,
+                                        devices,
+                                        schedules
+                                    )
+
+                            if (
+                                result.valid
+                            ) {
+
+                                validationError =
+                                    null
+
+                                step =
+                                    2
+
+                            } else {
+
+                                validationError =
+                                    result.error
+                            }
                         },
                         enabled =
-                            name.trim()
-                                .isNotBlank() &&
-                                (
-                                    isGlobal ||
-                                        targetId
-                                            .isNotBlank()
-                                    ),
+                            draft.name
+                                .trim()
+                                .isNotBlank(),
                         style =
                             HigButtonStyle.Primary,
                         modifier =
@@ -580,116 +532,45 @@ fun PolicyWizardSheet(
                     )
                 }
 
-                // ====================================================
-                // STEP 2 — ENFORCEMENT
-                // ====================================================
-
                 2 -> {
 
-                    Column {
-                        CupertinoText(
-                            text =
-                                "ENFORCEMENT ACTION",
-                            style =
-                                HigTypography.caption,
-                            color =
-                                LiasThemeColors.tertiaryLabel
-                        )
+                    StepEnforcement(
+                        draft =
+                            draft,
+                        initialPolicy =
+                            initialPolicy,
+                        onActionChange = {
+                            selected ->
 
-                        SegmentedControl(
-                            options =
-                                listOf(
-                                    "Allow",
-                                    "Schedule",
-                                    "Block"
-                                ),
-                            selectedOption =
-                                action
-                                    .replaceFirstChar {
-                                        it.uppercase()
-                                    },
-                            onOptionSelected = {
-                                action =
-                                    it.lowercase()
-
-                                serverError =
-                                    null
-
-                                serverConflicts =
-                                    emptyList()
-                            },
-                            isDestructive =
-                                action ==
-                                    "block",
-                            modifier =
-                                Modifier.padding(
-                                    top = 8.dp
+                            draft =
+                                draft.copy(
+                                    action =
+                                        selected,
+                                    scheduleIds =
+                                        if (
+                                            selected ==
+                                            "schedule"
+                                        ) {
+                                            draft.scheduleIds
+                                        } else {
+                                            emptySet()
+                                        }
                                 )
-                        )
-                    }
+                        },
+                        onPriorityChange = {
 
-                    PolicyCallout(
-                        title =
-                            when (action) {
-                                "allow" ->
-                                    "Allow"
-
-                                "block" ->
-                                    "Block"
-
-                                else ->
-                                    "Schedule-Driven"
-                            },
-                        text =
-                            PolicyValidation
-                                .actionExplanation(
-                                    candidate
-                                ),
-                        error =
-                            false
-                    )
-
-                    if (!isGlobal) {
-
-                        HigField(
-                            value =
-                                priorityText,
-                            onValueChange = { value ->
-
-                                priorityText =
-                                    value.filterIndexed { index, character ->
-
-                                        character.isDigit() ||
-                                            (
+                            draft =
+                                draft.copy(
+                                    priorityText =
+                                        it.filter {
+                                                character ->
+                                            character.isDigit() ||
                                                 character ==
-                                                    '-' &&
-                                                index ==
-                                                    0
-                                                )
-                                    }
-                            },
-                            label =
-                                "Priority",
-                            placeholder =
-                                "50"
-                        )
-
-                        CupertinoText(
-                            text =
-                                if (
-                                    type ==
-                                    "device"
-                                ) {
-                                    "For multiple rules targeting the same device, the highest priority wins."
-                                } else {
-                                    "Tag policies combine across matching tags. A blocking tag rule takes precedence over allowing tag rules."
-                                },
-                            style =
-                                HigTypography.caption,
-                            color =
-                                LiasThemeColors.secondaryLabel
-                        )
-                    }
+                                                '-'
+                                        }
+                                )
+                        }
+                    )
 
                     Row(
                         modifier =
@@ -701,8 +582,7 @@ fun PolicyWizardSheet(
                     ) {
 
                         HigButton(
-                            text =
-                                "Back",
+                            text = "Back",
                             onClick = {
                                 step =
                                     1
@@ -718,42 +598,27 @@ fun PolicyWizardSheet(
                         HigButton(
                             text =
                                 if (
-                                    action ==
+                                    draft.action ==
                                     "schedule"
                                 ) {
-                                    "Next"
+                                    "Continue"
                                 } else {
-                                    if (
-                                        isValidatingServer
-                                    ) {
-                                        "Checking…"
-                                    } else {
-                                        "Save Rule"
-                                    }
+                                    "Save Rule"
                                 },
                             onClick = {
+
                                 if (
-                                    action ==
+                                    draft.action ==
                                     "schedule"
                                 ) {
                                     step =
                                         3
                                 } else {
-                                    submit()
+                                    save()
                                 }
                             },
-                            enabled =
-                                validation.isValid &&
-                                    !isValidatingServer,
                             style =
-                                if (
-                                    action ==
-                                    "block"
-                                ) {
-                                    HigButtonStyle.Danger
-                                } else {
-                                    HigButtonStyle.Primary
-                                },
+                                HigButtonStyle.Primary,
                             modifier =
                                 Modifier.weight(
                                     1f
@@ -762,120 +627,49 @@ fun PolicyWizardSheet(
                     }
                 }
 
-                // ====================================================
-                // STEP 3 — SCHEDULES
-                // ====================================================
-
                 3 -> {
 
-                    CupertinoText(
-                        text =
-                            "ATTACH SCHEDULES",
-                        style =
-                            HigTypography.caption,
-                        color =
-                            LiasThemeColors.tertiaryLabel
-                    )
-
-                    CupertinoText(
-                        text =
-                            "Select one or more reusable schedules. LIAS combines them into one effective weekly timeline.",
-                        style =
-                            HigTypography.subheadline,
-                        color =
-                            LiasThemeColors.secondaryLabel
-                    )
-
-                    PolicyScheduleSelector(
+                    StepSchedules(
+                        draft =
+                            draft,
                         schedules =
                             schedules,
-                        selectedScheduleIds =
-                            selectedScheduleIds,
-                        onSelectionChanged = {
-                            selectedScheduleIds =
-                                it
+                        selectedSchedules =
+                            selectedSchedules,
+                        localConflicts =
+                            localConflicts,
+                        serverConflicts =
+                            serverConflicts,
+                        timezones =
+                            timezones,
+                        isValidating =
+                            isValidating,
+                        validationError =
+                            validationError,
+                        onToggleSchedule = {
+                            scheduleId ->
 
-                            serverConflicts =
-                                emptyList()
+                            val updated =
+                                draft.scheduleIds
+                                    .toMutableSet()
 
-                            serverError =
-                                null
+                            if (
+                                !updated.add(
+                                    scheduleId
+                                )
+                            ) {
+                                updated.remove(
+                                    scheduleId
+                                )
+                            }
+
+                            draft =
+                                draft.copy(
+                                    scheduleIds =
+                                        updated
+                                )
                         }
                     )
-
-                    if (
-                        validation.errors
-                            .isNotEmpty()
-                    ) {
-                        validation.errors
-                            .forEach { message ->
-                                PolicyCallout(
-                                    title =
-                                        "Cannot Save",
-                                    text =
-                                        message,
-                                    error =
-                                        true
-                                )
-                            }
-                    }
-
-                    validation.warnings
-                        .filterNot {
-                            it.contains(
-                                "already has",
-                                ignoreCase =
-                                    true
-                            )
-                        }
-                        .forEach {
-                            PolicyCallout(
-                                title =
-                                    "Review",
-                                text =
-                                    it,
-                                error =
-                                    false
-                            )
-                        }
-
-                    if (
-                        serverConflicts
-                            .isNotEmpty()
-                    ) {
-                        PolicyCallout(
-                            title =
-                                "LIAS Validation Failed",
-                            text =
-                                "${serverConflicts.size} contradictory ${if (serverConflicts.size == 1) "schedule window was" else "schedule windows were"} reported by the server.",
-                            error =
-                                true
-                        )
-
-                        serverConflicts
-                            .forEach { conflict ->
-
-                                CupertinoText(
-                                    text =
-                                        "• ${conflict.day.replaceFirstChar { it.titlecase() }} ${conflict.overlapStart}–${conflict.overlapEnd}: ${conflict.scheduleAName} (${conflict.actionA}) ↔ ${conflict.scheduleBName} (${conflict.actionB})",
-                                    style =
-                                        HigTypography.caption,
-                                    color =
-                                        LiasThemeColors.red
-                                )
-                            }
-                    }
-
-                    serverError?.let {
-                        PolicyCallout(
-                            title =
-                                "Validation Error",
-                            text =
-                                it,
-                            error =
-                                true
-                        )
-                    }
 
                     Row(
                         modifier =
@@ -887,8 +681,7 @@ fun PolicyWizardSheet(
                     ) {
 
                         HigButton(
-                            text =
-                                "Back",
+                            text = "Back",
                             onClick = {
                                 step =
                                     2
@@ -903,21 +696,32 @@ fun PolicyWizardSheet(
 
                         HigButton(
                             text =
-                                if (
-                                    isValidatingServer
-                                ) {
-                                    "Checking LIAS…"
-                                } else {
-                                    "Save Rule"
+                                when {
+                                    isValidating ->
+                                        "Validating…"
+
+                                    serverConflicts
+                                        .isNotEmpty() ||
+                                        localConflicts
+                                            .isNotEmpty() ->
+                                        "Resolve Conflicts"
+
+                                    else ->
+                                        "Save Rule"
                                 },
                             onClick = {
-                                submit()
+                                scope.launch {
+                                    save()
+                                }
                             },
                             enabled =
-                                validation.isValid &&
-                                    !isValidatingServer &&
+                                !isValidating &&
+                                    localConflicts
+                                        .isEmpty() &&
                                     serverConflicts
-                                        .isEmpty(),
+                                        .isEmpty() &&
+                                    validationError ==
+                                        null,
                             style =
                                 HigButtonStyle.Primary,
                             modifier =
@@ -930,4 +734,649 @@ fun PolicyWizardSheet(
             }
         }
     }
+}
+
+@Composable
+private fun StepTarget(
+    draft: PolicyDraft,
+    initialPolicy: Policy?,
+    availableTags: List<Tag>,
+    availableDevices: List<Device>,
+    shadowWarning: String?,
+    onNameChange: (String) -> Unit,
+    onTypeChange: (String) -> Unit,
+    onTargetChange: (String) -> Unit
+) {
+
+    HigField(
+        value =
+            draft.name,
+        onValueChange =
+            onNameChange,
+        label =
+            "Rule Name",
+        placeholder =
+            "e.g. Kids Bedtime"
+    )
+
+    if (
+        initialPolicy?.id ==
+        PolicySemantics.GLOBAL_POLICY_ID
+    ) {
+
+        CupertinoText(
+            text =
+                "Global Access applies to every non-infrastructure device before ordinary device and tag rules.",
+            style =
+                HigTypography.subheadline,
+            color =
+                LiasThemeColors.secondaryLabel
+        )
+
+    } else {
+
+        CupertinoText(
+            text = "APPLIES TO",
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors.tertiaryLabel
+        )
+
+        SegmentedControl(
+            options =
+                listOf(
+                    "Tag",
+                    "Device"
+                ),
+            selectedOption =
+                if (
+                    draft.type ==
+                    "device"
+                ) {
+                    "Device"
+                } else {
+                    "Tag"
+                },
+            onOptionSelected = {
+                option ->
+
+                onTypeChange(
+                    option.lowercase()
+                )
+            },
+            modifier =
+                Modifier.fillMaxWidth()
+        )
+
+        if (
+            draft.type ==
+            "tag"
+        ) {
+
+            CupertinoText(
+                text =
+                    "TAG GROUP",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
+            )
+
+            GroupedListCard {
+
+                availableTags
+                    .forEachIndexed {
+                            index,
+                            tag ->
+
+                        GroupedListRow(
+                            primaryText =
+                                tag.name,
+                            secondaryText =
+                                if (
+                                    tag.builtin
+                                ) {
+                                    "Built-in group"
+                                } else {
+                                    "Custom group"
+                                },
+                            trailingContent = {
+
+                                CupertinoSwitch(
+                                    checked =
+                                        draft.targetId ==
+                                            tag.id,
+                                    onCheckedChange = {
+
+                                        onTargetChange(
+                                            tag.id
+                                        )
+                                    }
+                                )
+                            },
+                            showDivider =
+                                index <
+                                    availableTags
+                                        .lastIndex,
+                            onClick = {
+
+                                onTargetChange(
+                                    tag.id
+                                )
+                            }
+                        )
+                    }
+            }
+
+            if (
+                availableTags
+                    .isEmpty()
+            ) {
+
+                CupertinoText(
+                    text =
+                        "No eligible tag groups are available.",
+                    style =
+                        HigTypography.subheadline,
+                    color =
+                        LiasThemeColors.orange
+                )
+            }
+
+        } else {
+
+            CupertinoText(
+                text =
+                    "DEVICE",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
+            )
+
+            GroupedListCard {
+
+                availableDevices
+                    .forEachIndexed {
+                            index,
+                            device ->
+
+                        GroupedListRow(
+                            primaryText =
+                                device.displayName,
+                            secondaryText =
+                                device.currentIP.ifBlank {
+                                    device.pdid
+                                },
+                            trailingContent = {
+
+                                CupertinoSwitch(
+                                    checked =
+                                        draft.targetId ==
+                                            device.pdid,
+                                    onCheckedChange = {
+
+                                        onTargetChange(
+                                            device.pdid
+                                        )
+                                    }
+                                )
+                            },
+                            showDivider =
+                                index <
+                                    availableDevices
+                                        .lastIndex,
+                            onClick = {
+
+                                onTargetChange(
+                                    device.pdid
+                                )
+                            }
+                        )
+                    }
+            }
+
+            if (
+                availableDevices
+                    .isEmpty()
+            ) {
+
+                CupertinoText(
+                    text =
+                        "No eligible non-infrastructure devices are available.",
+                    style =
+                        HigTypography.subheadline,
+                    color =
+                        LiasThemeColors.orange
+                )
+            }
+        }
+
+        CupertinoText(
+            text =
+                "Infrastructure devices are always online and are intentionally excluded.",
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors.tertiaryLabel
+        )
+    }
+
+    shadowWarning
+        ?.let {
+
+            WarningText(
+                title =
+                    "Another Rule Uses This Target",
+                text =
+                    it
+            )
+        }
+}
+
+@Composable
+private fun StepEnforcement(
+    draft: PolicyDraft,
+    initialPolicy: Policy?,
+    onActionChange: (String) -> Unit,
+    onPriorityChange: (String) -> Unit
+) {
+
+    CupertinoText(
+        text =
+            "ACCESS BEHAVIOR",
+        style =
+            HigTypography.caption,
+        color =
+            LiasThemeColors.tertiaryLabel
+    )
+
+    SegmentedControl(
+        options =
+            listOf(
+                "Allow",
+                "Schedule",
+                "Block"
+            ),
+        selectedOption =
+            draft.action
+                .replaceFirstChar {
+                    it.uppercase()
+                },
+        onOptionSelected = {
+            option ->
+
+            onActionChange(
+                option.lowercase()
+            )
+        },
+        isDestructive =
+            true,
+        modifier =
+            Modifier.fillMaxWidth()
+    )
+
+    CupertinoText(
+        text =
+            PolicySemantics
+                .actionExplanation(
+                    draft.action,
+                    draft.type
+                ),
+        style =
+            HigTypography.subheadline,
+        color =
+            LiasThemeColors.secondaryLabel
+    )
+
+    if (
+        initialPolicy?.id ==
+        PolicySemantics.GLOBAL_POLICY_ID
+    ) {
+
+        when (
+            draft.action
+        ) {
+
+            "allow" ->
+
+                WarningText(
+                    title =
+                        "Global Override",
+                    text =
+                        "Allow bypasses all ordinary device, tag, and schedule restrictions for non-infrastructure devices."
+                )
+
+            "block" ->
+
+                WarningText(
+                    title =
+                        "Block All",
+                    text =
+                        "Every non-infrastructure device will be blocked immediately."
+                )
+        }
+    }
+
+    if (
+        draft.type ==
+        "device"
+    ) {
+
+        HigField(
+            value =
+                draft.priorityText,
+            onValueChange =
+                onPriorityChange,
+            label =
+                "Priority",
+            placeholder =
+                "50"
+        )
+    }
+
+    CupertinoText(
+        text =
+            PolicySemantics
+                .priorityExplanation(
+                    draft.type
+                ),
+        style =
+            HigTypography.caption,
+        color =
+            LiasThemeColors.tertiaryLabel
+    )
+}
+
+@Composable
+private fun StepSchedules(
+    draft: PolicyDraft,
+    schedules: List<Schedule>,
+    selectedSchedules: List<Schedule>,
+    localConflicts: List<Conflict>,
+    serverConflicts: List<Conflict>,
+    timezones: List<String>,
+    isValidating: Boolean,
+    validationError: String?,
+    onToggleSchedule: (String) -> Unit
+) {
+
+    CupertinoText(
+        text =
+            "Choose one or more reusable schedules. LIAS combines them into one effective weekly bundle.",
+        style =
+            HigTypography.subheadline,
+        color =
+            LiasThemeColors.secondaryLabel
+    )
+
+    if (
+        schedules.isEmpty()
+    ) {
+
+        WarningText(
+            title =
+                "No Schedules Exist",
+            text =
+                "You may still save this rule, but an empty Schedule rule evaluates to Allow because LIAS intentionally defaults open when no schedules are attached."
+        )
+
+    } else {
+
+        GroupedListCard {
+
+            schedules
+                .sortedBy {
+                    it.name.lowercase()
+                }
+                .forEachIndexed {
+                        index,
+                        schedule ->
+
+                    GroupedListRow(
+                        primaryText =
+                            schedule.name,
+                        secondaryText =
+                            PolicyPresentation
+                                .scheduleSubtitle(
+                                    schedule
+                                ),
+                        trailingContent = {
+
+                            CupertinoSwitch(
+                                checked =
+                                    draft.scheduleIds
+                                        .contains(
+                                            schedule.id
+                                        ),
+                                onCheckedChange = {
+
+                                    onToggleSchedule(
+                                        schedule.id
+                                    )
+                                }
+                            )
+                        },
+                        showDivider =
+                            index <
+                                schedules.lastIndex,
+                        onClick = {
+
+                            onToggleSchedule(
+                                schedule.id
+                            )
+                        }
+                    )
+                }
+        }
+    }
+
+    if (
+        draft.scheduleIds
+            .isEmpty()
+    ) {
+
+        WarningText(
+            title =
+                "No Schedule Selected",
+            text =
+                "This is valid, but the rule will evaluate to Allow for its target. Add a schedule if you intend to restrict access."
+        )
+    }
+
+    if (
+        timezones.size >
+        1
+    ) {
+
+        WarningText(
+            title =
+                "Mixed Timezones",
+            text =
+                "Selected schedules use ${timezones.joinToString()}. This is difficult to reason about; aligning their timezones is recommended."
+        )
+    }
+
+    if (
+        localConflicts
+            .isNotEmpty()
+    ) {
+
+        ConflictList(
+            title =
+                "Schedule Contradiction",
+            conflicts =
+                localConflicts
+        )
+    }
+
+    if (
+        serverConflicts
+            .isNotEmpty()
+    ) {
+
+        ConflictList(
+            title =
+                "LIAS Rejected This Bundle",
+            conflicts =
+                serverConflicts
+        )
+    }
+
+    when {
+
+        isValidating -> {
+
+            CupertinoText(
+                text =
+                    "Checking schedule compatibility with LIAS…",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.secondaryLabel
+            )
+        }
+
+        validationError !=
+            null -> {
+
+            ErrorText(
+                validationError
+            )
+        }
+
+        selectedSchedules
+            .isNotEmpty() &&
+            localConflicts
+                .isEmpty() &&
+            serverConflicts
+                .isEmpty() -> {
+
+            CupertinoText(
+                text =
+                    "${selectedSchedules.size} ${
+                        if (
+                            selectedSchedules.size ==
+                            1
+                        ) {
+                            "schedule"
+                        } else {
+                            "schedules"
+                        }
+                    } selected · no contradictions reported",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.green
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConflictList(
+    title: String,
+    conflicts: List<Conflict>
+) {
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(
+                6.dp
+            )
+    ) {
+
+        CupertinoText(
+            text =
+                title,
+            style =
+                HigTypography.headline,
+            fontWeight =
+                FontWeight.SemiBold,
+            color =
+                LiasThemeColors.red
+        )
+
+        conflicts
+            .distinctBy {
+                listOf(
+                    it.scheduleAID,
+                    it.scheduleBID,
+                    it.day,
+                    it.overlapStart,
+                    it.overlapEnd
+                )
+                    .joinToString(
+                        "|"
+                    )
+            }
+            .forEach {
+                conflict ->
+
+                CupertinoText(
+                    text =
+                        "• ${
+                            PolicyPresentation
+                                .conflictSummary(
+                                    conflict
+                                )
+                        }",
+                    style =
+                        HigTypography.caption,
+                    color =
+                        LiasThemeColors.secondaryLabel
+                )
+            }
+    }
+}
+
+@Composable
+private fun WarningText(
+    title: String,
+    text: String
+) {
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(
+                3.dp
+            )
+    ) {
+
+        CupertinoText(
+            text =
+                title,
+            style =
+                HigTypography.headline,
+            fontWeight =
+                FontWeight.SemiBold,
+            color =
+                LiasThemeColors.orange
+        )
+
+        CupertinoText(
+            text =
+                text,
+            style =
+                HigTypography.subheadline,
+            color =
+                LiasThemeColors.secondaryLabel
+        )
+    }
+}
+
+@Composable
+private fun ErrorText(
+    text: String
+) {
+
+    CupertinoText(
+        text =
+            text,
+        style =
+            HigTypography.subheadline,
+        color =
+            LiasThemeColors.red
+    )
 }
