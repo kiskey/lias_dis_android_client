@@ -1,8 +1,7 @@
 // ====================================================================
 // File: RulesScreen.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: Policy list grouped by type. Toggles for enable/disable.
-//          Preserves Policy API and validation contracts.
+// Version: 3.0.2 (HIG Redesign Fix)
+// Purpose: Fixed deletePolicy arguments.
 // ====================================================================
 
 package com.lias.remote.ui.screens.rules
@@ -145,7 +144,7 @@ fun RulesScreen(viewModel: LiasViewModel) {
             title = "Delete Rule",
             message = "Are you sure you want to delete the policy '${policy.name}'?",
             confirmText = "Delete",
-            onConfirm = { viewModel.deletePolicy(policy.id) },
+            onConfirm = { viewModel.deletePolicy(policy.id, policy.name, policy) },
             isDestructive = true
         )
     }
