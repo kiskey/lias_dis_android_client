@@ -1,10 +1,3 @@
-// ====================================================================
-// File: DevicesScreen.kt
-// Version: 3.2.0 (Cupertino Refactor)
-// Purpose: Fixed mutableStateOf type inference. Uses CupertinoSection
-//          for grouped lists.
-// ====================================================================
-
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
@@ -14,23 +7,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,24 +33,24 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
-import com.lias.remote.ui.components.HigSwipeRow
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
-import com.lias.remote.ui.components.SwipeAction
+import com.lias.remote.ui.components.PillTone
+import com.lias.remote.ui.components.StatusDot
+import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
-import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoButton
 import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
 import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.section.CupertinoSection
 
 @Composable
 fun DevicesScreen(
@@ -98,44 +85,35 @@ fun DevicesScreen(
         searchPlaceholder = "Search by name, IP, or MAC",
         searchQuery = searchQuery,
         onSearchQueryChanged = { searchQuery = it },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { editingTag = null; showTagEditor = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(HigSpec.FabSize)
-            ) { Icon(Icons.Filled.Add, "New Tag", tint = Color.White) }
+        navTrailing = {
+            HigTextButton(text = "＋ Tag", onClick = { editingTag = null; showTagEditor = true })
         }
     ) { padding ->
         LazyColumn(state = scrollState, modifier = Modifier.fillMaxSize(), contentPadding = padding) {
             state.tags.forEach { tag ->
                 val devicesInTag = groupedDevices[tag.id] ?: emptyList()
                 if (devicesInTag.isNotEmpty()) {
-                    item(key = "header_${tag.id}") { ListSectionHeader("${tag.name} · ${devicesInTag.size}") }
-                    item(key = "card_${tag.id}") {
-                        CupertinoSection {
-                            devicesInTag.forEachIndexed { index, device ->
-                                val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
-                                
-                                HigSwipeRow(
-                                    trailingAction = SwipeAction(
-                                        icon = if (isPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                                        color = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                        onTrigger = {
-                                            if (isPaused) viewModel.unpauseDeviceInternet(device.pdid)
-                                            else activeDeviceForPause = device
-                                        }
-                                    )
-                                ) {
-                                    GroupedListRow(
-                                        primaryText = device.displayName,
-                                        secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown" }}",
-                                        trailingContent = { Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                        showDivider = index < devicesInTag.size - 1,
-                                        onClick = { onNavigateToDeviceDetail(device.pdid) }
-                                    )
+                    item(key = "header_${tag.id}") {
+                        ListSectionHeader(
+                            text = "${tag.name} · ${devicesInTag.size} devices",
+                            trailingAction = {
+                                if (tag.id != "infrastructure") {
+                                    HigTextButton(text = "⏱ Extend All", onClick = {})
                                 }
                             }
-                        }
+                        )
+                    }
+                    items(devicesInTag.size, key = { index -> devicesInTag[index].pdid }) { index ->
+                        val device = devicesInTag[index]
+                        val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
+
+                        DeviceCardItem(
+                            device = device,
+                            isPaused = isPaused,
+                            onExtend = { activeDeviceForExtend = device },
+                            onPause = { activeDeviceForPause = device },
+                            onDetail = { onNavigateToDeviceDetail(device.pdid) }
+                        )
                     }
                 }
             }
@@ -183,6 +161,63 @@ fun DevicesScreen(
 }
 
 @Composable
+private fun DeviceCardItem(
+    device: Device,
+    isPaused: Boolean,
+    onExtend: () -> Unit,
+    onPause: () -> Unit,
+    onDetail: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(LiasThemeColors.secondaryBackground)
+            .border(0.5.dp, LiasThemeColors.separator, RoundedCornerShape(14.dp))
+            .padding(14.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(isOnline = device.online, isPaused = isPaused)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        CupertinoText(device.displayName, style = HigTypography.headline, color = LiasThemeColors.label)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    CupertinoText(
+                        text = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unclassified" }}",
+                        style = HigTypography.caption,
+                        color = LiasThemeColors.tertiaryLabel
+                    )
+                }
+                StatusPill(
+                    text = if (isPaused) "Paused" else if (device.online) "Allow" else "Offline",
+                    tone = if (isPaused) PillTone.PAUSED else if (device.online) PillTone.ALLOWED else PillTone.INFO
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (isPaused) {
+                    HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
+                } else {
+                    HigButton(text = "⏸ Pause", onClick = onPause, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
+                    HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
+                }
+                HigButton(text = "›", onClick = onDetail, style = HigButtonStyle.Gray, modifier = Modifier.width(44.dp))
+            }
+        }
+    }
+}
+
+@Composable
 fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Unit) {
     var name by remember { mutableStateOf(initialTag?.name ?: "") }
     var selectedColor by remember { mutableStateOf(initialTag?.color ?: "#0A84FF") }
@@ -204,7 +239,7 @@ fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Uni
                         },
                         colors = CupertinoButtonDefaults.plainButtonColors()
                     ) {
-                        CupertinoText("Save")
+                        CupertinoText("Save", fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -212,14 +247,17 @@ fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Uni
             HigField(value = name, onValueChange = { name = it }, label = "Tag Name", placeholder = "e.g. Nursery")
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text("BADGE COLOR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CupertinoText("BADGE COLOR", style = HigTypography.caption, color = LiasThemeColors.tertiaryLabel, modifier = Modifier.padding(bottom = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     presetColors.forEach { colorHex ->
                         val isSelected = selectedColor.equals(colorHex, ignoreCase = true)
                         val color = Color(android.graphics.Color.parseColor(colorHex))
                         Box(
-                            modifier = Modifier.size(36.dp).clip(CircleShape).background(color)
-                                .then(if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.surface, CircleShape).border(4.dp, color, CircleShape) else Modifier)
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .then(if (isSelected) Modifier.border(2.dp, LiasThemeColors.label, CircleShape) else Modifier)
                                 .clickable { selectedColor = colorHex }
                         )
                     }
