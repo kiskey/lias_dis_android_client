@@ -1,7 +1,8 @@
 // ====================================================================
 // File: LiasViewModel.kt
-// Version: 3.0.2 (HIG Redesign Fix)
-// Purpose: Added missing imports for tag repository extensions.
+// Version: 3.1.0 (HIG Redesign)
+// Purpose: Integrated UndoState, SecurityAlert state, and Variable
+//          Pause using existing POST /policies contract.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -10,9 +11,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.SecurityAlertPayload
+import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
-import com.lias.remote.core.util.ExtendHelper
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
@@ -157,7 +159,7 @@ class LiasViewModel(
         }
     }
 
-    fun saveSchedule(schedule: com.lias.remote.core.models.Schedule) {
+    fun saveSchedule(schedule: Schedule) {
         viewModelScope.launch { eventRepository.saveSchedule(schedule) }
     }
 
@@ -165,11 +167,11 @@ class LiasViewModel(
         viewModelScope.launch { eventRepository.deleteSchedule(scheduleId) }
     }
 
-    fun createTag(tag: com.lias.remote.core.models.Tag) {
+    fun createTag(tag: Tag) {
         viewModelScope.launch { eventRepository.createTag(tag) }
     }
 
-    fun updateTag(tag: com.lias.remote.core.models.Tag) {
+    fun updateTag(tag: Tag) {
         viewModelScope.launch { eventRepository.updateTag(tag) }
     }
 
