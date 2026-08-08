@@ -1,20 +1,20 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt
-// Version: 10.0.0
+// Version: 24.0.0
 //
 // Purpose:
-//   Confirmation UI for LIAS Pause Internet.
+//   Server-aligned Pause confirmation.
 //
-// Critical correction:
-//   LIAS pause duration is NOT user-configurable.
+// Backend contract:
+//   POST /api/v1/devices/{pdid}/pause
+//   -> fixed one-hour pause
 //
-// Backend:
-//       POST /api/v1/devices/{pdid}/pause
+// Batch 24 intentionally removes the fake 15/30/60/120-minute Pause
+// selector.
 //
-// always creates a one-hour pause.
-//
-// The callback retains its existing (minutes: Int) signature so older
-// callers continue to compile, but this sheet can emit only 60.
+// Compatibility:
+//   onConfirm still returns Int so pre-Batch-24 call sites compile.
+//   The only value this sheet ever returns is 60.
 // ====================================================================
 
 package com.lias.remote.ui.screens
@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.lias.remote.core.network.FIXED_PAUSE_MINUTES
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
@@ -44,9 +43,12 @@ fun PauseSheet(
     onDismiss: () -> Unit,
     onConfirm: (minutes: Int) -> Unit
 ) {
+
     HigModalSheet(
         onDismiss =
-            onDismiss
+            onDismiss,
+        accessibilityLabel =
+            "Pause Internet"
     ) {
 
         Column(
@@ -91,18 +93,18 @@ fun PauseSheet(
                 text =
                     "1 Hour",
                 style =
-                    HigTypography.title1,
+                    HigTypography.largeTitle,
                 fontWeight =
-                    FontWeight.ExtraBold,
+                    FontWeight.Bold,
                 color =
                     LiasThemeColors.red
             )
 
             CupertinoText(
                 text =
-                    "LIAS will block internet access for this device for one hour. You can resume access earlier at any time.",
+                    "LIAS will block Internet access for this device for one hour. You can resume access early at any time.",
                 style =
-                    HigTypography.subheadline,
+                    HigTypography.body,
                 color =
                     LiasThemeColors.secondaryLabel,
                 textAlign =
@@ -111,7 +113,7 @@ fun PauseSheet(
 
             CupertinoText(
                 text =
-                    "The pause timer is maintained by the LIAS server, so it continues even if this app is closed.",
+                    "Infrastructure devices cannot be paused.",
                 style =
                     HigTypography.caption,
                 color =
@@ -124,8 +126,9 @@ fun PauseSheet(
                 text =
                     "Pause for 1 Hour",
                 onClick = {
+
                     onConfirm(
-                        FIXED_PAUSE_MINUTES
+                        60
                     )
                 },
                 style =
