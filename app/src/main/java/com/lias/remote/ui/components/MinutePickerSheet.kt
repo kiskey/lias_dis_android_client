@@ -1,10 +1,3 @@
-// ====================================================================
-// File: MinutePickerSheet.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: Native iOS minute picker sheet for Extend Access features.
-//          Uses quick-pick chips and a slider for granular control.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
@@ -12,11 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -24,10 +12,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoSlider
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun MinutePickerSheet(
@@ -48,14 +38,13 @@ fun MinutePickerSheet(
         ) {
             HigSheetHeader(title = "Extend Access", onCancel = onDismiss)
 
-            Text(
+            CupertinoText(
                 text = targetLabel,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.W600,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = HigTypography.title2,
+                fontWeight = FontWeight.SemiBold,
+                color = LiasThemeColors.label
             )
 
-            // Quick Picks
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -71,22 +60,17 @@ fun MinutePickerSheet(
                 }
             }
 
-            // Granular Slider
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
+                CupertinoText(
                     text = "${selectedMinutes.toInt()} minutes",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.W700
+                    style = HigTypography.title1,
+                    fontWeight = FontWeight.Bold
                 )
-                Slider(
+                CupertinoSlider(
                     value = selectedMinutes,
                     onValueChange = { selectedMinutes = it },
                     valueRange = 1f..120f,
                     steps = 118,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    ),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 )
             }
