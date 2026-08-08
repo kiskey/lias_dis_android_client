@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigSwipeRow.kt
-// Version: 1.2.0
+// Version: 1.3.0
 // Audit Fixes:
-//   1. Removed invalid self-reference to 'state' inside confirmValueChange lambda.
-//   2. Ensured returning false from confirmValueChange spring-resets the box.
+//   1. Removed side-effects from confirmValueChange to prevent drag-calculation toast spam.
+//   2. Held revealed state open with opposite-end Cupertino 'X' cancel button and auto-reset on tap.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
 import kotlinx.coroutines.launch
@@ -53,7 +54,6 @@ fun HigSwipeRow(
     modifier: Modifier = Modifier,
     leadingAction: SwipeAction? = null,
     trailingAction: SwipeAction? = null,
-    fullSwipeCommits: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -61,15 +61,9 @@ fun HigSwipeRow(
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    leadingAction?.onTrigger?.invoke()
-                    false
-                }
-                SwipeToDismissBoxValue.EndToStart -> {
-                    trailingAction?.onTrigger?.invoke()
-                    false
-                }
-                else -> false
+                SwipeToDismissBoxValue.StartToEnd -> leadingAction != null
+                SwipeToDismissBoxValue.EndToStart -> trailingAction != null
+                SwipeToDismissBoxValue.Settled -> true
             }
         }
     )
@@ -100,7 +94,7 @@ fun HigSwipeRow(
                                     leadingAction.onTrigger()
                                     coroutineScope.launch { state.reset() }
                                 }
-                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Icon(
                                 imageVector = leadingAction.icon,
@@ -111,14 +105,15 @@ fun HigSwipeRow(
                             Text(
                                 text = leadingAction.label,
                                 color = Color.White,
-                                style = MaterialTheme.typography.labelLarge
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
                             )
                         }
 
                         // Cupertino Cancel 'X' Button (Opposite End / Right side)
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -130,7 +125,7 @@ fun HigSwipeRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -150,7 +145,7 @@ fun HigSwipeRow(
                         // Cupertino Cancel 'X' Button (Opposite End / Left side)
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -162,7 +157,7 @@ fun HigSwipeRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -175,12 +170,13 @@ fun HigSwipeRow(
                                     trailingAction.onTrigger()
                                     coroutineScope.launch { state.reset() }
                                 }
-                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
                                 text = trailingAction.label,
                                 color = Color.White,
-                                style = MaterialTheme.typography.labelLarge
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(
