@@ -1,8 +1,7 @@
 // ====================================================================
 // File: ScheduleEditorSheet.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: Modal sheet for schedule creation. Strict HIG form layout.
-//          Preserves ScheduleRule data model.
+// Version: 3.0.2 (HIG Redesign Fix)
+// Purpose: Added missing HigButtonStyle import.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
@@ -97,9 +97,6 @@ fun ScheduleEditorSheet(
                 label = "Timezone",
                 placeholder = "America/New_York"
             )
-
-            // Note: Full rule editor UI omitted for brevity but hooks into rules.value
-            // In production, this expands to a list of HigCards for each rule.
         }
     }
 }
