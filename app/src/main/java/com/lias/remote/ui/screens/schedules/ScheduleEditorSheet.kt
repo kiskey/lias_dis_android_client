@@ -1,28 +1,37 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 8.0.0
+// Version: 18.0.0
 //
 // Purpose:
-//   Complete Schedule editor.
+//   Full LIAS schedule editor.
 //
-// Corrections:
-//   - Rules are actually editable.
-//   - Multiple rules supported.
-//   - Overnight windows supported.
-//   - Client validation mirrors LIAS.
-//   - Backend generates new IDs.
-//   - IANA timezone defaults to Android system timezone.
-//   - Mode semantics explained in context.
-//   - Internal contradictory windows disable Save.
+// Features:
+//   - server-owned schedule IDs
+//   - multiple editable windows
+//   - recurring weekdays
+//   - calendar date ranges
+//   - overnight handling
+//   - Downtime / Allowed Hours semantics
+//   - timezone validation
+//   - common timezone shortcuts
+//   - live preview
+//   - local recurring conflict inspection
+//
+// Note:
+//   Actual persistence remains server-authoritative. LIAS performs its
+//   own timezone/rule/conflict validation during POST/PUT.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,19 +42,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
-import com.lias.remote.core.models.ScheduleRule
-import com.lias.remote.core.util.ScheduleFormatting
-import com.lias.remote.core.util.ScheduleValidation
+import com.lias.remote.core.schedule.ScheduleDraft
+import com.lias.remote.core.schedule.ScheduleRuleDraft
+import com.lias.remote.core.schedule.ScheduleSemantics
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
+import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoText
-import java.time.ZoneId
 
 @Composable
 fun ScheduleEditorSheet(
@@ -53,107 +62,100 @@ fun ScheduleEditorSheet(
     onDismiss: () -> Unit,
     onSave: (Schedule) -> Unit
 ) {
-    val isExisting =
-        initialSchedule
-            ?.id
-            ?.isNotBlank() == true
 
-    var name by
+    /*
+     * A copied schedule arrives with id="" from SchedulesScreen.
+     * That is intentionally treated exactly like a new server object.
+     */
+    val isNew =
+        initialSchedule ==
+            null ||
+            initialSchedule.id
+                .isBlank()
+
+    var draft by
         remember(
             initialSchedule
         ) {
             mutableStateOf(
-                initialSchedule
-                    ?.name
-                    .orEmpty()
-            )
-        }
-
-    var mode by
-        remember(
-            initialSchedule
-        ) {
-            mutableStateOf(
-                initialSchedule
-                    ?.mode
-                    ?.lowercase()
-                    ?.takeIf {
-                        it ==
-                            "downtime" ||
-                            it ==
-                            "whitelist"
-                    }
-                    ?: "downtime"
-            )
-        }
-
-    var timezone by
-        remember(
-            initialSchedule
-        ) {
-            mutableStateOf(
-                initialSchedule
-                    ?.timezone
-                    ?.takeIf {
-                        it.isNotBlank()
-                    }
-                    ?: ZoneId
-                        .systemDefault()
-                        .id
-            )
-        }
-
-    var rules by
-        remember(
-            initialSchedule
-        ) {
-            mutableStateOf(
-                initialSchedule
-                    ?.safeRules
-                    ?.takeIf {
-                        it.isNotEmpty()
-                    }
-                    ?: listOf(
-                        defaultRuleForMode(
-                            "downtime"
-                        )
+                ScheduleDraft
+                    .fromSchedule(
+                        initialSchedule
                     )
             )
         }
 
-    val candidate =
-        Schedule(
-            id =
-                if (isExisting) {
-                    initialSchedule
-                        ?.id
-                        .orEmpty()
-                } else {
-                    /*
-                     * Empty ID is deliberate.
-                     * LIAS CreateSchedule generates the canonical ID.
-                     */
-                    ""
-                },
-            name =
-                name.trim(),
-            mode =
-                mode,
-            timezone =
-                timezone.trim(),
-            rules =
-                rules
-        )
+    var attemptedSave by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
     val validation =
-        ScheduleValidation.validate(
-            candidate
-        )
+        ScheduleSemantics
+            .validate(
+                draft
+            )
+
+    val wirePreview =
+        remember(
+            draft,
+            initialSchedule
+        ) {
+            draft.toSchedule(
+                initialSchedule
+            )
+        }
+
+    val recurringConflicts =
+        remember(
+            wirePreview
+        ) {
+            ScheduleSemantics
+                .recurringConflicts(
+                    wirePreview
+                )
+        }
+
+    val canSave =
+        validation.valid &&
+            recurringConflicts
+                .isEmpty()
+
+    fun updateRule(
+        index: Int,
+        updated: ScheduleRuleDraft
+    ) {
+
+        val rules =
+            draft.rules
+                .toMutableList()
+
+        if (
+            index !in
+            rules.indices
+        ) {
+            return
+        }
+
+        rules[
+            index
+        ] =
+            updated
+
+        draft =
+            draft.copy(
+                rules =
+                    rules
+            )
+    }
 
     HigModalSheet(
         onDismiss =
             onDismiss
     ) {
+
         Column(
             modifier =
                 Modifier
@@ -173,45 +175,50 @@ fun ScheduleEditorSheet(
 
             HigSheetHeader(
                 title =
-                    when {
-                        isExisting ->
-                            "Edit Schedule"
-
-                        initialSchedule !=
-                            null ->
-                            "Copy Schedule"
-
-                        else ->
-                            "New Schedule"
+                    if (
+                        isNew
+                    ) {
+                        "New Schedule"
+                    } else {
+                        "Edit Schedule"
                     },
                 onCancel =
                     onDismiss,
                 trailingAction = {
-                    HigButton(
+
+                    HigTextButton(
                         text =
                             "Save",
                         onClick = {
+
+                            attemptedSave =
+                                true
+
                             if (
-                                validation.isValid
+                                canSave
                             ) {
+
                                 onSave(
-                                    candidate
+                                    draft.toSchedule(
+                                        initialSchedule
+                                    )
                                 )
                             }
-                        },
-                        enabled =
-                            validation.isValid,
-                        style =
-                            HigButtonStyle.Primary
+                        }
                     )
                 }
             )
 
             HigField(
                 value =
-                    name,
+                    draft.name,
                 onValueChange = {
-                    name = it
+
+                    draft =
+                        draft.copy(
+                            name =
+                                it
+                        )
                 },
                 label =
                     "Schedule Name",
@@ -219,324 +226,502 @@ fun ScheduleEditorSheet(
                     "e.g. Bedtime"
             )
 
-            Column {
-                CupertinoText(
-                    text =
-                        "MODE",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors.tertiaryLabel
-                )
+            CupertinoText(
+                text =
+                    "BEHAVIOR",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
+            )
 
-                SegmentedControl(
-                    options =
-                        listOf(
-                            "Downtime",
-                            "Whitelist"
-                        ),
-                    selectedOption =
-                        if (
-                            mode ==
-                            "whitelist"
-                        ) {
-                            "Whitelist"
-                        } else {
-                            "Downtime"
-                        },
-                    onOptionSelected = { selected ->
-
-                        val newMode =
-                            selected.lowercase()
-
-                        val oldDefaultAction =
-                            if (
-                                mode ==
-                                "whitelist"
-                            ) {
-                                "allow"
-                            } else {
-                                "block"
-                            }
-
-                        val newDefaultAction =
-                            if (
-                                newMode ==
-                                "whitelist"
-                            ) {
-                                "allow"
-                            } else {
-                                "block"
-                            }
-
-                        /*
-                         * Only migrate rules that still match the old
-                         * mode's default action. Explicit mixed-action
-                         * rules remain untouched.
-                         */
-                        rules =
-                            rules.map { rule ->
-                                if (
-                                    rule.action.equals(
-                                        oldDefaultAction,
-                                        ignoreCase = true
-                                    )
-                                ) {
-                                    rule.copy(
-                                        action =
-                                            newDefaultAction
-                                    )
-                                } else {
-                                    rule
-                                }
-                            }
-
-                        mode =
-                            newMode
+            SegmentedControl(
+                options =
+                    listOf(
+                        "Downtime",
+                        "Allowed Hours"
+                    ),
+                selectedOption =
+                    if (
+                        ScheduleSemantics
+                            .normalizeMode(
+                                draft.mode
+                            ) ==
+                        "whitelist"
+                    ) {
+                        "Allowed Hours"
+                    } else {
+                        "Downtime"
                     },
-                    modifier =
-                        Modifier.padding(
-                            top = 8.dp
+                onOptionSelected = {
+                    selection ->
+
+                    draft =
+                        draft.withMode(
+                            if (
+                                selection ==
+                                "Allowed Hours"
+                            ) {
+                                "whitelist"
+                            } else {
+                                "downtime"
+                            }
                         )
-                )
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            )
+
+            CupertinoText(
+                text =
+                    ScheduleSemantics
+                        .modeExplanation(
+                            draft.mode
+                        ),
+                style =
+                    HigTypography.subheadline,
+                color =
+                    LiasThemeColors.secondaryLabel
+            )
+
+            if (
+                ScheduleSemantics
+                    .normalizeMode(
+                        draft.mode
+                    ) ==
+                "whitelist"
+            ) {
 
                 CupertinoText(
                     text =
-                        ScheduleFormatting
-                            .modeExplanation(
-                                mode
-                            ),
+                        "Be careful: Allowed Hours blocks Internet at every time that is not covered by a selected window.",
                     style =
                         HigTypography.caption,
                     color =
-                        LiasThemeColors.secondaryLabel,
-                    modifier =
-                        Modifier.padding(
-                            top = 7.dp
-                        )
+                        LiasThemeColors.orange
                 )
             }
 
+            CupertinoText(
+                text =
+                    "TIMEZONE",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
+            )
+
             HigField(
                 value =
-                    timezone,
+                    draft.timezone,
                 onValueChange = {
-                    timezone = it
+
+                    draft =
+                        draft.copy(
+                            timezone =
+                                it.trim()
+                        )
                 },
                 label =
-                    "Timezone",
+                    "IANA Timezone",
                 placeholder =
                     "America/Los_Angeles"
             )
 
             CupertinoText(
                 text =
-                    "Use an IANA timezone. Schedules attached to one policy must use the same timezone.",
+                    if (
+                        ScheduleSemantics
+                            .validTimezone(
+                                draft.timezone
+                            )
+                    ) {
+                        "Valid timezone"
+                    } else {
+                        "Use an IANA timezone such as America/Los_Angeles."
+                    },
                 style =
                     HigTypography.caption,
                 color =
-                    LiasThemeColors.secondaryLabel
+                    if (
+                        ScheduleSemantics
+                            .validTimezone(
+                                draft.timezone
+                            )
+                    ) {
+                        LiasThemeColors.green
+                    } else {
+                        LiasThemeColors.red
+                    }
             )
 
             Column(
                 verticalArrangement =
                     Arrangement.spacedBy(
-                        12.dp
+                        6.dp
                     )
             ) {
 
-                CupertinoText(
-                    text =
-                        "TIME WINDOWS",
-                    style =
-                        HigTypography.caption,
-                    color =
-                        LiasThemeColors.tertiaryLabel
-                )
+                ScheduleSemantics
+                    .commonTimezones
+                    .chunked(
+                        2
+                    )
+                    .forEach {
+                            rowTimezones ->
 
-                rules.forEachIndexed { index, rule ->
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    6.dp
+                                )
+                        ) {
 
-                    ScheduleRuleEditor(
-                        rule =
-                            rule,
-                        ruleNumber =
-                            index + 1,
-                        onRuleChanged = { updated ->
+                            rowTimezones.forEach {
+                                    timezone ->
 
-                            rules =
-                                rules.toMutableList()
-                                    .apply {
-                                        set(
-                                            index,
-                                            updated
+                                HigButton(
+                                    text =
+                                        shortTimezoneLabel(
+                                            timezone
+                                        ),
+                                    onClick = {
+
+                                        draft =
+                                            draft.copy(
+                                                timezone =
+                                                    timezone
+                                            )
+                                    },
+                                    style =
+                                        if (
+                                            draft.timezone ==
+                                            timezone
+                                        ) {
+                                            HigButtonStyle.Primary
+                                        } else {
+                                            HigButtonStyle.Gray
+                                        },
+                                    modifier =
+                                        Modifier.weight(
+                                            1f
                                         )
-                                    }
-                        },
-                        onDelete =
+                                )
+                            }
+
                             if (
-                                rules.size >
+                                rowTimezones.size ==
                                 1
                             ) {
-                                {
-                                    rules =
-                                        rules
-                                            .filterIndexed {
-                                                ruleIndex,
-                                                _ ->
 
-                                                ruleIndex !=
-                                                    index
-                                            }
-                                }
-                            } else {
-                                null
+                                Spacer(
+                                    modifier =
+                                        Modifier.weight(
+                                            1f
+                                        )
+                                )
                             }
+                        }
+                    }
+            }
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+
+                Column {
+
+                    CupertinoText(
+                        text =
+                            "TIME WINDOWS",
+                        style =
+                            HigTypography.caption,
+                        color =
+                            LiasThemeColors.tertiaryLabel
+                    )
+
+                    CupertinoText(
+                        text =
+                            "${draft.rules.size} ${
+                                if (
+                                    draft.rules.size ==
+                                    1
+                                ) {
+                                    "window"
+                                } else {
+                                    "windows"
+                                }
+                            }",
+                        style =
+                            HigTypography.subheadline,
+                        color =
+                            LiasThemeColors.secondaryLabel
                     )
                 }
 
-                HigButton(
+                HigTextButton(
                     text =
-                        "Add Time Window",
+                        "＋ Add Window",
                     onClick = {
-                        rules =
-                            rules +
-                                defaultRuleForMode(
-                                    mode
-                                )
-                    },
-                    style =
-                        HigButtonStyle.Gray,
-                    modifier =
-                        Modifier.fillMaxWidth()
+
+                        draft =
+                            draft.copy(
+                                rules =
+                                    draft.rules +
+                                        ScheduleDraft
+                                            .defaultRuleForMode(
+                                                draft.mode
+                                            )
+                            )
+                    }
                 )
             }
 
-            if (
-                validation.errors
-                    .isNotEmpty()
-            ) {
-                ValidationCallout(
-                    title =
-                        "Fix Before Saving",
-                    messages =
-                        validation.errors,
-                    isError =
-                        true
-                )
-            }
+            draft.rules
+                .forEachIndexed {
+                        index,
+                        rule ->
 
-            if (
-                validation.conflicts
-                    .isNotEmpty()
-            ) {
-                ValidationCallout(
-                    title =
-                        "Conflicting Windows",
-                    messages =
-                        validation.conflicts.map { conflict ->
-                            "${conflict.day.replaceFirstChar { it.titlecase() }} ${conflict.overlapStart}–${conflict.overlapEnd}: ${conflict.actionA} conflicts with ${conflict.actionB}."
+                    ScheduleRuleEditorCard(
+                        index =
+                            index,
+                        rule =
+                            rule,
+                        scheduleMode =
+                            draft.mode,
+                        canDelete =
+                            draft.rules.size >
+                                1,
+                        onChange = {
+                            updated ->
+
+                            updateRule(
+                                index,
+                                updated
+                            )
                         },
-                    isError =
-                        true
-                )
+                        onDelete = {
+
+                            val updated =
+                                draft.rules
+                                    .toMutableList()
+
+                            if (
+                                updated.size >
+                                1 &&
+                                index in
+                                updated.indices
+                            ) {
+
+                                updated.removeAt(
+                                    index
+                                )
+
+                                draft =
+                                    draft.copy(
+                                        rules =
+                                            updated
+                                    )
+                            }
+                        }
+                    )
+                }
+
+            SchedulePreviewCard(
+                draft =
+                    draft
+            )
+
+            if (
+                recurringConflicts
+                    .isNotEmpty()
+            ) {
+
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            4.dp
+                        )
+                ) {
+
+                    CupertinoText(
+                        text =
+                            "Contradictory Windows",
+                        style =
+                            HigTypography.headline,
+                        fontWeight =
+                            FontWeight.SemiBold,
+                        color =
+                            LiasThemeColors.red
+                    )
+
+                    recurringConflicts
+                        .forEach {
+                            conflict ->
+
+                            CupertinoText(
+                                text =
+                                    "• ${
+                                        conflict.scheduleAName
+                                    } ${
+                                        conflict.actionA.uppercase()
+                                    } vs ${
+                                        conflict.actionB.uppercase()
+                                    } · ${
+                                        conflict.day
+                                            .replaceFirstChar {
+                                                it.uppercase()
+                                            }
+                                    } ${
+                                        conflict.overlapStart
+                                    }–${
+                                        conflict.overlapEnd
+                                    }",
+                                style =
+                                    HigTypography.caption,
+                                color =
+                                    LiasThemeColors.secondaryLabel
+                            )
+                        }
+                }
             }
 
             if (
-                validation.warnings
-                    .isNotEmpty()
+                attemptedSave &&
+                !validation.valid
             ) {
-                ValidationCallout(
-                    title =
-                        "Review",
-                    messages =
-                        validation.warnings,
-                    isError =
-                        false
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun ValidationCallout(
-    title: String,
-    messages: List<String>,
-    isError: Boolean
-) {
-    Column(
-        modifier =
-            Modifier.fillMaxWidth(),
-        verticalArrangement =
-            Arrangement.spacedBy(
-                4.dp
-            )
-    ) {
-        CupertinoText(
-            text =
-                title,
-            style =
-                HigTypography.subheadline,
-            fontWeight =
-                FontWeight.SemiBold,
-            color =
-                if (isError) {
-                    LiasThemeColors.red
-                } else {
-                    LiasThemeColors.orange
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            4.dp
+                        )
+                ) {
+
+                    CupertinoText(
+                        text =
+                            "Fix Before Saving",
+                        style =
+                            HigTypography.headline,
+                        fontWeight =
+                            FontWeight.SemiBold,
+                        color =
+                            LiasThemeColors.red
+                    )
+
+                    validation.issues
+                        .distinctBy {
+                            it.message
+                        }
+                        .forEach {
+                            issue ->
+
+                            CupertinoText(
+                                text =
+                                    "• ${issue.message}",
+                                style =
+                                    HigTypography.caption,
+                                color =
+                                    LiasThemeColors.secondaryLabel
+                            )
+                        }
                 }
-        )
+            }
 
-        messages.forEach { message ->
+            HigButton(
+                text =
+                    when {
+
+                        !validation.valid ->
+                            "Review Schedule"
+
+                        recurringConflicts
+                            .isNotEmpty() ->
+                            "Resolve Conflicts"
+
+                        isNew ->
+                            "Create Schedule"
+
+                        else ->
+                            "Save Changes"
+                    },
+                onClick = {
+
+                    attemptedSave =
+                        true
+
+                    if (
+                        canSave
+                    ) {
+
+                        onSave(
+                            draft.toSchedule(
+                                initialSchedule
+                            )
+                        )
+                    }
+                },
+                enabled =
+                    canSave,
+                style =
+                    HigButtonStyle.Primary,
+                modifier =
+                    Modifier.fillMaxWidth()
+            )
+
             CupertinoText(
                 text =
-                    "• $message",
+                    if (
+                        isNew
+                    ) {
+                        "LIAS will assign the schedule ID after creation."
+                    } else {
+                        "LIAS will validate and persist these changes before they become authoritative."
+                    },
                 style =
                     HigTypography.caption,
                 color =
-                    LiasThemeColors.secondaryLabel
+                    LiasThemeColors.tertiaryLabel
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        8.dp
+                    )
             )
         }
     }
 }
 
-private fun defaultRuleForMode(
-    mode: String
-): ScheduleRule =
-    ScheduleRule(
-        days =
-            listOf(
-                "mon",
-                "tue",
-                "wed",
-                "thu",
-                "fri"
-            ),
-        startTime =
-            if (
-                mode ==
-                "whitelist"
-            ) {
-                "15:00"
-            } else {
-                "22:00"
-            },
-        endTime =
-            if (
-                mode ==
-                "whitelist"
-            ) {
-                "17:00"
-            } else {
-                "06:00"
-            },
-        action =
-            if (
-                mode ==
-                "whitelist"
-            ) {
-                "allow"
-            } else {
-                "block"
-            }
-    )
+private fun shortTimezoneLabel(
+    timezone: String
+): String {
+
+    if (
+        timezone ==
+        "UTC"
+    ) {
+        return "UTC"
+    }
+
+    val city =
+        timezone
+            .substringAfterLast(
+                '/'
+            )
+            .replace(
+                '_',
+                ' '
+            )
+
+    return city
+        .take(
+            18
+        )
+}
