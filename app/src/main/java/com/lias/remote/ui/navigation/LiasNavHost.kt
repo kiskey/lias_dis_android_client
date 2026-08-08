@@ -1,63 +1,38 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 3.2.0
-// Purpose: Navigation host with enlarged 28dp iOS tab bar icons and transitions.
-// Audit Fixes:
-//   1. Enlarged bottom tab bar icons to 28dp for better visual fill on Pixel 6a without clipping.
+// File: LiasNavHost.kt
+// Version: 3.0.0 (HIG Redesign)
+// Purpose: Adaptive 5-tab navigation. HIG-compliant 49dp bottom bar.
+//          Spring physics transitions. Global undo/snackbar host.
 // ====================================================================
 
 package com.lias.remote.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.SettingsViewModel
-import com.lias.remote.ui.screens.connect.ConnectScreen
 import com.lias.remote.ui.screens.devices.DeviceDetailScreen
 import com.lias.remote.ui.screens.devices.DevicesScreen
 import com.lias.remote.ui.screens.home.HomeScreen
@@ -67,7 +42,7 @@ import com.lias.remote.ui.screens.settings.ConnectionSettingsScreen
 import com.lias.remote.ui.screens.settings.SettingsScreen
 import com.lias.remote.ui.theme.HigSpec
 
-sealed class LiasScreen(val route: String, val label: String, val icon: ImageVector) {
+sealed class LiasScreen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     data object Home : LiasScreen("home", "Home", Icons.Filled.Home)
     data object Devices : LiasScreen("devices", "Devices", Icons.Filled.Devices)
     data object Schedules : LiasScreen("schedules", "Schedules", Icons.Filled.Schedule)
@@ -81,185 +56,128 @@ fun LiasNavHost(
     settingsViewModel: SettingsViewModel
 ) {
     val navController = rememberNavController()
-    val items = listOf(
-        LiasScreen.Home,
-        LiasScreen.Devices,
-        LiasScreen.Schedules,
-        LiasScreen.Rules,
-        LiasScreen.Settings
-    )
-
+    val items = listOf(LiasScreen.Home, LiasScreen.Devices, LiasScreen.Schedules, LiasScreen.Rules, LiasScreen.Settings)
     val settingsState by settingsViewModel.uiState.collectAsState()
     val isConnected = settingsState.savedServerUrl.isNotBlank()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Global UI Events (Snackbars, Security Alerts)
     LaunchedEffect(Unit) {
         liasViewModel.uiEvents.collect { event ->
             when (event) {
-                is UiEvent.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(
-                        message = event.message,
-                        duration = SnackbarDuration.Short
-                    )
-                }
-                is UiEvent.ShowSnackbarError -> {
-                    snackbarHostState.showSnackbar(
-                        message = event.message,
-                        duration = SnackbarDuration.Long
-                    )
-                }
-                is UiEvent.ShowSecurityAlert -> {
-                    snackbarHostState.showSnackbar(
-                        message = "🚨 Security Alert: ${event.details}",
-                        duration = SnackbarDuration.Long
-                    )
-                }
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+                is UiEvent.ShowSnackbarError -> snackbarHostState.showSnackbar(event.message)
+                is UiEvent.ShowSecurityAlert -> snackbarHostState.showSnackbar("🚨 Security Alert: ${event.details}")
             }
         }
     }
 
     if (!isConnected) {
-        ConnectScreen(
-            viewModel = settingsViewModel,
-            onConnected = {}
-        )
-    } else {
-        Scaffold(
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            bottomBar = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(HigSpec.TabBarHeight)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+        com.lias.remote.ui.screens.connect.ConnectScreen(viewModel = settingsViewModel, onConnected = {})
+        return
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        bottomBar = {
+            // HIG Tab Bar: 49dp + NavigationBars padding
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .height(HigSpec.TabBarHeight)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val navBackStackEntry by navController.currentBackStackEntryAsState()
-                        val currentDestination = navBackStackEntry?.destination
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentDestination = navBackStackEntry?.destination
 
-                        items.forEach { screen ->
-                            val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                            val activeColor = MaterialTheme.colorScheme.primary
-                            val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    items.forEach { screen ->
+                        val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                        val activeColor = MaterialTheme.colorScheme.primary
+                        val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    .padding(vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = screen.icon,
-                                    contentDescription = screen.label,
-                                    tint = if (isSelected) activeColor else inactiveColor,
-                                    modifier = Modifier.size(28.dp) // Enlarged to 28dp for prominent Pixel 6a fit
-                                )
-                                Text(
-                                    text = screen.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) activeColor else inactiveColor,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
+                                }
+                        ) {
+                            Icon(
+                                imageVector = screen.icon,
+                                contentDescription = screen.label,
+                                tint = if (isSelected) activeColor else inactiveColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = screen.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.W600 else FontWeight.W400,
+                                color = if (isSelected) activeColor else inactiveColor
+                            )
                         }
                     }
                 }
             }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = LiasScreen.Home.route,
-                modifier = Modifier.padding(innerPadding),
-                enterTransition = {
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
-                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
-                },
-                exitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                        targetOffset = { fullWidth -> fullWidth / 3 },
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
-                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
-                },
-                popEnterTransition = {
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                        initialOffset = { fullWidth -> fullWidth / 3 },
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
-                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
-                },
-                popExitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f)
-                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.82f, stiffness = 400f))
-                }
-            ) {
-                composable(LiasScreen.Home.route) {
-                    HomeScreen(
-                        viewModel = liasViewModel,
-                        onNavigateToDeviceDetail = { pdid ->
-                            navController.navigate("device_detail/$pdid")
-                        }
-                    )
-                }
-                composable(LiasScreen.Devices.route) {
-                    DevicesScreen(
-                        viewModel = liasViewModel,
-                        onNavigateToDeviceDetail = { pdid ->
-                            navController.navigate("device_detail/$pdid")
-                        }
-                    )
-                }
-                composable(
-                    route = "device_detail/{pdid}",
-                    arguments = listOf(navArgument("pdid") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val pdid = backStackEntry.arguments?.getString("pdid") ?: ""
-                    DeviceDetailScreen(
-                        pdid = pdid,
-                        viewModel = liasViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(LiasScreen.Schedules.route) {
-                    SchedulesScreen(viewModel = liasViewModel)
-                }
-                composable(LiasScreen.Rules.route) {
-                    RulesScreen(viewModel = liasViewModel)
-                }
-                composable(LiasScreen.Settings.route) {
-                    SettingsScreen(
-                        viewModel = settingsViewModel,
-                        onNavigateToConnection = {
-                            navController.navigate("connection_settings")
-                        }
-                    )
-                }
-                composable("connection_settings") {
-                    ConnectionSettingsScreen(
-                        viewModel = settingsViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = LiasScreen.Home.route,
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = { fadeIn(tween(200)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200)) },
+            exitTransition = { fadeOut(tween(200)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200)) },
+            popEnterTransition = { fadeIn(tween(200)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200)) },
+            popExitTransition = { fadeOut(tween(200)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(200)) }
+        ) {
+            composable(LiasScreen.Home.route) {
+                HomeScreen(
+                    viewModel = liasViewModel,
+                    onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") }
+                )
+            }
+            composable(LiasScreen.Devices.route) {
+                DevicesScreen(
+                    viewModel = liasViewModel,
+                    onNavigateToDeviceDetail = { pdid -> navController.navigate("device_detail/$pdid") }
+                )
+            }
+            composable(
+                route = "device_detail/{pdid}",
+                arguments = listOf(navArgument("pdid") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val pdid = backStackEntry.arguments?.getString("pdid") ?: ""
+                DeviceDetailScreen(
+                    pdid = pdid,
+                    viewModel = liasViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(LiasScreen.Schedules.route) { SchedulesScreen(viewModel = liasViewModel) }
+            composable(LiasScreen.Rules.route) { RulesScreen(viewModel = liasViewModel) }
+            composable(LiasScreen.Settings.route) {
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    onNavigateToConnection = { navController.navigate("connection_settings") }
+                )
+            }
+            composable("connection_settings") {
+                ConnectionSettingsScreen(
+                    viewModel = settingsViewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }
