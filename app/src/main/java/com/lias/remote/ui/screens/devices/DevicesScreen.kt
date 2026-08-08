@@ -1,29 +1,65 @@
 // ====================================================================
 // File: DevicesScreen.kt
 // Version: 3.1.0 (HIG Redesign)
-// Purpose: Integrated PauseSheet and ExtendAccessSheet. Added Undo
-//          state hooks for tag assignments.
+// Purpose: Device inventory grouped by tags. Integrated PauseSheet,
+//          ExtendAccessSheet, and TagEditorSheet.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.*
+import com.lias.remote.ui.components.GroupedListCard
+import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetHeader
+import com.lias.remote.ui.components.HigSwipeRow
+import com.lias.remote.ui.components.HigTextButton
+import com.lias.remote.ui.components.ListSectionHeader
+import com.lias.remote.ui.components.SwipeAction
+import com.lias.remote.ui.screens.ExtendAccessSheet
+import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigSpec
 
 @Composable
@@ -140,5 +176,50 @@ fun DevicesScreen(
                 activeDeviceForPause = null
             }
         )
+    }
+}
+
+@Composable
+fun TagEditorSheet(initialTag: Tag?, onDismiss: () -> Unit, onSave: (Tag) -> Unit) {
+    var name by remember { mutableStateOf(initialTag?.name ?: "") }
+    var selectedColor by remember { mutableStateOf(initialTag?.color ?: "#0A84FF") }
+    val presetColors = listOf("#0A84FF", "#5856D6", "#FF9500", "#FF2D55", "#00C7BE", "#30D158", "#FFCC00", "#8E8E93")
+
+    HigModalSheet(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            HigSheetHeader(
+                title = if (initialTag == null) "New Tag" else "Edit Tag",
+                onCancel = onDismiss,
+                trailingAction = {
+                    HigTextButton(
+                        text = "Save",
+                        onClick = {
+                            val finalId = initialTag?.id ?: name.lowercase().replace(" ", "_")
+                            onSave(Tag(id = finalId, name = name, color = selectedColor, precedence = initialTag?.precedence ?: 50, builtin = initialTag?.builtin ?: false))
+                        }
+                    )
+                }
+            )
+
+            HigField(value = name, onValueChange = { name = it }, label = "Tag Name", placeholder = "e.g. Nursery")
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("BADGE COLOR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    presetColors.forEach { colorHex ->
+                        val isSelected = selectedColor.equals(colorHex, ignoreCase = true)
+                        val color = Color(android.graphics.Color.parseColor(colorHex))
+                        Box(
+                            modifier = Modifier.size(36.dp).clip(CircleShape).background(color)
+                                .then(if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.surface, CircleShape).border(4.dp, color, CircleShape) else Modifier)
+                                .clickable { selectedColor = colorHex }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
