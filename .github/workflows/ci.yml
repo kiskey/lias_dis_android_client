@@ -1,53 +1,95 @@
 # ====================================================================
 # File: .github/workflows/ci.yml
-# Version: 1.2.0
-# Audit Fixes:
-#   1. Updated Gradle wrapper generation to 8.10.2 to satisfy AGP 8.8.0
-#      minimum version requirement for Android compileSdk 36 build.
+# Version: 27.0.0
+#
+# Purpose:
+#   Reproducible Android verification.
+#
+# Batch 27:
+#   - Uses repository Gradle wrapper.
+#   - Does NOT regenerate wrapper during CI.
+#   - Verifies unit tests before APK assembly.
+#   - Runs lint.
+#   - Runs debug compilation explicitly.
+#   - Uploads debug APK only after all checks succeed.
 # ====================================================================
 
-name: CI
+name: Android CI
 
 on:
+  push:
+    branches:
+      - main
+
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  check:
-    name: Lint, Test, and Build Debug
+
+  verify:
+
+    name: Verify Android Client
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout Code
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      # Audit Fix (CI-1.2): Generate Gradle wrapper 8.10.2 for AGP 8.8.0 compatibility
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.10.2
-
-      - name: Make gradlew Executable
+      - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Run Lint
-        run: ./gradlew lintDebug
+      - name: Show toolchain
+        run: |
+          java -version
+          ./gradlew --version
 
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest
+      - name: Compile debug Kotlin
+        run: |
+          ./gradlew \
+            :app:compileDebugKotlin \
+            --stacktrace
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Run unit tests
+        run: |
+          ./gradlew \
+            :app:testDebugUnitTest \
+            --stacktrace
 
-      - name: Upload Debug APK Artifact
+      - name: Run Android lint
+        run: |
+          ./gradlew \
+            :app:lintDebug \
+            --stacktrace
+
+      - name: Assemble debug APK
+        run: |
+          ./gradlew \
+            :app:assembleDebug \
+            --stacktrace
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: lias-remote-debug-apk
+          name: lias-remote-debug
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
           retention-days: 7
