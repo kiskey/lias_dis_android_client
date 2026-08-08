@@ -1,8 +1,7 @@
 // ====================================================================
 // File: HigButton.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: Strict HIG button styles (Primary, Secondary, Gray, Danger)
-//          using CupertinoButton underlying engine. 10dp corners.
+// Version: 3.0.1 (HIG Redesign Fix)
+// Purpose: Removed invalid cornerRadius parameter from CupertinoButton.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -58,7 +57,6 @@ fun HigButton(
         onClick = onClick,
         enabled = enabled,
         colors = buttonColors,
-        cornerRadius = HigSpec.ButtonCorner,
         modifier = modifier
             .defaultMinSize(minHeight = 44.dp)
             .clip(RoundedCornerShape(HigSpec.ButtonCorner))
@@ -85,7 +83,6 @@ fun HigTextButton(
     CupertinoButton(
         onClick = onClick,
         colors = CupertinoButtonDefaults.plainButtonColors(contentColor = color),
-        cornerRadius = HigSpec.ButtonCorner,
         modifier = modifier
     ) {
         Text(
