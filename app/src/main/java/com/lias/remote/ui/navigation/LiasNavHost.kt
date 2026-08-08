@@ -108,7 +108,7 @@ fun LiasNavHost(
                 CupertinoTopAppBar(
                     title = { CupertinoText("LIAS Remote — HIG Redesign") }
                 )
-                // Global System Banner anchored dynamically when connecting or disconnected
+                // System Banner anchored dynamically when connecting or disconnected
                 if (uiState.connectionState != ConnectionState.CONNECTED) {
                     Box(
                         modifier = Modifier
