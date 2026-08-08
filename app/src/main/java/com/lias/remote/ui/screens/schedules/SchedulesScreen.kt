@@ -1,17 +1,16 @@
 // ====================================================================
 // File: SchedulesScreen.kt
-// Version: 3.0.0 (HIG Redesign)
-// Purpose: Schedule list with FAB. Strict HIG layout. Preserves
-//          Schedule API and conflict validation logic.
+// Version: 3.0.2 (HIG Redesign Fix)
+// Purpose: Added missing items import.
 // ====================================================================
 
-package com.lias.remote.ui.screens.schedules
+package com.lias.remote.ui.schedules
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -26,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
