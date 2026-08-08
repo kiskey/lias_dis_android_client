@@ -1,15 +1,21 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt
-// Version: 3.1.0
+// Version: 3.2.0
 // Audit Fixes:
-//   1. Added MoveTagSheet to let users switch/move devices between all tag groups.
-//   2. Added Cupertino HIG cancel 'X' swipe options and duplicate pause protection.
+//   1. Added missing Column and Spacer imports to resolve compileDebugKotlin failure.
+//   2. Retained MoveTagSheet, Cupertino HIG cancel 'X' swipe options, and duplicate pause guards.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -330,6 +336,7 @@ fun DevicesScreen(
             text = {
                 Column {
                     Text("Enter a new friendly name:")
+                    Spacer(modifier = Modifier.size(8.dp))
                     HigField(
                         value = newName,
                         onValueChange = { newName = it },
