@@ -150,7 +150,6 @@ fun DeviceDetailScreen(
                     GroupedListRow(primaryText = "Vendor", secondaryText = device.vendor.ifBlank { "Unknown" }, showDivider = true)
                     GroupedListRow(primaryText = "Type", secondaryText = device.deviceType.ifBlank { "Unclassified" }, showDivider = true)
                     
-                    // Assigned User Entity Mapping
                     GroupedListRow(
                         primaryText = "Assigned User",
                         secondaryText = assignedUser?.name ?: "Unassigned",
@@ -175,7 +174,7 @@ fun DeviceDetailScreen(
                 }
             }
 
-            // Timeline Activity Log Section
+            // Activity Log Section
             item { ListSectionHeader("Activity · Last 24h") }
             item {
                 GroupedListCard(modifier = Modifier.padding(horizontal = 16.dp)) {
