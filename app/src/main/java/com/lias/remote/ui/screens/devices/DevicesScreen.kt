@@ -103,7 +103,7 @@ fun DevicesScreen(
                             }
                         )
                     }
-                    items(devicesInTag.size, key = { idx -> devicesInTag[idx].pdid }) { index ->
+                    items(devicesInTag.size, key = { index -> devicesInTag[index].pdid }) { index ->
                         val device = devicesInTag[index]
                         val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
 
