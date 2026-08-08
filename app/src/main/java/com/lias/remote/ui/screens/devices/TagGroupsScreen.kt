@@ -1,9 +1,9 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagGroupsScreen.kt
-// Version: 3.0.0
+// Version: 3.1.0
 // Purpose: Expandable Tag Group view formatted with native iOS HIG inset surfaces.
 // Audit Fixes:
-//   1. Replaced Material 3 Card and AlertDialog with iOS Surface and HigAlertDialog.
+//   1. Maintained DeviceCard paused indicator pass-through.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
