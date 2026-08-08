@@ -1,22 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/repositories/EventRepository.kt
-// Version: 25.0.0
-//
-// Purpose:
-//   Canonical server-authoritative application repository.
-//
-// Batch 25:
-//   - start() is idempotent.
-//   - No duplicate SSE connect path.
-//   - Persisted SettingsRepository controls endpoint lifecycle.
-//   - Public refreshAll() for explicit UI refresh.
-//   - Authentication/serialization/network errors propagate into state.
-//   - Successful refresh clears stale repository error.
-//   - EffectiveStatus remains authoritative.
-//   - SSE replay reconnect behavior remains owned by LiasSseClient.
-//   - Removes emoji-as-status UI events.
-// ====================================================================
-
 package com.lias.remote.repositories
 
 import com.lias.remote.core.diagnostics.ErrorPresentation
@@ -29,6 +10,7 @@ import com.lias.remote.core.models.Policy
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.core.network.DeviceListResponse
@@ -56,6 +38,15 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 
+/**
+ * Canonical server-authoritative repository.
+ *
+ * Mutation ownership is split into focused files, all coordinated by
+ * [mutations].
+ *
+ * Bulk refreshes are revision-guarded so an older REST snapshot cannot
+ * overwrite a newer mutation or SSE-driven state change.
+ */
 class EventRepository(
     internal val api: LiasApiClient,
     private val sse: LiasSseClient,
@@ -67,8 +58,7 @@ class EventRepository(
             UiState()
         )
 
-    val state:
-        StateFlow<UiState> =
+    val state: StateFlow<UiState> =
         _state.asStateFlow()
 
     internal val _uiEvents =
@@ -77,9 +67,20 @@ class EventRepository(
             extraBufferCapacity = 64
         )
 
-    val uiEvents:
-        SharedFlow<UiEvent> =
+    val uiEvents: SharedFlow<UiEvent> =
         _uiEvents.asSharedFlow()
+
+    /**
+     * Shared serialization + revision authority used by:
+     *
+     * - PolicyScheduleMutations
+     * - TagMutations
+     * - GlobalControlMutations
+     * - TemporaryAccessRepository
+     * - EventRepositoryActions
+     */
+    internal val mutations =
+        MutationCoordinator()
 
     private val json =
         Json {
@@ -104,13 +105,6 @@ class EventRepository(
     private val recentToastMap =
         ConcurrentHashMap<String, Long>()
 
-    /**
-     * Repository startup is explicitly idempotent.
-     *
-     * Activity recreation, duplicated composable entry or repeated
-     * ViewModel initialization must never create multiple SSE/event
-     * collectors.
-     */
     fun start() {
 
         if (
@@ -131,13 +125,6 @@ class EventRepository(
         }
     }
 
-    /**
-     * Auth changes do not themselves decide whether a connection
-     * should exist. They simply update clients.
-     *
-     * LiasSseClient will cancel an active call when credentials change,
-     * causing its existing reconnect loop to reopen with the new token.
-     */
     private fun observeAuthentication() {
 
         scope.launch {
@@ -147,26 +134,25 @@ class EventRepository(
                 .collect {
                     token ->
 
-                    api.authToken =
+                    val normalized =
                         token
                             ?.trim()
                             ?.ifBlank {
                                 null
                             }
 
+                    api.authToken =
+                        normalized
+
                     sse.authToken =
-                        token
-                            ?.trim()
-                            ?.ifBlank {
-                                null
-                            }
+                        normalized
                 }
         }
     }
 
     /**
-     * Persisted server configuration is the sole authority for the
-     * existence of the live SSE connection.
+     * Persisted configuration is the sole authority deciding whether
+     * the live LIAS connection exists.
      */
     private fun observeServerConfiguration() {
 
@@ -204,20 +190,16 @@ class EventRepository(
                         return@collect
                     }
 
-                    /*
-                     * Setting baseUrl first is intentional:
-                     * Batch 23 LiasSseClient resets Last-Event-ID only
-                     * when the logical server actually changes.
-                     */
                     api.baseUrl =
                         url
 
+                    /*
+                     * Batch-23 LiasSseClient resets its replay cursor
+                     * only when this logical server actually changes.
+                     */
                     sse.baseUrl =
                         url
 
-                    /*
-                     * connect() itself safely replaces an old stream.
-                     */
                     sse.connect(
                         scope
                     )
@@ -254,10 +236,11 @@ class EventRepository(
     }
 
     /**
-     * Full authoritative REST synchronization.
+     * Complete authoritative synchronization from LIAS.
      *
-     * This is public because pull-to-refresh / retry UI should request a
-     * repository refresh without reaching into networking internals.
+     * A revision snapshot prevents this REST request from overwriting a
+     * mutation or SSE event that happens while the requests are in
+     * flight.
      */
     suspend fun refreshAll() {
 
@@ -267,6 +250,9 @@ class EventRepository(
         ) {
             return
         }
+
+        val snapshotRevision =
+            mutations.revision()
 
         coroutineScope {
 
@@ -305,6 +291,20 @@ class EventRepository(
                     )
                 }
 
+            /*
+             * Important:
+             * UiState contains users and DeviceDetail consumes them.
+             *
+             * Without loading USERS here, existing server users vanish
+             * after a fresh process start until one is locally created.
+             */
+            val usersDeferred =
+                async {
+                    api.get<List<User>>(
+                        Endpoints.USERS
+                    )
+                }
+
             val devicesResult =
                 devicesDeferred.await()
 
@@ -319,6 +319,17 @@ class EventRepository(
 
             val statsResult =
                 statsDeferred.await()
+
+            val usersResult =
+                usersDeferred.await()
+
+            if (
+                !mutations.snapshotIsCurrent(
+                    snapshotRevision
+                )
+            ) {
+                return@coroutineScope
+            }
 
             val current =
                 _state.value
@@ -364,13 +375,22 @@ class EventRepository(
                     ?.data
                     ?: current.stats
 
+            val loadedUsers =
+                (
+                    usersResult as?
+                        ApiResult.Success
+                    )
+                    ?.data
+                    ?: current.users
+
             val refreshFailure =
                 firstFailure(
                     devicesResult,
                     tagsResult,
                     policiesResult,
                     schedulesResult,
-                    statsResult
+                    statsResult,
+                    usersResult
                 )
 
             _state.value =
@@ -385,6 +405,8 @@ class EventRepository(
                         loadedSchedules,
                     stats =
                         loadedStats,
+                    users =
+                        loadedUsers,
                     isInitialLoaded =
                         true,
                     errorMessage =
@@ -399,9 +421,10 @@ class EventRepository(
                 )
 
             /*
-             * Effective status is intentionally a second phase:
-             * inventory appears quickly, while authoritative access
-             * state fills immediately afterward.
+             * EffectiveStatus is intentionally fetched after the
+             * inventory snapshot.
+             *
+             * Missing status never becomes fabricated Allow/Block.
              */
             val deviceStatuses =
                 linkedMapOf<
@@ -428,12 +451,8 @@ class EventRepository(
                         ] =
                             result.data
 
-                    else -> {
-                        /*
-                         * Do not fabricate access state.
-                         * Missing entry means "status unavailable".
-                         */
-                    }
+                    else ->
+                        Unit
                 }
             }
 
@@ -462,10 +481,21 @@ class EventRepository(
                         ] =
                             result.data
 
-                    else -> {
-                        // Same fail-closed presentation rule.
-                    }
+                    else ->
+                        Unit
                 }
+            }
+
+            /*
+             * A mutation may have happened during EffectiveStatus
+             * retrieval too.
+             */
+            if (
+                !mutations.snapshotIsCurrent(
+                    snapshotRevision
+                )
+            ) {
+                return@coroutineScope
             }
 
             _state.value =
@@ -479,8 +509,7 @@ class EventRepository(
     }
 
     private fun firstFailure(
-        vararg results:
-            ApiResult<*>
+        vararg results: ApiResult<*>
     ): ApiResult<*>? =
         results.firstOrNull {
             it !is
@@ -496,15 +525,9 @@ class EventRepository(
                 val now =
                     System.currentTimeMillis()
 
-                /*
-                 * Suppress noisy banners while the Batch-23 replay
-                 * cursor is recovering events after reconnect.
-                 */
                 val replayPhase =
-                    (
-                        now -
-                            lastSseConnectedTime
-                        ) <
+                    now -
+                        lastSseConnectedTime <
                         REPLAY_QUIET_PERIOD_MS
 
                 val toastKey =
@@ -517,15 +540,24 @@ class EventRepository(
                         ?: 0L
 
                 val duplicateToast =
-                    (
-                        now -
-                            previousToast
-                        ) <
+                    now -
+                        previousToast <
                         TOAST_DEDUP_WINDOW_MS
 
                 val mayNotify =
                     !replayPhase &&
                         !duplicateToast
+
+                /*
+                 * Every meaningful server event invalidates REST
+                 * snapshots that may currently be in flight.
+                 */
+                if (
+                    event.type !=
+                    EventConstants.PING
+                ) {
+                    mutations.markExternalChange()
+                }
 
                 when (
                     event.type
@@ -586,6 +618,7 @@ class EventRepository(
                                         } catch (
                                             _: Exception
                                         ) {
+
                                             emptyList()
                                         }
                                     }
@@ -593,8 +626,7 @@ class EventRepository(
 
                             val message =
                                 if (
-                                    confirmedBy
-                                        .isEmpty()
+                                    confirmedBy.isEmpty()
                                 ) {
 
                                     "Device is online"
@@ -635,24 +667,18 @@ class EventRepository(
                         }
                     }
 
-                    EventConstants.EFFECTIVE_STATUS_CHANGED -> {
+                    EventConstants.EFFECTIVE_STATUS_CHANGED ->
 
-                        /*
-                         * Policy/schedule/extension changes can affect
-                         * multiple targets because precedence is global.
-                         */
                         refreshAll()
-                    }
 
                     EventConstants.HOSTNAME_CHANGED,
                     EventConstants.FINGERPRINT_UPDATED,
                     EventConstants.IP_CHANGED,
-                    EventConstants.MAC_CHANGED -> {
+                    EventConstants.MAC_CHANGED ->
 
                         refreshSingleDevice(
                             event.deviceID
                         )
-                    }
 
                     EventConstants.DEVICE_REMOVED -> {
 
@@ -690,6 +716,7 @@ class EventRepository(
                                     } catch (
                                         _: Exception
                                     ) {
+
                                         null
                                     }
                                 }
@@ -754,6 +781,7 @@ class EventRepository(
                                     } catch (
                                         _: Exception
                                     ) {
+
                                         null
                                     }
                                 }
@@ -773,9 +801,8 @@ class EventRepository(
                         )
                     }
 
-                    EventConstants.PING -> {
-                        // Heartbeat only.
-                    }
+                    EventConstants.PING ->
+                        Unit
                 }
             }
     }
@@ -798,54 +825,55 @@ class EventRepository(
             )
 
         if (
-            deviceResult is
+            deviceResult !is
             ApiResult.Success
         ) {
+            return
+        }
 
-            val updated =
-                deviceResult.data
+        val updated =
+            deviceResult.data
 
-            val devices =
-                _state.value
-                    .devices
-                    .toMutableList()
+        val devices =
+            _state.value
+                .devices
+                .toMutableList()
 
-            val index =
-                devices.indexOfFirst {
-                    it.pdid ==
-                        pdid
-                }
-
-            if (
-                index >=
-                0
-            ) {
-
-                devices[
-                    index
-                ] =
-                    updated
-
-            } else {
-
-                devices.add(
-                    updated
-                )
+        val index =
+            devices.indexOfFirst {
+                it.pdid ==
+                    pdid
             }
 
-            var statuses =
-                _state.value
-                    .deviceEffectiveStatuses
+        if (
+            index >=
+            0
+        ) {
 
+            devices[
+                index
+            ] =
+                updated
+
+        } else {
+
+            devices.add(
+                updated
+            )
+        }
+
+        var statuses =
+            _state.value
+                .deviceEffectiveStatuses
+
+        when (
             val statusResult =
                 api.getDeviceEffectiveStatus(
                     pdid
                 )
+        ) {
 
-            if (
-                statusResult is
-                ApiResult.Success
-            ) {
+            is ApiResult.Success ->
 
                 statuses =
                     statuses +
@@ -853,16 +881,88 @@ class EventRepository(
                             pdid to
                                 statusResult.data
                             )
-            }
 
-            _state.value =
-                _state.value.copy(
-                    devices =
-                        devices,
-                    deviceEffectiveStatuses =
-                        statuses
-                )
+            else ->
+                Unit
         }
+
+        _state.value =
+            _state.value.copy(
+                devices =
+                    devices,
+                deviceEffectiveStatuses =
+                    statuses
+            )
+    }
+
+    /**
+     * Canonical local upsert helpers used only after successful server
+     * mutations.
+     */
+    internal fun upsertPolicy(
+        policy: Policy
+    ) {
+
+        val current =
+            _state.value
+
+        _state.value =
+            current.copy(
+                policies =
+                    current.policies
+                        .filterNot {
+                            it.id ==
+                                policy.id
+                        } +
+                        policy
+            )
+    }
+
+    internal fun upsertSchedule(
+        schedule: Schedule
+    ) {
+
+        val current =
+            _state.value
+
+        _state.value =
+            current.copy(
+                schedules =
+                    current.schedules
+                        .filterNot {
+                            it.id ==
+                                schedule.id
+                        } +
+                        schedule
+            )
+    }
+
+    internal fun upsertTag(
+        tag: Tag
+    ) {
+
+        val current =
+            _state.value
+
+        _state.value =
+            current.copy(
+                tags =
+                    current.tags
+                        .filterNot {
+                            it.id ==
+                                tag.id
+                        } +
+                        tag
+            )
+    }
+
+    internal suspend fun emitUiEvent(
+        event: UiEvent
+    ) {
+
+        _uiEvents.emit(
+            event
+        )
     }
 
     companion object {
