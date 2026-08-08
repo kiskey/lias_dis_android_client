@@ -19,7 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawRect // Explicit drawRect extension function import
+import androidx.compose.ui.graphics.drawscope.drawRect // Explicit extension import required for Canvas drawing
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
