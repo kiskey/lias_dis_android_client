@@ -51,10 +51,7 @@ import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoButton
 import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.ChevronRight
 
 @Composable
 fun DevicesScreen(
@@ -228,11 +225,10 @@ private fun DeviceCardItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action row: Infrastructure devices are Immune (NO pause/extend buttons)
+            // Action row: Infrastructure devices have NO pause/extend buttons
             if (!isInfra) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (isBlockedOrPaused) {
-                        // Extend option valid ONLY if blocked or paused
                         HigButton(text = "⏱ Extend", onClick = onExtend, style = HigButtonStyle.Secondary, modifier = Modifier.weight(1f))
                     } else {
                         HigButton(text = "⏸ Pause", onClick = onPause, style = HigButtonStyle.Gray, modifier = Modifier.weight(1f))
