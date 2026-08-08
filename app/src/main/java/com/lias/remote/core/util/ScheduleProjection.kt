@@ -1,47 +1,100 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/util/ScheduleProjection.kt
-// Version: 1.2.0
-// Audit Fixes:
-//   1. Added expandDayRange helper method for continuous day range rule parsing.
-//   2. Updated projection engine to use `schedule.safeRules` and `rule.safeDays`
-//      to eliminate Kotlin nullable receiver compilation errors.
+// Version: 8.0.0
+//
+// Purpose:
+//   Android-side projection of LIAS schedule rules onto a seven-day
+//   minute-of-week timeline.
+//
+// Contract:
+//   Mirrors apps/lias/internal/scheduleconflict/conflict.go.
+//
+// Important:
+//   This is a preview / preflight engine.
+//
+//   The LIAS backend remains authoritative for:
+//     - final validation
+//     - schedule persistence
+//     - policy bundle validation
+//     - enforcement
+//
+// Semantics:
+//   - Sunday = day index 0, matching Go time.Weekday.
+//   - Same-day rule: one segment.
+//   - Overnight rule: two segments.
+//   - Identical start/end: no projected segment; validation rejects it.
+//   - Invalid times/days are ignored here because ScheduleValidation
+//     reports them separately to the editor.
 // ====================================================================
 
 package com.lias.remote.core.util
 
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
-import com.lias.remote.core.models.ScheduleRule
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.util.Locale
 
 object ScheduleProjection {
 
-    private val dayToIndex = mapOf(
-        "sun" to 0, "sunday" to 0,
-        "mon" to 1, "monday" to 1,
-        "tue" to 2, "tuesday" to 2,
-        "wed" to 3, "wednesday" to 3,
-        "thu" to 4, "thursday" to 4,
-        "fri" to 5, "friday" to 5,
-        "sat" to 6, "saturday" to 6
-    )
+    const val MINUTES_PER_DAY =
+        1_440
 
-    private val dayNames = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
-    val daysOrder = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+    const val MINUTES_PER_WEEK =
+        10_080
 
-    fun expandDayRange(fromDay: String, toDay: String): List<String> {
-        val startIdx = daysOrder.indexOf(fromDay.lowercase().trim().take(3))
-        val endIdx = daysOrder.indexOf(toDay.lowercase().trim().take(3))
-        if (startIdx == -1 || endIdx == -1) return listOf(fromDay)
+    val daysOrder =
+        listOf(
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri",
+            "sat",
+            "sun"
+        )
 
-        val result = mutableListOf<String>()
-        var curr = startIdx
-        while (true) {
-            result.add(daysOrder[curr])
-            if (curr == endIdx) break
-            curr = (curr + 1) % 7
-        }
-        return result
-    }
+    private val dayToIndex =
+        mapOf(
+            "sun" to 0,
+            "sunday" to 0,
+
+            "mon" to 1,
+            "monday" to 1,
+
+            "tue" to 2,
+            "tuesday" to 2,
+
+            "wed" to 3,
+            "wednesday" to 3,
+
+            "thu" to 4,
+            "thursday" to 4,
+
+            "fri" to 5,
+            "friday" to 5,
+
+            "sat" to 6,
+            "saturday" to 6
+        )
+
+    private val fullDayNames =
+        listOf(
+            "sunday",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday"
+        )
+
+    private val strictTimeFormatter =
+        DateTimeFormatter.ofPattern(
+            "HH:mm",
+            Locale.US
+        )
 
     data class Segment(
         val start: Int,
@@ -52,85 +105,492 @@ object ScheduleProjection {
         val ruleIdx: Int
     )
 
-    private fun parseTime(timeStr: String): Int {
-        val parts = timeStr.split(":")
-        return if (parts.size == 2) {
-            (parts[0].toIntOrNull() ?: 0) * 60 + (parts[1].toIntOrNull() ?: 0)
-        } else 0
-    }
+    fun expandDayRange(
+        fromDay: String,
+        toDay: String
+    ): List<String> {
+        val from =
+            normalizeDay(fromDay)
 
-    private fun formatMinuteOfWeek(m: Int): Pair<String, String> {
-        val mod = ((m % 10080) + 10080) % 10080
-        val dayIdx = mod / 1440
-        val minOfDay = mod % 1440
-        val hh = String.format("%02d", minOfDay / 60)
-        val mm = String.format("%02d", minOfDay % 60)
-        return dayNames[dayIdx] to "$hh:$mm"
-    }
+        val to =
+            normalizeDay(toDay)
 
-    fun projectSchedule(schedule: Schedule): List<Segment> {
-        val segments = mutableListOf<Segment>()
-        
-        schedule.safeRules.forEachIndexed { ruleIdx, rule ->
-            val startMin = parseTime(rule.startTime)
-            val endMin = parseTime(rule.endTime)
-            if (startMin == endMin) return@forEachIndexed
+        val startIndex =
+            daysOrder.indexOf(
+                from
+            )
 
-            rule.safeDays.forEach { dStr ->
-                val dayIdx = dayToIndex[dStr.lowercase().trim()] ?: return@forEach
-                
-                if (startMin < endMin) {
-                    segments.add(Segment(dayIdx * 1440 + startMin, dayIdx * 1440 + endMin, rule.action, schedule.id, schedule.name, ruleIdx))
-                } else {
-                    // Overnight wrap
-                    segments.add(Segment(dayIdx * 1440 + startMin, (dayIdx + 1) * 1440, rule.action, schedule.id, schedule.name, ruleIdx))
-                    val nextDayIdx = (dayIdx + 1) % 7
-                    segments.add(Segment(nextDayIdx * 1440, nextDayIdx * 1440 + endMin, rule.action, schedule.id, schedule.name, ruleIdx))
-                }
-            }
+        val endIndex =
+            daysOrder.indexOf(
+                to
+            )
+
+        if (
+            startIndex < 0 ||
+            endIndex < 0
+        ) {
+            return listOf(
+                fromDay
+            )
         }
-        return segments
+
+        val result =
+            mutableListOf<String>()
+
+        var current =
+            startIndex
+
+        while (true) {
+            result.add(
+                daysOrder[current]
+            )
+
+            if (
+                current ==
+                endIndex
+            ) {
+                break
+            }
+
+            current =
+                (
+                    current + 1
+                    ) % 7
+        }
+
+        return result
     }
 
-    fun detectConflicts(schedules: List<Schedule>): List<Conflict> {
-        if (schedules.isEmpty()) return emptyList()
+    fun projectSchedule(
+        schedule: Schedule
+    ): List<Segment> {
+        val segments =
+            mutableListOf<Segment>()
 
-        val allSegments = schedules.flatMap { projectSchedule(it) }.sortedBy { it.start }
-        val conflicts = mutableListOf<Conflict>()
-        val seen = mutableSetOf<String>()
+        schedule.safeRules
+            .forEachIndexed { ruleIndex, rule ->
 
-        for (i in allSegments.indices) {
-            for (j in i + 1 until allSegments.size) {
-                if (allSegments[j].start >= allSegments[i].end) break
+                val startMinute =
+                    parseTime(
+                        rule.startTime
+                    )
+                        ?: return@forEachIndexed
 
-                val overlapStart = maxOf(allSegments[i].start, allSegments[j].start)
-                val overlapEnd = minOf(allSegments[i].end, allSegments[j].end)
+                val endMinute =
+                    parseTime(
+                        rule.endTime
+                    )
+                        ?: return@forEachIndexed
 
-                if (overlapStart < overlapEnd && allSegments[i].action != allSegments[j].action) {
-                    if (allSegments[i].scheduleId != allSegments[j].scheduleId || allSegments[i].ruleIdx != allSegments[j].ruleIdx) {
-                        val (startDay, startTime) = formatMinuteOfWeek(overlapStart)
-                        val (_, endTime) = formatMinuteOfWeek(overlapEnd)
+                if (
+                    startMinute ==
+                    endMinute
+                ) {
+                    return@forEachIndexed
+                }
 
-                        val key = "${allSegments[i].scheduleId}|${allSegments[j].scheduleId}|$startDay|$startTime|$endTime"
-                        if (seen.add(key)) {
-                            conflicts.add(
-                                Conflict(
-                                    scheduleAID = allSegments[i].scheduleId,
-                                    scheduleAName = allSegments[i].scheduleName,
-                                    scheduleBID = allSegments[j].scheduleId,
-                                    scheduleBName = allSegments[j].scheduleName,
-                                    day = startDay,
-                                    overlapStart = startTime,
-                                    overlapEnd = endTime,
-                                    actionA = allSegments[i].action,
-                                    actionB = allSegments[j].action
+                rule.safeDays
+                    .forEach { rawDay ->
+
+                        val dayIndex =
+                            dayToIndex[
+                                rawDay
+                                    .trim()
+                                    .lowercase()
+                            ]
+                                ?: return@forEach
+
+                        if (
+                            startMinute <
+                            endMinute
+                        ) {
+
+                            segments.add(
+                                Segment(
+                                    start =
+                                        dayIndex *
+                                            MINUTES_PER_DAY +
+                                            startMinute,
+
+                                    end =
+                                        dayIndex *
+                                            MINUTES_PER_DAY +
+                                            endMinute,
+
+                                    action =
+                                        normalizeAction(
+                                            rule.action
+                                        ),
+
+                                    scheduleId =
+                                        schedule.id,
+
+                                    scheduleName =
+                                        schedule.name,
+
+                                    ruleIdx =
+                                        ruleIndex
+                                )
+                            )
+
+                        } else {
+
+                            /*
+                             * Overnight rule.
+                             *
+                             * Example:
+                             *   Sat 22:00 -> 06:00
+                             *
+                             * becomes:
+                             *   Sat 22:00 -> Sun 00:00
+                             *   Sun 00:00 -> Sun 06:00
+                             */
+                            segments.add(
+                                Segment(
+                                    start =
+                                        dayIndex *
+                                            MINUTES_PER_DAY +
+                                            startMinute,
+
+                                    end =
+                                        (
+                                            dayIndex + 1
+                                            ) *
+                                            MINUTES_PER_DAY,
+
+                                    action =
+                                        normalizeAction(
+                                            rule.action
+                                        ),
+
+                                    scheduleId =
+                                        schedule.id,
+
+                                    scheduleName =
+                                        schedule.name,
+
+                                    ruleIdx =
+                                        ruleIndex
+                                )
+                            )
+
+                            val nextDayIndex =
+                                (
+                                    dayIndex + 1
+                                    ) % 7
+
+                            segments.add(
+                                Segment(
+                                    start =
+                                        nextDayIndex *
+                                            MINUTES_PER_DAY,
+
+                                    end =
+                                        nextDayIndex *
+                                            MINUTES_PER_DAY +
+                                            endMinute,
+
+                                    action =
+                                        normalizeAction(
+                                            rule.action
+                                        ),
+
+                                    scheduleId =
+                                        schedule.id,
+
+                                    scheduleName =
+                                        schedule.name,
+
+                                    ruleIdx =
+                                        ruleIndex
                                 )
                             )
                         }
                     }
+            }
+
+        return segments
+    }
+
+    fun detectConflicts(
+        schedules: List<Schedule>
+    ): List<Conflict> {
+        if (
+            schedules.isEmpty()
+        ) {
+            return emptyList()
+        }
+
+        val segments =
+            schedules
+                .flatMap {
+                    projectSchedule(it)
+                }
+                .sortedWith(
+                    compareBy<Segment> {
+                        it.start
+                    }.thenBy {
+                        it.end
+                    }
+                )
+
+        val conflicts =
+            mutableListOf<Conflict>()
+
+        val seen =
+            mutableSetOf<String>()
+
+        for (
+            firstIndex
+            in segments.indices
+        ) {
+
+            for (
+                secondIndex
+                in firstIndex + 1
+                until segments.size
+            ) {
+
+                val first =
+                    segments[
+                        firstIndex
+                    ]
+
+                val second =
+                    segments[
+                        secondIndex
+                    ]
+
+                if (
+                    second.start >=
+                    first.end
+                ) {
+                    break
+                }
+
+                val overlapStart =
+                    maxOf(
+                        first.start,
+                        second.start
+                    )
+
+                val overlapEnd =
+                    minOf(
+                        first.end,
+                        second.end
+                    )
+
+                if (
+                    overlapStart >=
+                    overlapEnd
+                ) {
+                    continue
+                }
+
+                if (
+                    first.action ==
+                    second.action
+                ) {
+                    continue
+                }
+
+                /*
+                 * Match backend behavior:
+                 *
+                 * A contradiction is ignored only when both projected
+                 * segments originate from the exact same source rule.
+                 */
+                if (
+                    first.scheduleId ==
+                        second.scheduleId &&
+                    first.ruleIdx ==
+                        second.ruleIdx
+                ) {
+                    continue
+                }
+
+                val (
+                    day,
+                    startTime
+                    ) =
+                    formatMinuteOfWeek(
+                        overlapStart
+                    )
+
+                val (_, endTime) =
+                    formatMinuteOfWeek(
+                        overlapEnd
+                    )
+
+                val key =
+                    buildString {
+                        append(
+                            first.scheduleId
+                        )
+                        append('|')
+
+                        append(
+                            second.scheduleId
+                        )
+                        append('|')
+
+                        append(day)
+                        append('|')
+
+                        append(startTime)
+                        append('|')
+
+                        append(endTime)
+                    }
+
+                if (
+                    seen.add(key)
+                ) {
+                    conflicts.add(
+                        Conflict(
+                            scheduleAID =
+                                first.scheduleId,
+
+                            scheduleAName =
+                                first.scheduleName,
+
+                            scheduleBID =
+                                second.scheduleId,
+
+                            scheduleBName =
+                                second.scheduleName,
+
+                            day =
+                                day,
+
+                            overlapStart =
+                                startTime,
+
+                            overlapEnd =
+                                endTime,
+
+                            actionA =
+                                first.action,
+
+                            actionB =
+                                second.action
+                        )
+                    )
                 }
             }
         }
+
         return conflicts
     }
+
+    fun hasMixedTimezones(
+        schedules: List<Schedule>
+    ): Boolean =
+        schedules
+            .map {
+                it.timezone.trim()
+            }
+            .filter {
+                it.isNotBlank()
+            }
+            .distinct()
+            .size > 1
+
+    fun normalizeDay(
+        day: String
+    ): String =
+        when (
+            day
+                .trim()
+                .lowercase()
+        ) {
+            "monday", "mon" ->
+                "mon"
+
+            "tuesday", "tue" ->
+                "tue"
+
+            "wednesday", "wed" ->
+                "wed"
+
+            "thursday", "thu" ->
+                "thu"
+
+            "friday", "fri" ->
+                "fri"
+
+            "saturday", "sat" ->
+                "sat"
+
+            "sunday", "sun" ->
+                "sun"
+
+            else ->
+                day
+                    .trim()
+                    .lowercase()
+        }
+
+    private fun parseTime(
+        value: String
+    ): Int? =
+        try {
+            val time =
+                LocalTime.parse(
+                    value.trim(),
+                    strictTimeFormatter
+                )
+
+            time.hour * 60 +
+                time.minute
+
+        } catch (
+            _: DateTimeParseException
+        ) {
+            null
+        }
+
+    private fun formatMinuteOfWeek(
+        minuteOfWeek: Int
+    ): Pair<String, String> {
+        val normalized =
+            (
+                (
+                    minuteOfWeek %
+                        MINUTES_PER_WEEK
+                    ) +
+                    MINUTES_PER_WEEK
+                ) %
+                MINUTES_PER_WEEK
+
+        val dayIndex =
+            normalized /
+                MINUTES_PER_DAY
+
+        val minuteOfDay =
+            normalized %
+                MINUTES_PER_DAY
+
+        val hour =
+            minuteOfDay / 60
+
+        val minute =
+            minuteOfDay % 60
+
+        return fullDayNames[
+            dayIndex
+        ] to String.format(
+            Locale.US,
+            "%02d:%02d",
+            hour,
+            minute
+        )
+    }
+
+    private fun normalizeAction(
+        action: String
+    ): String =
+        action
+            .trim()
+            .lowercase()
 }
