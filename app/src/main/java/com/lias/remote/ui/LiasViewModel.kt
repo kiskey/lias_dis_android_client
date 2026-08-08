@@ -1,8 +1,7 @@
 // ====================================================================
 // File: LiasViewModel.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Integrated UndoState, SecurityAlert state, and Variable
-//          Pause using existing POST /policies contract.
+// Version: 3.0.2 (HIG Redesign Fix)
+// Purpose: Added missing imports for tag repository extensions.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -19,6 +18,7 @@ import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.cancelDeviceExtension
+import com.lias.remote.repositories.createTag
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
@@ -97,7 +97,6 @@ class LiasViewModel(
         }
     }
 
-    // NEW: Variable Pause using existing Policy API
     fun pauseDeviceInternet(pdid: String, minutes: Int) {
         viewModelScope.launch {
             val expiresAt = Instant.now().plusSeconds(minutes * 60L).toString()
