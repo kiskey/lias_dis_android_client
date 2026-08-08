@@ -1,6 +1,6 @@
 // ====================================================================
 // File: DeviceDetailScreen.kt
-// Version: 3.0.0 (HIG Redesign)
+// Version: 3.1.0 (HIG Redesign)
 // Purpose: Device specifics. Sticky action bar. Grouped identity cards.
 //          Preserves all /logs and /effective-status API calls.
 // ====================================================================
@@ -39,10 +39,12 @@ import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigLargeTitleScaffold
+import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
-import com.lias.remote.ui.components.MinutePickerSheet
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
+import com.lias.remote.ui.screens.ExtendAccessSheet
+import com.lias.remote.ui.screens.PauseSheet
 
 @Composable
 fun DeviceDetailScreen(
@@ -57,6 +59,7 @@ fun DeviceDetailScreen(
     var logs by remember { mutableStateOf<List<FlowLog>>(emptyList()) }
     var isLoadingLogs by remember { mutableStateOf(true) }
     var showExtendSheet by remember { mutableStateOf(false) }
+    var showPauseSheet by remember { mutableStateOf(false) }
 
     val isPaused = state.policies.any { it.id == "pol_pause_${device.pdid}" }
 
@@ -69,9 +72,7 @@ fun DeviceDetailScreen(
     HigLargeTitleScaffold(
         title = "",
         scrollState = scrollState,
-        navLeading = { 
-            HigTextButton(text = "‹ Devices", onClick = onBack) 
-        }
+        navLeading = { HigTextButton(text = "‹ Devices", onClick = onBack) }
     ) { padding ->
         LazyColumn(
             state = scrollState,
@@ -101,14 +102,14 @@ fun DeviceDetailScreen(
                         if (isPaused) {
                             HigButton(
                                 text = "Resume Internet",
-                                onClick = { viewModel.unpauseInternet(device.pdid) },
+                                onClick = { viewModel.unpauseDeviceInternet(device.pdid) },
                                 style = HigButtonStyle.Primary,
                                 modifier = Modifier.weight(1f)
                             )
                         } else {
                             HigButton(
-                                text = "Pause (1h)",
-                                onClick = { viewModel.pauseInternet(device.pdid) },
+                                text = "Pause",
+                                onClick = { showPauseSheet = true },
                                 style = HigButtonStyle.Secondary,
                                 modifier = Modifier.weight(1f)
                             )
@@ -161,12 +162,29 @@ fun DeviceDetailScreen(
     }
 
     if (showExtendSheet) {
-        MinutePickerSheet(
+        val status = viewModel.effectiveStatusFor(device.pdid)
+        ExtendAccessSheet(
             targetLabel = device.displayName,
+            targetSubtitle = device.currentIP.ifBlank { device.pdid },
+            currentExtension = status.activeExtension,
             onDismiss = { showExtendSheet = false },
-            onConfirm = { minutes ->
-                viewModel.extendDeviceAccess(device.pdid, minutes)
+            onConfirm = { mins ->
+                viewModel.extendDeviceAccess(device.pdid, mins)
                 showExtendSheet = false
+            },
+            onCancelExtension = if (status.activeExtension != null) {
+                { viewModel.cancelDeviceExtension(device.pdid); showExtendSheet = false }
+            } else null
+        )
+    }
+
+    if (showPauseSheet) {
+        PauseSheet(
+            targetLabel = device.displayName,
+            onDismiss = { showPauseSheet = false },
+            onConfirm = { mins ->
+                viewModel.pauseDeviceInternet(device.pdid, mins)
+                showPauseSheet = false
             }
         )
     }
