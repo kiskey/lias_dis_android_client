@@ -1,30 +1,28 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt
-// Version: 2.0.0
+// Version: 13.0.0
 //
 // Purpose:
-//   Production-oriented Server-Sent Events client for LIAS Remote.
+//   Lifecycle-aware, replay-safe LIAS Server-Sent Events transport.
 //
-// Contract:
-//   Mirrors the LIAS backend StreamEvents implementation.
-//
-// Audit / Stability Changes:
-//   1. Correctly preserves Last-Event-ID replay semantics.
-//   2. Parses SSE id separately from payload.
-//   3. Converts the backend nanosecond event ID into the LiasEvent
-//      timestamp field when possible.
-//   4. Supports multi-line SSE data fields.
-//   5. Ignores SSE comments/heartbeats safely.
-//   6. Resets event framing state after each dispatched event.
-//   7. Avoids reconnecting indefinitely on a clean client disconnect.
-//   8. Preserves the existing exponential reconnect strategy.
-//   9. Treats HTTP failures as reconnectable while exposing the
-//      connection state to the UI.
+// Corrections:
+//   - connect() is idempotent.
+//   - Authentication changes force a new HTTP stream.
+//   - Server changes clear Last-Event-ID.
+//   - Foreground/background disconnect preserves replay position.
+//   - Network-loss disconnect preserves replay position.
+//   - Successful SSE handshakes reset exponential backoff.
+//   - Last-Event-ID is maintained per LIAS server.
+//   - Duplicate event IDs are suppressed defensively.
+//   - Correct multiline SSE data parsing.
+//   - Stale cancelled jobs cannot overwrite the current state.
 // ====================================================================
 
 package com.lias.remote.core.network
 
 import com.lias.remote.core.models.LiasEvent
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,25 +48,19 @@ class LiasSseClient(
     private val client: OkHttpClient
 ) {
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-    }
-
-    @Volatile
-    var baseUrl: String = "http://127.0.0.1:8081"
-
-    @Volatile
-    var authToken: String? = null
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+        }
 
     private val _events =
         MutableSharedFlow<LiasEvent>(
             replay = 0,
-            extraBufferCapacity = 128
+            extraBufferCapacity = 256
         )
 
-    val events: SharedFlow<LiasEvent> =
+    val events:
+        SharedFlow<LiasEvent> =
         _events.asSharedFlow()
 
     private val _connectionState =
@@ -76,116 +68,391 @@ class LiasSseClient(
             ConnectionState.DISCONNECTED
         )
 
-    val connectionState: StateFlow<ConnectionState> =
+    val connectionState:
+        StateFlow<ConnectionState> =
         _connectionState.asStateFlow()
 
-    @Volatile
-    private var sseJob: Job? = null
+    private val _lastError =
+        MutableStateFlow<String?>(
+            null
+        )
+
+    val lastError:
+        StateFlow<String?> =
+        _lastError.asStateFlow()
+
+    private val lock =
+        Any()
 
     @Volatile
-    private var activeCall: Call? = null
+    private var configuredBaseUrl:
+        String = ""
 
-    /**
-     * Backend event IDs are Unix nanoseconds.
-     *
-     * Long is sufficient for the timestamp range used by the backend.
+    @Volatile
+    private var configuredAuthToken:
+        String? = null
+
+    @Volatile
+    private var desiredConnected:
+        Boolean = false
+
+    @Volatile
+    private var networkAvailable:
+        Boolean = true
+
+    private var sseJob:
+        Job? = null
+
+    @Volatile
+    private var activeCall:
+        Call? = null
+
+    /*
+     * LIAS event IDs are Unix nanoseconds and fit inside signed Long.
      */
-    @Volatile
-    private var lastEventId: Long = 0L
+    private val lastEventId =
+        AtomicLong(
+            0L
+        )
 
-    fun connect(scope: CoroutineScope) {
-        disconnect()
+    private val lastDeliveredEventId =
+        AtomicLong(
+            0L
+        )
 
-        sseJob = scope.launch(Dispatchers.IO) {
-            var backoff = INITIAL_BACKOFF_MS
+    /*
+     * Incremented for every transport replacement. An older cancelled
+     * coroutine is therefore unable to publish final DISCONNECTED state
+     * over a newer active stream.
+     */
+    private val generation =
+        AtomicLong(
+            0L
+        )
 
-            while (isActive) {
-                try {
-                    _connectionState.value =
-                        if (backoff == INITIAL_BACKOFF_MS) {
-                            ConnectionState.CONNECTING
-                        } else {
-                            ConnectionState.RECONNECTING
-                        }
+    fun configure(
+        baseUrl: String,
+        authToken: String?
+    ) {
+        val normalizedUrl =
+            normalizeUrl(
+                baseUrl
+            )
 
-                    consumeSseStream()
-
-                    // A stream ending normally is treated as a
-                    // reconnect condition unless the coroutine was
-                    // cancelled.
-                    if (isActive) {
-                        _connectionState.value =
-                            ConnectionState.RECONNECTING
-
-                        delay(backoff)
-
-                        backoff =
-                            (backoff * 2L)
-                                .coerceAtMost(MAX_BACKOFF_MS)
-                    }
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (_: Exception) {
-                    if (!isActive) {
-                        break
-                    }
-
-                    _connectionState.value =
-                        ConnectionState.RECONNECTING
-
-                    delay(backoff)
-
-                    backoff =
-                        (backoff * 2L)
-                            .coerceAtMost(MAX_BACKOFF_MS)
+        val normalizedToken =
+            authToken
+                ?.trim()
+                ?.takeIf {
+                    it.isNotBlank()
                 }
+
+        val serverChanged:
+            Boolean
+
+        val credentialChanged:
+            Boolean
+
+        synchronized(lock) {
+
+            serverChanged =
+                normalizedUrl !=
+                    configuredBaseUrl
+
+            credentialChanged =
+                normalizedToken !=
+                    configuredAuthToken
+
+            configuredBaseUrl =
+                normalizedUrl
+
+            configuredAuthToken =
+                normalizedToken
+
+            if (serverChanged) {
+                /*
+                 * Replay IDs are meaningful only for the server that
+                 * issued them.
+                 */
+                lastEventId.set(
+                    0L
+                )
+
+                lastDeliveredEventId.set(
+                    0L
+                )
             }
-
-            _connectionState.value =
-                ConnectionState.DISCONNECTED
-        }
-    }
-
-    fun disconnect() {
-        activeCall?.cancel()
-        activeCall = null
-
-        sseJob?.cancel()
-        sseJob = null
-
-        _connectionState.value =
-            ConnectionState.DISCONNECTED
-    }
-
-    private fun normalizeUrl(raw: String): String {
-        var url = raw.trim()
-
-        if (url.isBlank()) {
-            return ""
         }
 
         if (
-            !url.startsWith("http://") &&
-            !url.startsWith("https://")
+            serverChanged ||
+            credentialChanged
         ) {
-            url = "http://$url"
+            restartIfDesired()
         }
-
-        return url.trimEnd('/')
     }
 
-    private suspend fun consumeSseStream() {
-        val sanitizedBase =
-            normalizeUrl(baseUrl)
-
-        require(sanitizedBase.isNotBlank()) {
-            "LIAS server URL is not configured."
+    fun setNetworkAvailable(
+        available: Boolean
+    ) {
+        if (
+            networkAvailable ==
+            available
+        ) {
+            return
         }
 
-        val requestBuilder =
+        networkAvailable =
+            available
+
+        if (available) {
+            restartIfDesired()
+        } else {
+            cancelActiveTransport(
+                publishDisconnected =
+                    true
+            )
+        }
+    }
+
+    fun connect(
+        scope: CoroutineScope
+    ) {
+        desiredConnected =
+            true
+
+        startIfNeeded(
+            scope
+        )
+    }
+
+    fun disconnect(
+        preserveReplayPosition: Boolean =
+            true
+    ) {
+        desiredConnected =
+            false
+
+        cancelActiveTransport(
+            publishDisconnected =
+                true
+        )
+
+        if (
+            !preserveReplayPosition
+        ) {
+            clearReplayPosition()
+        }
+    }
+
+    fun reconnect(
+        scope: CoroutineScope,
+        preserveReplayPosition: Boolean =
+            true
+    ) {
+        desiredConnected =
+            true
+
+        cancelActiveTransport(
+            publishDisconnected =
+                false
+        )
+
+        if (
+            !preserveReplayPosition
+        ) {
+            clearReplayPosition()
+        }
+
+        startIfNeeded(
+            scope
+        )
+    }
+
+    fun clearReplayPosition() {
+        lastEventId.set(
+            0L
+        )
+
+        lastDeliveredEventId.set(
+            0L
+        )
+    }
+
+    fun currentReplayPosition():
+        Long =
+        lastEventId.get()
+
+    private fun restartIfDesired() {
+        if (
+            !desiredConnected
+        ) {
+            return
+        }
+
+        val ownerScope =
+            transportScope
+                ?: return
+
+        reconnect(
+            scope =
+                ownerScope,
+            preserveReplayPosition =
+                true
+        )
+    }
+
+    @Volatile
+    private var transportScope:
+        CoroutineScope? = null
+
+    private fun startIfNeeded(
+        scope: CoroutineScope
+    ) {
+        transportScope =
+            scope
+
+        if (
+            !desiredConnected ||
+            !networkAvailable ||
+            configuredBaseUrl.isBlank()
+        ) {
+            _connectionState.value =
+                ConnectionState.DISCONNECTED
+
+            return
+        }
+
+        synchronized(lock) {
+
+            if (
+                sseJob?.isActive ==
+                true
+            ) {
+                return
+            }
+
+            val myGeneration =
+                generation.incrementAndGet()
+
+            sseJob =
+                scope.launch(
+                    Dispatchers.IO
+                ) {
+
+                    var backoff =
+                        INITIAL_BACKOFF_MS
+
+                    while (
+                        isActive &&
+                        desiredConnected &&
+                        networkAvailable &&
+                        configuredBaseUrl
+                            .isNotBlank()
+                    ) {
+
+                        try {
+
+                            publishState(
+                                myGeneration,
+                                if (
+                                    backoff ==
+                                    INITIAL_BACKOFF_MS
+                                ) {
+                                    ConnectionState.CONNECTING
+                                } else {
+                                    ConnectionState.RECONNECTING
+                                }
+                            )
+
+                            consumeSseStream(
+                                generation =
+                                    myGeneration,
+                                onConnected = {
+
+                                    backoff =
+                                        INITIAL_BACKOFF_MS
+
+                                    _lastError.value =
+                                        null
+                                }
+                            )
+
+                            /*
+                             * A normal end-of-body is still an SSE
+                             * disconnect and must reconnect.
+                             */
+                            throw IOException(
+                                "LIAS event stream closed."
+                            )
+
+                        } catch (
+                            cancellation:
+                                CancellationException
+                        ) {
+
+                            throw cancellation
+
+                        } catch (
+                            error: Exception
+                        ) {
+
+                            if (
+                                !desiredConnected ||
+                                !networkAvailable ||
+                                !isActive
+                            ) {
+                                break
+                            }
+
+                            _lastError.value =
+                                error.message
+                                    ?.takeIf {
+                                        it.isNotBlank()
+                                    }
+                                    ?: "LIAS event stream disconnected."
+
+                            publishState(
+                                myGeneration,
+                                ConnectionState.RECONNECTING
+                            )
+
+                            delay(
+                                backoff
+                            )
+
+                            backoff =
+                                (
+                                    backoff *
+                                        2L
+                                    )
+                                    .coerceAtMost(
+                                        MAX_BACKOFF_MS
+                                    )
+                        }
+                    }
+
+                    publishState(
+                        myGeneration,
+                        ConnectionState.DISCONNECTED
+                    )
+                }
+        }
+    }
+
+    private suspend fun consumeSseStream(
+        generation: Long,
+        onConnected: () -> Unit
+    ) {
+        val serverUrl =
+            configuredBaseUrl
+
+        val token =
+            configuredAuthToken
+
+        val builder =
             Request.Builder()
                 .url(
-                    "$sanitizedBase${Endpoints.EVENTS_SSE}"
+                    "$serverUrl${Endpoints.EVENTS_SSE}"
                 )
                 .header(
                     "Accept",
@@ -195,286 +462,471 @@ class LiasSseClient(
                     "Cache-Control",
                     "no-cache"
                 )
-                .header(
-                    "Connection",
-                    "keep-alive"
-                )
 
-        authToken
-            ?.takeIf { it.isNotBlank() }
-            ?.let { token ->
-                requestBuilder.header(
+        token
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                builder.header(
                     "Authorization",
-                    "Bearer $token"
+                    "Bearer $it"
                 )
             }
 
-        if (lastEventId > 0L) {
-            requestBuilder.header(
-                "Last-Event-ID",
-                lastEventId.toString()
-            )
-        }
+        lastEventId
+            .get()
+            .takeIf {
+                it > 0L
+            }
+            ?.let {
+                builder.header(
+                    "Last-Event-ID",
+                    it.toString()
+                )
+            }
 
         val call =
             client.newCall(
-                requestBuilder.build()
+                builder.build()
             )
 
-        activeCall = call
+        activeCall =
+            call
 
-        call.execute().use { response ->
+        try {
 
-            if (!response.isSuccessful) {
-                throw SseHttpException(
-                    response.code
-                )
-            }
+            call.execute()
+                .use { response ->
 
-            _connectionState.value =
-                ConnectionState.CONNECTED
+                    if (
+                        !response.isSuccessful
+                    ) {
+                        throw SseHttpException(
+                            response.code
+                        )
+                    }
 
-            val source =
-                response.body?.source()
-                    ?: throw IllegalStateException(
-                        "LIAS SSE response has no body."
+                    val contentType =
+                        response.header(
+                            "Content-Type"
+                        )
+                            .orEmpty()
+
+                    if (
+                        !contentType.contains(
+                            "text/event-stream",
+                            ignoreCase = true
+                        )
+                    ) {
+                        throw IOException(
+                            "LIAS returned an invalid SSE content type."
+                        )
+                    }
+
+                    publishState(
+                        generation,
+                        ConnectionState.CONNECTED
                     )
 
-            var eventType: String? = null
-            var eventId: Long? = null
-            val dataBuilder =
-                StringBuilder()
+                    onConnected()
 
-            while (!source.exhausted()) {
-                val line =
-                    source.readUtf8Line()
-                        ?: break
+                    val source =
+                        response.body
+                            ?.source()
+                            ?: throw IOException(
+                                "LIAS returned an empty event stream."
+                            )
 
-                when {
-                    line.isEmpty() -> {
-                        dispatchEvent(
-                            eventType = eventType,
-                            eventId = eventId,
-                            data = dataBuilder.toString()
-                        )
+                    var eventType =
+                        ""
 
-                        eventType = null
-                        eventId = null
-                        dataBuilder.clear()
-                    }
+                    var eventId:
+                        Long? = null
 
-                    line.startsWith(":") -> {
-                        // SSE comment / heartbeat.
-                        // It intentionally has no application meaning.
-                    }
+                    val dataBuilder =
+                        StringBuilder()
 
-                    line.startsWith("event:") -> {
-                        eventType =
-                            parseFieldValue(line)
-                                .takeIf { it.isNotBlank() }
-                    }
+                    while (
+                        !source.exhausted()
+                    ) {
 
-                    line.startsWith("id:") -> {
-                        val parsedId =
-                            parseFieldValue(line)
-                                .toLongOrNull()
+                        val line =
+                            source.readUtf8Line()
+                                ?: break
 
-                        if (parsedId != null) {
-                            eventId = parsedId
-                            lastEventId = parsedId
+                        when {
+
+                            line.isEmpty() -> {
+
+                                if (
+                                    eventType.isNotBlank() ||
+                                    dataBuilder
+                                        .isNotEmpty()
+                                ) {
+
+                                    deliverFrame(
+                                        eventType =
+                                            eventType,
+                                        eventId =
+                                            eventId,
+                                        data =
+                                            dataBuilder
+                                                .toString()
+                                    )
+                                }
+
+                                eventType =
+                                    ""
+
+                                eventId =
+                                    null
+
+                                dataBuilder
+                                    .clear()
+                            }
+
+                            line.startsWith(
+                                ":"
+                            ) -> {
+                                /*
+                                 * SSE comment/heartbeat.
+                                 */
+                            }
+
+                            line.startsWith(
+                                "event:"
+                            ) -> {
+
+                                eventType =
+                                    line
+                                        .removePrefix(
+                                            "event:"
+                                        )
+                                        .trimStart()
+                            }
+
+                            line.startsWith(
+                                "id:"
+                            ) -> {
+
+                                eventId =
+                                    line
+                                        .removePrefix(
+                                            "id:"
+                                        )
+                                        .trim()
+                                        .toLongOrNull()
+                            }
+
+                            line.startsWith(
+                                "data:"
+                            ) -> {
+
+                                if (
+                                    dataBuilder
+                                        .isNotEmpty()
+                                ) {
+                                    dataBuilder
+                                        .append(
+                                            '\n'
+                                        )
+                                }
+
+                                dataBuilder
+                                    .append(
+                                        line
+                                            .removePrefix(
+                                                "data:"
+                                            )
+                                            .removePrefix(
+                                                " "
+                                            )
+                                    )
+                            }
+
+                            line.startsWith(
+                                "retry:"
+                            ) -> {
+                                /*
+                                 * LIAS currently does not emit retry,
+                                 * but parsing it is intentionally
+                                 * harmless. Client backoff remains
+                                 * bounded locally.
+                                 */
+                            }
                         }
-                    }
-
-                    line.startsWith("data:") -> {
-                        if (dataBuilder.isNotEmpty()) {
-                            dataBuilder.append('\n')
-                        }
-
-                        dataBuilder.append(
-                            parseFieldValue(line)
-                        )
-                    }
-
-                    // retry: is intentionally ignored.
-                    // The LIAS client owns its reconnect policy so a
-                    // server-supplied retry value cannot unexpectedly
-                    // create an aggressive reconnect loop.
-                    line.startsWith("retry:") -> Unit
-
-                    else -> {
-                        // Unknown SSE field. Ignore per SSE semantics.
                     }
                 }
-            }
 
-            // The server normally terminates events with a blank line,
-            // but dispatch a final buffered event defensively.
+        } finally {
+
             if (
-                dataBuilder.isNotEmpty() ||
-                eventType != null ||
-                eventId != null
+                activeCall ===
+                call
             ) {
-                dispatchEvent(
-                    eventType = eventType,
-                    eventId = eventId,
-                    data = dataBuilder.toString()
-                )
+                activeCall =
+                    null
             }
-
-            throw IllegalStateException(
-                "LIAS SSE stream closed by server."
-            )
         }
     }
 
-    private suspend fun dispatchEvent(
-        eventType: String?,
+    private suspend fun deliverFrame(
+        eventType: String,
         eventId: Long?,
         data: String
     ) {
-        if (data.isBlank()) {
-            return
+        if (
+            eventId != null
+        ) {
+
+            val previous =
+                lastDeliveredEventId
+                    .get()
+
+            if (
+                eventId <=
+                previous
+            ) {
+                /*
+                 * Replay is defined as IDs strictly newer than the
+                 * supplied Last-Event-ID, but suppress duplicates
+                 * defensively if a proxy/server repeats a frame.
+                 */
+                lastEventId
+                    .updateAndGet {
+                        current ->
+
+                        maxOf(
+                            current,
+                            eventId
+                        )
+                    }
+
+                return
+            }
+
+            lastDeliveredEventId.set(
+                eventId
+            )
+
+            lastEventId
+                .updateAndGet {
+                    current ->
+
+                    maxOf(
+                        current,
+                        eventId
+                    )
+                }
         }
 
         val type =
             eventType
-                ?.takeIf { it.isNotBlank() }
-                ?: "message"
+                .ifBlank {
+                    "message"
+                }
 
         val payload =
-            try {
-                json.parseToJsonElement(data)
-            } catch (_: Exception) {
+            if (
+                data.isBlank()
+            ) {
                 null
+            } else {
+                try {
+                    json.parseToJsonElement(
+                        data
+                    )
+                } catch (
+                    _: Exception
+                ) {
+                    null
+                }
             }
-
-        val deviceId =
-            extractDeviceId(data)
-
-        val timestamp =
-            eventId
-                ?.let(::timestampFromEventId)
-                ?: extractTimestamp(data)
 
         val event =
             LiasEvent(
-                type = type,
-                timestamp = timestamp,
-                deviceID = deviceId,
-                payload = payload
+                type =
+                    type,
+                timestamp =
+                    "",
+                deviceID =
+                    extractTargetId(
+                        data
+                    ),
+                payload =
+                    payload
             )
 
-        _events.emit(event)
+        _events.emit(
+            event
+        )
     }
 
-    private fun parseFieldValue(
-        line: String
+    private fun extractTargetId(
+        jsonString: String
     ): String {
-        val separatorIndex =
-            line.indexOf(':')
-
-        if (separatorIndex < 0) {
+        if (
+            jsonString.isBlank()
+        ) {
             return ""
         }
 
-        var value =
-            line.substring(separatorIndex + 1)
+        return try {
 
-        if (value.startsWith(" ")) {
-            value = value.drop(1)
+            val element =
+                json.parseToJsonElement(
+                    jsonString
+                )
+
+            if (
+                element !is
+                JsonObject
+            ) {
+                return ""
+            }
+
+            element[
+                "pdid"
+            ]
+                ?.jsonPrimitive
+                ?.contentOrNull
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+                ?: element[
+                    "target_id"
+                ]
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                ?: element[
+                    "new_pdid"
+                ]
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                ?: element[
+                    "device_id"
+                ]
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                ?: element[
+                    "old_pdid"
+                ]
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                ?: ""
+
+        } catch (
+            _: Exception
+        ) {
+            ""
+        }
+    }
+
+    private fun cancelActiveTransport(
+        publishDisconnected: Boolean
+    ) {
+        generation.incrementAndGet()
+
+        activeCall
+            ?.cancel()
+
+        activeCall =
+            null
+
+        sseJob
+            ?.cancel()
+
+        sseJob =
+            null
+
+        if (
+            publishDisconnected
+        ) {
+            _connectionState.value =
+                ConnectionState.DISCONNECTED
+        }
+    }
+
+    private fun publishState(
+        streamGeneration: Long,
+        state: ConnectionState
+    ) {
+        if (
+            generation.get() ==
+            streamGeneration
+        ) {
+            _connectionState.value =
+                state
+        }
+    }
+
+    private fun normalizeUrl(
+        raw: String
+    ): String {
+        var value =
+            raw.trim()
+
+        if (
+            value.isBlank()
+        ) {
+            return ""
+        }
+
+        if (
+            !value.startsWith(
+                "http://",
+                ignoreCase = true
+            ) &&
+            !value.startsWith(
+                "https://",
+                ignoreCase = true
+            )
+        ) {
+            value =
+                "http://$value"
         }
 
         return value
-    }
-
-    private fun timestampFromEventId(
-        eventId: Long
-    ): String {
-        return try {
-            java.time.Instant
-                .ofEpochSecond(
-                    eventId / 1_000_000_000L,
-                    eventId % 1_000_000_000L
-                )
-                .toString()
-        } catch (_: Exception) {
-            ""
-        }
-    }
-
-    private fun extractTimestamp(
-        jsonString: String
-    ): String {
-        if (jsonString.isBlank()) {
-            return ""
-        }
-
-        return try {
-            val element =
-                json.parseToJsonElement(
-                    jsonString
-                )
-
-            if (element is JsonObject) {
-                element["timestamp"]
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    .orEmpty()
-            } else {
-                ""
-            }
-        } catch (_: Exception) {
-            ""
-        }
-    }
-
-    private fun extractDeviceId(
-        jsonString: String
-    ): String {
-        if (jsonString.isBlank()) {
-            return ""
-        }
-
-        return try {
-            val element =
-                json.parseToJsonElement(
-                    jsonString
-                )
-
-            if (element is JsonObject) {
-                element["pdid"]
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?.takeIf { it.isNotBlank() }
-                    ?: element["device_id"]
-                        ?.jsonPrimitive
-                        ?.contentOrNull
-                        ?.takeIf { it.isNotBlank() }
-                    ?: element["new_pdid"]
-                        ?.jsonPrimitive
-                        ?.contentOrNull
-                        ?.takeIf { it.isNotBlank() }
-                    ?: element["old_pdid"]
-                        ?.jsonPrimitive
-                        ?.contentOrNull
-                        ?.takeIf { it.isNotBlank() }
-                    ?: ""
-            } else {
-                ""
-            }
-        } catch (_: Exception) {
-            ""
-        }
+            .trimEnd(
+                '/'
+            )
     }
 
     private class SseHttpException(
         val statusCode: Int
-    ) : Exception(
-        "LIAS SSE endpoint returned HTTP $statusCode."
+    ) : IOException(
+        when (statusCode) {
+
+            401 ->
+                "LIAS rejected the SSE authentication token."
+
+            403 ->
+                "LIAS denied access to the event stream."
+
+            else ->
+                "LIAS event stream returned HTTP $statusCode."
+        }
     )
 
     private companion object {
-        const val INITIAL_BACKOFF_MS = 500L
-        const val MAX_BACKOFF_MS = 10_000L
+
+        const val INITIAL_BACKOFF_MS =
+            500L
+
+        const val MAX_BACKOFF_MS =
+            15_000L
     }
 }
