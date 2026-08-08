@@ -24,7 +24,7 @@ object HigSpec {
     val SheetHandleWidth = 36.dp
     val SheetHandleHeight = 5.dp
 
-    // HIG Tab Bar standard height (49dp + safe area)
+    // HIG Tab Bar standard height
     val TabBarHeight = 49.dp
     val BottomNavPadding = 83.dp
 
