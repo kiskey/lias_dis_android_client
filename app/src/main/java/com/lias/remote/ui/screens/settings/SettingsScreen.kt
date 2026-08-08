@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.SegmentedControl
@@ -31,6 +32,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberLazyListState()
+    var showFlushDialog by remember { mutableStateOf(false) }
 
     HigLargeTitleScaffold(title = "Settings", scrollState = scrollState) { padding ->
         LazyColumn(state = scrollState, modifier = Modifier.fillMaxSize(), contentPadding = padding) {
@@ -102,7 +104,7 @@ fun SettingsScreen(
                         secondaryText = "Rebuilds automatically on next sync",
                         isDestructive = true,
                         trailingContent = { CupertinoText("›", style = HigTypography.headline, color = LiasThemeColors.tertiaryLabel) },
-                        onClick = { viewModel.flushNftables() }
+                        onClick = { showFlushDialog = true }
                     )
                 }
             }
@@ -122,5 +124,16 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showFlushDialog) {
+        HigAlertDialog(
+            onDismissRequest = { showFlushDialog = false },
+            title = "Flush nftables?",
+            message = "This will temporarily disable all LIAS enforcement. Internet access will be unrestricted until LIAS rebuilds the table.",
+            confirmText = "Flush",
+            onConfirm = { viewModel.flushNftables() },
+            isDestructive = true
+        )
     }
 }
