@@ -41,7 +41,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
-# Cupertino (Native iOS Look & Feel)
+# Cupertino (AlexZhirkevich)
 cupertino = { group = "io.github.alexzhirkevich", name = "cupertino", version.ref = "cupertino" }
 cupertino-icons-extended = { group = "io.github.alexzhirkevich", name = "cupertino-icons-extended", version.ref = "cupertino" }
 
