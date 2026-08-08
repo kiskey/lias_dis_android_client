@@ -42,7 +42,6 @@ import io.github.alexzhirkevich.cupertino.CupertinoSlider
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.outlined.ExclamationmarkTriangle
-import io.github.alexzhirkevich.cupertino.icons.outlined.Globe
 import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 
 @Composable
@@ -143,7 +142,7 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             CupertinoIcon(
-                imageVector = CupertinoIcons.Outlined.Globe,
+                imageVector = CupertinoIcons.Outlined.Shield,
                 contentDescription = null,
                 tint = LiasThemeColors.blue,
                 modifier = Modifier.size(48.dp)
