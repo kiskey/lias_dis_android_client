@@ -1,17 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/LiasViewModel.kt
-// Version: 10.0.0
+// Version: 11.0.0
 //
 // Purpose:
-//   Complete UI-facing façade for LIAS Remote.
+//   Complete UI-facing LIAS façade.
 //
-// Batch 10:
-//   - Pause goes through LIAS /pause endpoint.
-//   - Android no longer fabricates pause Policy/Schedule objects.
-//   - Pause duration is fixed to the server-supported 60 minutes.
-//   - Extend returns/uses authoritative server duration.
-//   - Temporary status is re-fetched through EventRepository.
-//   - Existing policy/schedule/device/tag/user functionality retained.
+// Batch 11 additions:
+//   - extendTagAccess()
+//   - cancelTagExtension()
+//   - device/tag effective-state helpers remain authoritative
+//
+// Pause continues to use the fixed server-owned one-hour endpoint.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -34,12 +33,14 @@ import com.lias.remote.repositories.UiState
 import com.lias.remote.repositories.assignDeviceTags
 import com.lias.remote.repositories.assignDeviceUser
 import com.lias.remote.repositories.cancelDeviceExtensionAuthoritatively
+import com.lias.remote.repositories.cancelTagExtensionAuthoritatively
 import com.lias.remote.repositories.createTag
 import com.lias.remote.repositories.createUser
 import com.lias.remote.repositories.deletePolicy
 import com.lias.remote.repositories.deleteSchedule
 import com.lias.remote.repositories.deleteTag
 import com.lias.remote.repositories.extendDeviceAuthoritatively
+import com.lias.remote.repositories.extendTagAuthoritatively
 import com.lias.remote.repositories.exportPolicies
 import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.importPolicies
@@ -96,8 +97,7 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            eventRepository
-                .uiEvents
+            eventRepository.uiEvents
                 .collect { event ->
 
                     if (
@@ -114,8 +114,7 @@ class LiasViewModel(
                                 pdid =
                                     event.pdid,
                                 timestamp =
-                                    Instant
-                                        .now()
+                                    Instant.now()
                                         .toString()
                             )
                     }
@@ -142,48 +141,7 @@ class LiasViewModel(
     }
 
     // ----------------------------------------------------------------
-    // Security
-    // ----------------------------------------------------------------
-
-    fun triggerSecurityAlert() {
-
-        _pendingSecurityAlert.value =
-            SecurityAlertPayload(
-                alertType =
-                    "mac_spoof_detected",
-                details =
-                    "Potential network identity anomaly detected.",
-                pdid =
-                    state.value
-                        .devices
-                        .firstOrNull()
-                        ?.pdid
-                        .orEmpty(),
-                timestamp =
-                    Instant
-                        .now()
-                        .toString()
-            )
-    }
-
-    fun dismissSecurityAlert() {
-
-        _pendingSecurityAlert.value =
-            null
-    }
-
-    // ----------------------------------------------------------------
-    // Undo
-    // ----------------------------------------------------------------
-
-    fun clearUndo() {
-
-        _undoState.value =
-            null
-    }
-
-    // ----------------------------------------------------------------
-    // Effective status
+    // Effective access
     // ----------------------------------------------------------------
 
     fun effectiveStatusFor(
@@ -203,7 +161,7 @@ class LiasViewModel(
             ]
 
     // ----------------------------------------------------------------
-    // Extend Access
+    // Device Extend
     // ----------------------------------------------------------------
 
     fun extendDeviceAccess(
@@ -213,22 +171,19 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .extendDeviceAuthoritatively(
-                        pdid =
+            when (
+                val result =
+                    eventRepository
+                        .extendDeviceAuthoritatively(
                             pdid,
-                        minutes =
                             minutes
-                    )
-
-            when (result) {
+                        )
+            ) {
 
                 is ApiResult.Success -> {
 
                     val actualMinutes =
-                        result.data
-                            .minutes
+                        result.data.minutes
                             .takeIf {
                                 it > 0
                             }
@@ -243,6 +198,7 @@ class LiasViewModel(
                 }
 
                 else -> {
+
                     emitFailure(
                         result,
                         "Unable to extend access."
@@ -287,6 +243,98 @@ class LiasViewModel(
     }
 
     // ----------------------------------------------------------------
+    // Tag Extend
+    // ----------------------------------------------------------------
+
+    fun extendTagAccess(
+        tagId: String,
+        tagName: String,
+        minutes: Int
+    ) {
+
+        viewModelScope.launch {
+
+            when (
+                val result =
+                    eventRepository
+                        .extendTagAuthoritatively(
+                            tagId,
+                            minutes
+                        )
+            ) {
+
+                is ApiResult.Success -> {
+
+                    val actualMinutes =
+                        result.data.minutes
+                            .takeIf {
+                                it > 0
+                            }
+                            ?: minutes
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Access extended for $tagName · $actualMinutes minutes"
+                            )
+                        )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to extend access for $tagName."
+                    )
+                }
+            }
+        }
+    }
+
+    fun cancelTagExtension(
+        tagId: String
+    ) {
+
+        val tagName =
+            state.value.tags
+                .find {
+                    it.id ==
+                        tagId
+                }
+                ?.name
+                ?: "tag"
+
+        viewModelScope.launch {
+
+            val result =
+                eventRepository
+                    .cancelTagExtensionAuthoritatively(
+                        tagId
+                    )
+
+            if (
+                result is
+                ApiResult.Success
+            ) {
+
+                eventRepository
+                    .emitUiEvent(
+                        UiEvent.ShowSnackbar(
+                            "Extension cancelled for $tagName"
+                        )
+                    )
+
+            } else {
+
+                emitFailure(
+                    result,
+                    "Unable to cancel tag extension."
+                )
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------
     // Pause / Resume
     // ----------------------------------------------------------------
 
@@ -296,10 +344,6 @@ class LiasViewModel(
             FIXED_PAUSE_MINUTES
     ) {
 
-        /*
-         * Keep the argument for source compatibility with older UI
-         * call sites, but refuse to imply unsupported durations.
-         */
         if (
             minutes !=
             FIXED_PAUSE_MINUTES
@@ -324,8 +368,25 @@ class LiasViewModel(
             )
 
         if (
-            currentStatus != null &&
-            !currentStatus.pauseAvailable
+            currentStatus == null
+        ) {
+
+            viewModelScope.launch {
+
+                eventRepository
+                    .emitUiEvent(
+                        UiEvent.ShowSnackbarError(
+                            "Waiting for the current device access state."
+                        )
+                    )
+            }
+
+            return
+        }
+
+        if (
+            !currentStatus
+                .pauseAvailable
         ) {
 
             viewModelScope.launch {
@@ -412,30 +473,24 @@ class LiasViewModel(
     private fun pauseUnavailableMessage(
         status: EffectiveStatus
     ): String =
-        when (
-            status.source
-                .lowercase()
-        ) {
+        when {
 
-            "infrastructure" ->
+            status.source ==
+                "infrastructure" ->
                 "Infrastructure devices are always online."
 
-            "global" ->
-                if (
-                    status.action ==
-                    "block"
-                ) {
-                    "Global Access is already blocking this device."
-                } else {
-                    "Pause is not available for the current global state."
-                }
+            status.source ==
+                "global" &&
+                status.action ==
+                "block" ->
+                "Global Access is already blocking this device."
 
             else ->
-                "Pause is not available for the current device state."
+                "Pause is not available for the current access state."
         }
 
     // ----------------------------------------------------------------
-    // Tags assigned to devices
+    // Device metadata
     // ----------------------------------------------------------------
 
     fun assignTags(
@@ -444,8 +499,7 @@ class LiasViewModel(
     ) {
 
         val previous =
-            state.value
-                .devices
+            state.value.devices
                 .find {
                     it.pdid ==
                         pdid
@@ -492,18 +546,13 @@ class LiasViewModel(
         }
     }
 
-    // ----------------------------------------------------------------
-    // Rename
-    // ----------------------------------------------------------------
-
     fun renameDevice(
         pdid: String,
         newName: String
     ) {
 
         val previous =
-            state.value
-                .devices
+            state.value.devices
                 .find {
                     it.pdid ==
                         pdid
@@ -621,7 +670,7 @@ class LiasViewModel(
     }
 
     // ----------------------------------------------------------------
-    // Global controls
+    // Global mode
     // ----------------------------------------------------------------
 
     fun toggleVacationMode(
@@ -650,7 +699,7 @@ class LiasViewModel(
     }
 
     // ----------------------------------------------------------------
-    // Policy validation
+    // Policies
     // ----------------------------------------------------------------
 
     suspend fun validatePolicy(
@@ -664,78 +713,6 @@ class LiasViewModel(
                     }
                     .distinct()
             )
-
-    // ----------------------------------------------------------------
-    // Policy import/export
-    // ----------------------------------------------------------------
-
-    fun exportPolicies() {
-
-        viewModelScope.launch {
-
-            val result =
-                eventRepository
-                    .exportPolicies()
-
-            if (
-                result is
-                ApiResult.Success
-            ) {
-
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Policy export prepared"
-                        )
-                    )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to export policies."
-                )
-            }
-        }
-    }
-
-    fun importPolicies(
-        payload: String
-    ) {
-
-        viewModelScope.launch {
-
-            val result =
-                eventRepository
-                    .importPolicies(
-                        payload
-                    )
-
-            if (
-                result is
-                ApiResult.Success
-            ) {
-
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Policies imported"
-                        )
-                    )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to import policies."
-                )
-            }
-        }
-    }
-
-    // ----------------------------------------------------------------
-    // Policies
-    // ----------------------------------------------------------------
 
     fun savePolicy(
         policy: Policy
@@ -821,6 +798,72 @@ class LiasViewModel(
         }
     }
 
+    fun exportPolicies() {
+
+        viewModelScope.launch {
+
+            when (
+                val result =
+                    eventRepository
+                        .exportPolicies()
+            ) {
+
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Policy export prepared"
+                            )
+                        )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to export policies."
+                    )
+                }
+            }
+        }
+    }
+
+    fun importPolicies(
+        payload: String
+    ) {
+
+        viewModelScope.launch {
+
+            when (
+                val result =
+                    eventRepository
+                        .importPolicies(
+                            payload
+                        )
+            ) {
+
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Policies imported"
+                            )
+                        )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to import policies."
+                    )
+                }
+            }
+        }
+    }
+
     // ----------------------------------------------------------------
     // Schedules
     // ----------------------------------------------------------------
@@ -831,30 +874,31 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .saveSchedule(
-                        schedule
-                    )
-
-            if (
-                result is
-                ApiResult.Success
+            when (
+                val result =
+                    eventRepository
+                        .saveSchedule(
+                            schedule
+                        )
             ) {
 
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Schedule saved"
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Schedule saved"
+                            )
                         )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to save schedule."
                     )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to save schedule."
-                )
+                }
             }
         }
     }
@@ -865,30 +909,31 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .deleteSchedule(
-                        scheduleId
-                    )
-
-            if (
-                result is
-                ApiResult.Success
+            when (
+                val result =
+                    eventRepository
+                        .deleteSchedule(
+                            scheduleId
+                        )
             ) {
 
-                eventRepository
-                    .emitUiEvent(
-                        UiEvent.ShowSnackbar(
-                            "Schedule deleted"
+                is ApiResult.Success -> {
+
+                    eventRepository
+                        .emitUiEvent(
+                            UiEvent.ShowSnackbar(
+                                "Schedule deleted"
+                            )
                         )
+                }
+
+                else -> {
+
+                    emitFailure(
+                        result,
+                        "Unable to delete schedule."
                     )
-
-            } else {
-
-                emitFailure(
-                    result,
-                    "Unable to delete schedule."
-                )
+                }
             }
         }
     }
@@ -903,21 +948,22 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .createTag(
-                        tag
-                    )
-
-            if (
-                result !is
-                ApiResult.Success
+            when (
+                val result =
+                    eventRepository
+                        .createTag(
+                            tag
+                        )
             ) {
 
-                emitFailure(
-                    result,
-                    "Unable to create tag."
-                )
+                is ApiResult.Success ->
+                    Unit
+
+                else ->
+                    emitFailure(
+                        result,
+                        "Unable to create tag."
+                    )
             }
         }
     }
@@ -928,21 +974,22 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .updateTag(
-                        tag
-                    )
-
-            if (
-                result !is
-                ApiResult.Success
+            when (
+                val result =
+                    eventRepository
+                        .updateTag(
+                            tag
+                        )
             ) {
 
-                emitFailure(
-                    result,
-                    "Unable to update tag."
-                )
+                is ApiResult.Success ->
+                    Unit
+
+                else ->
+                    emitFailure(
+                        result,
+                        "Unable to update tag."
+                    )
             }
         }
     }
@@ -953,27 +1000,67 @@ class LiasViewModel(
 
         viewModelScope.launch {
 
-            val result =
-                eventRepository
-                    .deleteTag(
-                        tagId
-                    )
-
-            if (
-                result !is
-                ApiResult.Success
+            when (
+                val result =
+                    eventRepository
+                        .deleteTag(
+                            tagId
+                        )
             ) {
 
-                emitFailure(
-                    result,
-                    "Unable to delete tag."
-                )
+                is ApiResult.Success ->
+                    Unit
+
+                else ->
+                    emitFailure(
+                        result,
+                        "Unable to delete tag."
+                    )
             }
         }
     }
 
     // ----------------------------------------------------------------
-    // Error translation
+    // Security
+    // ----------------------------------------------------------------
+
+    fun triggerSecurityAlert() {
+
+        _pendingSecurityAlert.value =
+            SecurityAlertPayload(
+                alertType =
+                    "mac_spoof_detected",
+                details =
+                    "Potential network identity anomaly detected.",
+                pdid =
+                    state.value.devices
+                        .firstOrNull()
+                        ?.pdid
+                        .orEmpty(),
+                timestamp =
+                    Instant.now()
+                        .toString()
+            )
+    }
+
+    fun dismissSecurityAlert() {
+
+        _pendingSecurityAlert.value =
+            null
+    }
+
+    // ----------------------------------------------------------------
+    // Undo
+    // ----------------------------------------------------------------
+
+    fun clearUndo() {
+
+        _undoState.value =
+            null
+    }
+
+    // ----------------------------------------------------------------
+    // Errors
     // ----------------------------------------------------------------
 
     private suspend fun emitFailure(
