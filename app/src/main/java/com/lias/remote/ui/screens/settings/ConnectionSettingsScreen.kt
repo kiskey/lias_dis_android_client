@@ -36,7 +36,7 @@ fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.state.collectAsState()
     var tempUrl by remember { mutableStateOf(state.serverUrl) }
     var tempToken by remember { mutableStateOf(state.authToken) }
 
