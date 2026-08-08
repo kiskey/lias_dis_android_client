@@ -1,11 +1,3 @@
-// ====================================================================
-// File: ActionSheets.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Contains all HIG Modal Bottom Sheets (Onboarding, Security,
-//          GlobalSwitch, Pause, ExtendAccess) to fulfill the redesign
-//          plan without omissions.
-// ====================================================================
-
 package com.lias.remote.ui.screens
 
 import androidx.compose.foundation.background
@@ -17,10 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,8 +33,12 @@ import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemIndigoDark
+import io.github.alexzhirkevich.cupertino.CupertinoSlider
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun OnboardingSheet(onComplete: () -> Unit) {
@@ -60,10 +52,10 @@ fun OnboardingSheet(onComplete: () -> Unit) {
                 modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp))
                     .background(Brush.linearGradient(listOf(SystemBlueDark, SystemIndigoDark))),
                 contentAlignment = Alignment.Center
-            ) { Text("🛡", style = MaterialTheme.typography.headlineLarge, color = Color.White) }
+            ) { CupertinoText("🛡", style = HigTypography.title1, color = Color.White) }
 
-            Text("Welcome to LIAS", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.W700, color = MaterialTheme.colorScheme.onSurface)
-            Text("Secure your family's internet in 3 simple steps.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            CupertinoText("Welcome to LIAS", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
+            CupertinoText("Secure your family's internet in 3 simple steps.", style = HigTypography.body, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             OnboardingStep("Step 1", "Tag Your Router", "Assign the \"Infrastructure\" tag to your router/gateway to prevent accidental lockouts.")
             OnboardingStep("Step 2", "Create a Schedule", "Set up a \"Bedtime\" schedule — e.g., block 22:00 to 06:00 nightly.")
@@ -78,11 +70,11 @@ fun OnboardingSheet(onComplete: () -> Unit) {
 private fun OnboardingStep(num: String, title: String, desc: String) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)
+            .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
     ) {
-        Text(num.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.W700)
-        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.W600, modifier = Modifier.padding(top = 2.dp))
-        Text(desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+        CupertinoText(num.uppercase(), style = HigTypography.caption, color = LiasThemeColors.blue, fontWeight = FontWeight.Bold)
+        CupertinoText(title, style = HigTypography.headline, color = LiasThemeColors.label, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
+        CupertinoText(desc, style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -94,19 +86,19 @@ fun SecurityAlertSheet(alert: SecurityAlertPayload, onDismiss: () -> Unit, onBlo
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("🚨", style = MaterialTheme.typography.headlineLarge)
-            Text("Security Alert", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.W700, color = MaterialTheme.colorScheme.onSurface)
-            Text(alert.alertType.replace("_", " ").replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            CupertinoText("🚨", style = HigTypography.largeTitle)
+            CupertinoText("Security Alert", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
+            CupertinoText(alert.alertType.replace("_", " ").replaceFirstChar { it.uppercase() }, style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             Column(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)
+                    .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
             ) {
-                Text("DETAILS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.W600)
-                Text(alert.details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
+                CupertinoText("DETAILS", style = HigTypography.caption, color = LiasThemeColors.secondaryLabel, fontWeight = FontWeight.SemiBold)
+                CupertinoText(alert.details, style = HigTypography.body, color = LiasThemeColors.label, modifier = Modifier.padding(top = 6.dp))
             }
 
-            Text("This may indicate a device impersonating another on your network. Choose how to respond:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            CupertinoText("This may indicate a device impersonating another on your network. Choose how to respond:", style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             HigButton(text = "Block Suspicious Device", onClick = onBlock, style = HigButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
             HigButton(text = "Mark as Trusted (DHCP Rebind)", onClick = onTrust, style = HigButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
@@ -125,15 +117,15 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("🌐", style = MaterialTheme.typography.headlineLarge)
-            Text("Global Access Switch", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.W700, color = MaterialTheme.colorScheme.onSurface)
-            Text("Controls every non-infrastructure device on your network.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            CupertinoText("🌐", style = HigTypography.largeTitle)
+            CupertinoText("Global Access Switch", style = HigTypography.title2, fontWeight = FontWeight.Bold, color = LiasThemeColors.label)
+            CupertinoText("Controls every non-infrastructure device on your network.", style = HigTypography.body, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             Column(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)
+                    .background(LiasThemeColors.tertiaryBackground).padding(16.dp)
             ) {
-                Text("CHOOSE MODE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.W600)
+                CupertinoText("CHOOSE MODE", style = HigTypography.caption, color = LiasThemeColors.secondaryLabel, fontWeight = FontWeight.SemiBold)
                 SegmentedControl(
                     options = listOf("Allow All", "Schedule", "Block All"),
                     selectedOption = when(selectedAction) { "allow" -> "Allow All"; "block" -> "Block All"; else -> "Schedule" },
@@ -148,9 +140,9 @@ fun GlobalSwitchSheet(currentPolicy: Policy, onDismiss: () -> Unit, onSave: (Pol
             if (selectedAction == "block") {
                 Box(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f)).padding(12.dp)
+                        .background(LiasThemeColors.red.copy(alpha = 0.12f)).padding(12.dp)
                 ) {
-                    Text("⚠️ Block All requires confirmation and will disconnect all family devices immediately.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.W500)
+                    CupertinoText("⚠️ Block All requires Face ID / confirmation and will disconnect all family devices immediately.", style = HigTypography.subheadline, color = LiasThemeColors.red, fontWeight = FontWeight.Medium)
                 }
             }
 
@@ -176,8 +168,8 @@ fun PauseSheet(targetLabel: String, onDismiss: () -> Unit, onConfirm: (minutes: 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             HigSheetHeader(title = "Pause Internet", onCancel = onDismiss)
-            Text(targetLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.W600, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            
+            CupertinoText(targetLabel, style = HigTypography.title2, fontWeight = FontWeight.SemiBold, color = LiasThemeColors.secondaryLabel)
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 quickPicks.forEach { pick ->
                     val isSelected = selectedMinutes.toInt() == pick
@@ -190,8 +182,8 @@ fun PauseSheet(targetLabel: String, onDismiss: () -> Unit, onConfirm: (minutes: 
                 }
             }
 
-            Text("${selectedMinutes.toInt()} minutes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.W800)
-            Text("All internet traffic will be blocked for this device until the timer expires.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            CupertinoText("${selectedMinutes.toInt()} minutes", style = HigTypography.title1, fontWeight = FontWeight.ExtraBold)
+            CupertinoText("All internet traffic will be blocked for this device until the timer expires.", style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel, textAlign = TextAlign.Center)
 
             HigButton(
                 text = "Pause for " + if (selectedMinutes >= 60) "${selectedMinutes.toInt() / 60} Hour${if (selectedMinutes > 60) "s" else ""}" else "$selectedMinutes Minutes",
@@ -222,12 +214,12 @@ fun ExtendAccessSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             HigSheetHeader(title = "Extend Access", onCancel = onDismiss)
-            Text(targetLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.W600, color = MaterialTheme.colorScheme.onSurface)
-            Text(targetSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            CupertinoText(targetLabel, style = HigTypography.title2, fontWeight = FontWeight.SemiBold, color = LiasThemeColors.label)
+            CupertinoText(targetSubtitle, style = HigTypography.subheadline, color = LiasThemeColors.secondaryLabel)
 
             currentExtension?.let { ext ->
                 val minsLeft = ExtendHelper.minutesUntil(ext.expiresAt)
-                Text("Active extension: ${minsLeft}m left", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.W600)
+                CupertinoText("Active extension: ${minsLeft}m left", style = HigTypography.subheadline, color = LiasThemeColors.blue, fontWeight = FontWeight.SemiBold)
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -243,13 +235,12 @@ fun ExtendAccessSheet(
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${selectedMinutes.toInt()} minutes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.W700)
-                Slider(
+                CupertinoText("${selectedMinutes.toInt()} minutes", style = HigTypography.title1, fontWeight = FontWeight.Bold)
+                CupertinoSlider(
                     value = selectedMinutes,
                     onValueChange = { selectedMinutes = it },
                     valueRange = 1f..120f,
                     steps = 118,
-                    colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 )
             }
