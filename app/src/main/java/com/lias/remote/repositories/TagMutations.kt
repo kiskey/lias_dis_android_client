@@ -1,15 +1,19 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/TagMutations.kt
-// Version: 14.0.0
+// Version: 15.0.0
 //
 // Purpose:
-//   Server-confirmed tag CRUD.
+//   Dependency-aware tag persistence.
 //
-// Corrections:
-//   - Create commits only the canonical server-created tag.
-//   - Update no longer overwrites the UI before server acceptance.
-//   - Failed deletes no longer remove/reappend objects.
-//   - Same-tag operations serialize.
+// Important:
+//   Backend DeleteTag removes only the tag itself.
+//   It does not transactionally clean:
+//     - device tag mappings
+//     - policies targeting the tag
+//     - temporary tag extensions
+//
+// Therefore Android refuses destructive deletion while dependencies
+// remain rather than attempting an unreliable client-side cascade.
 // ====================================================================
 
 package com.lias.remote.repositories
@@ -17,6 +21,7 @@ package com.lias.remote.repositories
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.Endpoints
+import com.lias.remote.core.util.ConfigurationSafety
 
 suspend fun EventRepository.createTag(
     tag: Tag
@@ -39,10 +44,6 @@ suspend fun EventRepository.createTag(
             result is
             ApiResult.Success
         ) {
-
-            /*
-             * Tag manager owns ID and other canonical properties.
-             */
             upsertTag(
                 result.data
             )
@@ -70,6 +71,39 @@ suspend fun EventRepository.updateTag(
             )
         }
 
+        val existing =
+            _state.value
+                .tags
+                .find {
+                    it.id ==
+                        tag.id
+                }
+                ?: return@mutate ApiResult.HttpError(
+                    code =
+                        404,
+                    message =
+                        "The tag no longer exists."
+                )
+
+        /*
+         * Built-in tags are system classifications. The backend tag
+         * manager determines exactly which modifications it accepts.
+         *
+         * infrastructure receives stronger client-side protection.
+         */
+        if (
+            existing.id ==
+            ConfigurationSafety
+                .INFRASTRUCTURE_TAG_ID
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    "Infrastructure is a protected system tag."
+            )
+        }
+
         val result =
             api.put<
                 Tag,
@@ -85,10 +119,6 @@ suspend fun EventRepository.updateTag(
             result is
             ApiResult.Success
         ) {
-
-            /*
-             * Commit exactly what tagMgr.Update returned.
-             */
             upsertTag(
                 result.data
             )
@@ -105,15 +135,146 @@ suspend fun EventRepository.deleteTag(
             "tag:$tagId"
     ) {
 
+        val tag =
+            _state.value
+                .tags
+                .find {
+                    it.id ==
+                        tagId
+                }
+                ?: return@mutate ApiResult.HttpError(
+                    code =
+                        404,
+                    message =
+                        "The tag no longer exists."
+                )
+
+        val impact =
+            ConfigurationSafety
+                .tagImpact(
+                    tag =
+                        tag,
+                    devices =
+                        _state.value.devices,
+                    policies =
+                        _state.value.policies
+                )
+
         if (
-            tagId ==
-            "infrastructure"
+            impact.isInfrastructure
         ) {
             return@mutate ApiResult.HttpError(
                 code =
-                    400,
+                    409,
                 message =
-                    "Infrastructure is immutable."
+                    "Infrastructure is immutable and cannot be deleted."
+            )
+        }
+
+        if (
+            impact.isBuiltIn
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    "Built-in system tags cannot be deleted."
+            )
+        }
+
+        if (
+            impact.assignedDevices
+                .isNotEmpty()
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    buildString {
+
+                        append(
+                            "Move "
+                        )
+
+                        append(
+                            impact
+                                .assignedDevices
+                                .size
+                        )
+
+                        append(
+                            if (
+                                impact
+                                    .assignedDevices
+                                    .size ==
+                                1
+                            ) {
+                                " device"
+                            } else {
+                                " devices"
+                            }
+                        )
+
+                        append(
+                            " out of “"
+                        )
+
+                        append(
+                            tag.name
+                        )
+
+                        append(
+                            "” before deleting it."
+                        )
+                    }
+            )
+        }
+
+        if (
+            impact.targetingPolicies
+                .isNotEmpty()
+        ) {
+            return@mutate ApiResult.HttpError(
+                code =
+                    409,
+                message =
+                    buildString {
+
+                        append(
+                            "Delete or retarget "
+                        )
+
+                        append(
+                            impact
+                                .targetingPolicies
+                                .size
+                        )
+
+                        append(
+                            if (
+                                impact
+                                    .targetingPolicies
+                                    .size ==
+                                1
+                            ) {
+                                " rule"
+                            } else {
+                                " rules"
+                            }
+                        )
+
+                        append(
+                            " that still use “"
+                        )
+
+                        append(
+                            tag.name
+                        )
+
+                        append(
+                            "” first."
+                        )
+                    }
             )
         }
 
@@ -129,9 +290,6 @@ suspend fun EventRepository.deleteTag(
             ApiResult.Success
         ) {
 
-            /*
-             * Remove only after LIAS confirmed deletion.
-             */
             _state.value =
                 _state.value.copy(
                     tags =
@@ -146,13 +304,6 @@ suspend fun EventRepository.deleteTag(
                             tagId
                 )
 
-            /*
-             * Tag membership/effective policy can change on multiple
-             * devices, so reconcile after confirmed server mutation.
-             *
-             * Mutation revision protection prevents this refresh from
-             * overwriting a newer concurrent mutation.
-             */
             refreshAll()
         }
 
