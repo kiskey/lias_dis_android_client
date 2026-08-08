@@ -1,8 +1,8 @@
 // ====================================================================
 // File: DeviceDetailScreen.kt
-// Version: 3.1.0 (HIG Redesign)
-// Purpose: Device specifics. Sticky action bar. Grouped identity cards.
-//          Preserves all /logs and /effective-status API calls.
+// Version: 3.2.0 (Cupertino Refactor)
+// Purpose: Fixed ApiResult type argument, VM function names, and
+//          missing HigTextButton import.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -65,7 +65,7 @@ fun DeviceDetailScreen(
 
     LaunchedEffect(pdid) {
         val result = viewModel.getDeviceLogs(pdid)
-        if (result is ApiResult.Success) logs = result.data
+        if (result is ApiResult.Success<List<FlowLog>>) logs = result.data
         isLoadingLogs = false
     }
 
