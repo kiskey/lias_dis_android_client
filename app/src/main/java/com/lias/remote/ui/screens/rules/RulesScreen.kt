@@ -18,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
@@ -249,9 +248,7 @@ fun PolicyWizardSheet(
                         HigButton(
                             text = if (action == "schedule") "Next" else "Save Rule",
                             onClick = {
-                                if (action != "schedule") {
-                                    onSave(Policy(id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}", name = name, type = type, targetID = "", action = action, priority = priority.toIntOrNull() ?: 50, enabled = true))
-                                } else { step = 3 }
+                                onSave(Policy(id = initialPolicy?.id ?: "pol_${System.currentTimeMillis()}", name = name, type = type, targetID = "", action = action, priority = priority.toIntOrNull() ?: 50, enabled = true))
                             },
                             style = HigButtonStyle.Primary, modifier = Modifier.weight(1f)
                         )
