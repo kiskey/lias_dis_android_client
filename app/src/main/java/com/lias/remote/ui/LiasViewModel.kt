@@ -13,7 +13,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
-import com.lias.remote.repositories.* // Wildcard import resolves all extension methods on EventRepository
+import com.lias.remote.repositories.* // Wildcard import resolves all repository extension functions
 import com.lias.remote.ui.components.UndoState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
