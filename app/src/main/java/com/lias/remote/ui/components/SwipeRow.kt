@@ -1,10 +1,10 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SwipeRow.kt
-// Version: 2.3.0
+// Version: 2.4.0
 // Purpose: Apple HIG SwipeToDismiss row component with full-bleed action
 //          backgrounds, Cupertino cancel 'X' option, and auto-reset.
 // Audit Fixes:
-//   1. Removed side-effects from confirmValueChange to prevent drag-calculation toast spam.
+//   1. Corrected CircleShape import to androidx.compose.foundation.shape.CircleShape.
 //   2. Held revealed state open with opposite-end Cupertino 'X' cancel button and auto-reset on tap.
 // ====================================================================
 
@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.shape.CircleShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -94,7 +94,7 @@ fun SwipeActionRow(
 
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -106,7 +106,7 @@ fun SwipeActionRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -125,7 +125,7 @@ fun SwipeActionRow(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.25f))
                                 .clickable {
@@ -137,7 +137,7 @@ fun SwipeActionRow(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cancel",
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
 
