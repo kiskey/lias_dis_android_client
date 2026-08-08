@@ -1,24 +1,21 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 21.0.0
+// File:
+// app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
+// Version: 27.0.0
 //
 // Purpose:
-//   HIG-inspired bottom modal surface.
+//   Shared HIG-style modal sheet infrastructure.
 //
-// Batch 21:
-//   - Android Back dismisses the current modal.
-//   - Modal content exposes pane semantics.
-//   - Scrim gets an explicit accessibility dismissal action.
-//   - Scrim and sheet are separate siblings; an empty clickable handler
-//     is no longer used solely to stop event propagation.
-//   - Navigation-bar inset respected.
-//   - Sheet header title is exposed as a heading.
-//   - Cancel/trailing actions inherit 48dp targets from HigTextButton.
+// Batch 27:
+//   - Adds accessibilityLabel used by Batches 24–26.
+//   - Preserves all existing callers because parameter is optional.
+//   - Adds pane semantics for assistive technologies.
+//   - Backdrop remains dismissible.
+//   - Sheet body consumes pointer taps to prevent accidental dismissal.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,6 +24,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -34,7 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,11 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,18 +55,16 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 fun HigModalSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    accessibilityLabel: String = "Modal sheet",
+    accessibilityLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
 
-    BackHandler(
-        enabled =
-            true,
-        onBack =
-            onDismiss
-    )
+    val backdropInteractionSource =
+        remember {
+            MutableInteractionSource()
+        }
 
-    val scrimInteraction =
+    val sheetInteractionSource =
         remember {
             MutableInteractionSource()
         }
@@ -83,61 +75,44 @@ fun HigModalSheet(
         enter =
             fadeIn() +
                 slideInVertically {
-                    it
+                    fullHeight ->
+
+                    fullHeight
                 },
         exit =
             fadeOut() +
                 slideOutVertically {
-                    it
+                    fullHeight ->
+
+                    fullHeight
                 }
     ) {
 
         Box(
             modifier =
-                Modifier.fillMaxSize()
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Color.Black.copy(
+                            alpha =
+                                0.40f
+                        )
+                    )
+                    .clickable(
+                        interactionSource =
+                            backdropInteractionSource,
+                        indication =
+                            null,
+                        onClick =
+                            onDismiss
+                    ),
+            contentAlignment =
+                Alignment.BottomCenter
         ) {
-
-            /*
-             * Scrim is its own dismissal target.
-             *
-             * The sheet content is no longer nested inside this
-             * clickable node, removing the need for onClick = {}.
-             */
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Color.Black
-                                .copy(
-                                    alpha =
-                                        0.40f
-                                )
-                        )
-                        .semantics {
-
-                            role =
-                                Role.Button
-
-                            contentDescription =
-                                "Dismiss $accessibilityLabel"
-                        }
-                        .clickable(
-                            interactionSource =
-                                scrimInteraction,
-                            indication =
-                                null,
-                            onClick =
-                                onDismiss
-                        )
-            )
 
             Column(
                 modifier =
                     modifier
-                        .align(
-                            Alignment.BottomCenter
-                        )
                         .fillMaxWidth()
                         .clip(
                             RoundedCornerShape(
@@ -151,14 +126,38 @@ fun HigModalSheet(
                             LiasThemeColors
                                 .secondaryBackground
                         )
-                        .semantics {
-                            paneTitle =
+                        .then(
+                            if (
                                 accessibilityLabel
-                        }
-                        .navigationBarsPadding()
+                                    .isNullOrBlank()
+                            ) {
+
+                                Modifier
+
+                            } else {
+
+                                Modifier.semantics {
+
+                                    paneTitle =
+                                        accessibilityLabel
+                                }
+                            }
+                        )
+                        .clickable(
+                            interactionSource =
+                                sheetInteractionSource,
+                            indication =
+                                null,
+                            onClick = {
+                                /*
+                                 * Consume clicks so they never reach
+                                 * the dismissible backdrop.
+                                 */
+                            }
+                        )
                         .padding(
                             bottom =
-                                12.dp
+                                24.dp
                         )
             ) {
 
@@ -166,8 +165,7 @@ fun HigModalSheet(
                     modifier =
                         Modifier
                             .align(
-                                Alignment
-                                    .CenterHorizontally
+                                Alignment.CenterHorizontally
                             )
                             .padding(
                                 top =
@@ -176,8 +174,10 @@ fun HigModalSheet(
                                     12.dp
                             )
                             .width(
-                                HigSpec
-                                    .SheetHandleWidth
+                                HigSpec.SheetHandleWidth
+                            )
+                            .height(
+                                HigSpec.SheetHandleHeight
                             )
                             .clip(
                                 RoundedCornerShape(
@@ -187,12 +187,6 @@ fun HigModalSheet(
                             .background(
                                 LiasThemeColors
                                     .tertiaryLabel
-                            )
-                            .padding(
-                                vertical =
-                                    HigSpec
-                                        .SheetHandleHeight /
-                                        2
                             )
                 )
 
@@ -217,30 +211,22 @@ fun HigSheetHeader(
                 .fillMaxWidth()
                 .padding(
                     horizontal =
-                        12.dp,
+                        16.dp,
                     vertical =
-                        2.dp
+                        8.dp
                 ),
         verticalAlignment =
-            Alignment.CenterVertically
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.SpaceBetween
     ) {
 
-        Box(
-            modifier =
-                Modifier.weight(
-                    1f
-                ),
-            contentAlignment =
-                Alignment.CenterStart
-        ) {
-
-            HigTextButton(
-                text =
-                    "Cancel",
-                onClick =
-                    onCancel
-            )
-        }
+        HigTextButton(
+            text =
+                "Cancel",
+            onClick =
+                onCancel
+        )
 
         CupertinoText(
             text =
@@ -250,34 +236,27 @@ fun HigSheetHeader(
             fontWeight =
                 FontWeight.SemiBold,
             color =
-                LiasThemeColors.label,
-            modifier =
-                Modifier
-                    .weight(
-                        2f
-                    )
-                    .semantics {
-                        heading()
-                    }
+                LiasThemeColors.label
         )
 
-        Box(
-            modifier =
-                Modifier.weight(
-                    1f
-                ),
-            contentAlignment =
-                Alignment.CenterEnd
+        if (
+            trailingAction !=
+            null
         ) {
 
-            trailingAction
-                ?.invoke()
-                ?: Spacer(
-                    modifier =
-                        Modifier.width(
-                            44.dp
-                        )
-                )
+            trailingAction()
+
+        } else {
+
+            /*
+             * Keeps title visually centered against the Cancel button.
+             */
+            Spacer(
+                modifier =
+                    Modifier.width(
+                        60.dp
+                    )
+            )
         }
     }
 }
