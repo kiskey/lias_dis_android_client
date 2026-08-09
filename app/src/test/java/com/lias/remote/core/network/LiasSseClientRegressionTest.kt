@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/test/java/com/lias/remote/core/network/LiasSseClientRegressionTest.kt
-// Version: 23.0.0
+// Version: 27.6.0
 //
 // Purpose:
 //   Verify LIAS SSE replay and credential lifecycle.
@@ -20,8 +20,10 @@ package com.lias.remote.core.network
 import com.lias.remote.core.models.LiasEvent
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -424,6 +426,16 @@ class LiasSseClientRegressionTest {
                     serverA
                 )
 
+            val eventDeferred =
+                async(
+                    start =
+                        CoroutineStart.UNDISPATCHED
+                ) {
+
+                    client.events
+                        .first()
+                }
+
             client.connect(
                 scope
             )
@@ -433,9 +445,7 @@ class LiasSseClientRegressionTest {
                 withTimeout(
                     3_000L
                 ) {
-
-                    client.events
-                        .first()
+                    eventDeferred.await()
                 }
 
             assertEquals(

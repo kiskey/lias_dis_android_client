@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/LiasConnectionProbe.kt
-// Version: 22.0.0
+// Version: 27.6.0
 //
 // Purpose:
 //   Isolated LIAS endpoint verification.
@@ -109,9 +109,6 @@ class LiasConnectionProbe(
         var normalized =
             rawUrl
                 .trim()
-                .trimEnd(
-                    '/'
-                )
 
         if (
             normalized.isBlank()
@@ -119,19 +116,30 @@ class LiasConnectionProbe(
             return null
         }
 
-        if (
-            !normalized.startsWith(
+        val hasHttpScheme =
+            normalized.startsWith(
                 "http://",
                 ignoreCase = true
-            ) &&
-            !normalized.startsWith(
+            )
+
+        val hasHttpsScheme =
+            normalized.startsWith(
                 "https://",
                 ignoreCase = true
             )
+
+        if (
+            !hasHttpScheme &&
+            !hasHttpsScheme
         ) {
             normalized =
                 "http://$normalized"
         }
+
+        normalized =
+            normalized.trimEnd(
+                '/'
+            )
 
         return try {
 
@@ -140,14 +148,30 @@ class LiasConnectionProbe(
                     normalized
                 )
 
-            if (
-                uri.scheme !in
-                setOf(
-                    "http",
+            val normalizedScheme =
+                uri.scheme
+                    ?.lowercase()
+
+            val validScheme =
+                normalizedScheme ==
+                    "http" ||
+                    normalizedScheme ==
                     "https"
-                ) ||
-                uri.host
+
+            val validHost =
+                !uri.host
                     .isNullOrBlank()
+
+            val safeAuthority =
+                uri.userInfo ==
+                    null &&
+                    uri.fragment ==
+                    null
+
+            if (
+                !validScheme ||
+                !validHost ||
+                !safeAuthority
             ) {
                 null
             } else {
