@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt
-// Version: 28.2.1
+// Version: 28.6.1
 //
 // Focused Cupertino-style schedule picker presentation.
 //
@@ -33,12 +33,16 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -49,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -253,6 +258,24 @@ private fun FocusedPickerDialog(
         mutableStateOf(false)
     }
 
+    val configuration =
+        LocalConfiguration.current
+
+    /*
+     * Keep the entire picker task inside the safe visible window.
+     * The card uses at most 72% of the screen height, leaving clear
+     * context above it while keeping the Done button above system bars.
+     */
+    val maxPickerHeight =
+        (
+            configuration.screenHeightDp *
+                0.72f
+            )
+            .dp
+            .coerceAtLeast(
+                420.dp
+            )
+
     LaunchedEffect(Unit) {
         visible = true
     }
@@ -268,8 +291,12 @@ private fun FocusedPickerDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(LiasThemeColors.background)
-                .windowInsetsPadding(WindowInsets.systemBars),
-            contentAlignment = Alignment.BottomCenter
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 20.dp
+                ),
+            contentAlignment = Alignment.Center
         ) {
             AnimatedVisibility(
                 visible = visible,
@@ -281,18 +308,31 @@ private fun FocusedPickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .widthIn(
+                            max = 600.dp
+                        )
+                        .heightIn(
+                            max = maxPickerHeight
+                        )
                         .clip(
                             RoundedCornerShape(
-                                topStart = HigSpec.SheetCorner,
-                                topEnd = HigSpec.SheetCorner
+                                HigSpec.SheetCorner
                             )
                         )
-                        .background(LiasThemeColors.secondaryBackground)
+                        .background(
+                            LiasThemeColors.secondaryBackground
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        )
                         .padding(
                             horizontal = 20.dp,
                             vertical = 16.dp
                         ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            14.dp
+                        )
                 ) {
                     HigSheetHeader(
                         title = title,
