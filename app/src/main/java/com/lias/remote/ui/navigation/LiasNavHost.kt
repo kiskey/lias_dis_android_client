@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 25.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Canonical application navigation graph.
@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -752,7 +753,7 @@ private fun ConnectionBanner(
 }
 
 @Composable
-private fun TabItem(
+private fun RowScope.TabItem(
     screen: LiasScreen,
     selected: Boolean,
     onClick: () -> Unit

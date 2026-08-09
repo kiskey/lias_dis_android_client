@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/UiState.kt
-// Version: 25.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Canonical immutable application state.
@@ -78,6 +78,57 @@ data class UiState(
         get() =
             !errorMessage
                 .isNullOrBlank()
+
+    /**
+     * REST synchronization is deliberately separate from SSE
+     * connectivity. This computed projection preserves that UX
+     * distinction without introducing another mutable source of truth.
+     */
+    val syncState: SyncState
+        get() {
+            val message =
+                errorMessage
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+
+            val hasUsableData =
+                devices.isNotEmpty() ||
+                    tags.isNotEmpty() ||
+                    policies.isNotEmpty() ||
+                    schedules.isNotEmpty() ||
+                    users.isNotEmpty() ||
+                    stats != null
+
+            return when {
+                !isInitialLoaded && message == null ->
+                    SyncState.Loading
+
+                !isInitialLoaded && message != null ->
+                    SyncState.Failed(
+                        message
+                    )
+
+                message != null && !hasUsableData ->
+                    SyncState.Failed(
+                        message
+                    )
+
+                message != null ->
+                    SyncState.Stale(
+                        synchronizedAt =
+                            null,
+                        message =
+                            message
+                    )
+
+                else ->
+                    SyncState.Ready(
+                        synchronizedAt =
+                            0L
+                    )
+            }
+        }
 
     fun effectiveStatusForDevice(
         pdid: String

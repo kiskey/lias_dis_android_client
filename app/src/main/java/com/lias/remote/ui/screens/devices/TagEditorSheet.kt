@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 16.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Create/edit custom LIAS tags.
@@ -52,7 +52,7 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 @Composable
 fun TagEditorSheet(
     initialTag: Tag?,
-    dependencyImpact: TagDependencyImpact?,
+    dependencyImpact: TagDependencyImpact? = null,
     onDismiss: () -> Unit,
     onSave: (Tag) -> Unit,
     onDelete: (() -> Unit)? = null

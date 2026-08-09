@@ -3,6 +3,7 @@ package com.lias.remote.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lias.remote.core.diagnostics.ErrorPresentation
+import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.FlowLog
 import com.lias.remote.core.models.Policy
@@ -35,6 +36,7 @@ import com.lias.remote.repositories.savePolicy
 import com.lias.remote.repositories.saveSchedule
 import com.lias.remote.repositories.toggleVacationMode
 import com.lias.remote.repositories.updateTag
+import com.lias.remote.repositories.validatePolicy
 import com.lias.remote.ui.components.UndoState
 import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -338,7 +340,7 @@ class LiasViewModel(
                     UndoState(
                         message =
                             "Tags updated",
-                        undoAction = {
+                        action = {
 
                             viewModelScope.launch {
 
@@ -393,7 +395,7 @@ class LiasViewModel(
                     UndoState(
                         message =
                             "Device renamed to '${newName.trim()}'",
-                        undoAction = {
+                        action = {
 
                             viewModelScope.launch {
 
@@ -449,6 +451,13 @@ class LiasViewModel(
         }
     }
 
+    suspend fun validatePolicy(
+        scheduleIds: List<String>
+    ): ApiResult<List<Conflict>> =
+        eventRepository.validatePolicy(
+            scheduleIds
+        )
+
     // ----------------------------------------------------------------
     // Policies
     // ----------------------------------------------------------------
@@ -496,28 +505,14 @@ class LiasViewModel(
             ) {
 
                 _undoState.value =
-                    UndoState(
-                        message =
-                            "Rule '$policyName' deleted",
-                        undoAction = {
+                    null
 
-                            viewModelScope.launch {
-
-                                /*
-                                 * Undo is a CREATE, not an UPDATE of a
-                                 * deleted identity.
-                                 *
-                                 * LIAS generates the canonical ID.
-                                 */
-                                eventRepository
-                                    .savePolicy(
-                                        policy.copy(
-                                            id =
-                                                ""
-                                        )
-                                    )
-                            }
-                        }
+                eventRepository
+                    ._uiEvents
+                    .emit(
+                        UiEvent.ShowSnackbar(
+                            "Rule '$policyName' deleted"
+                        )
                     )
 
             } else {

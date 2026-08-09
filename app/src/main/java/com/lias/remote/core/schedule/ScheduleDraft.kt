@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/schedule/ScheduleDraft.kt
-// Version: 18.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Editor-safe representation of LIAS schedules.
@@ -104,14 +104,11 @@ data class ScheduleRuleDraft(
 
                 days =
                     rule.safeDays
-                        .map {
+                        .mapNotNull {
                             ScheduleSemantics
                                 .normalizeDay(
                                     it
                                 )
-                        }
-                        .filter {
-                            it.isNotBlank()
                         }
                         .toSet(),
 

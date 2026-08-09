@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt
-// Version: 26.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Authoritative device detail and actions.
@@ -998,19 +998,11 @@ fun DeviceDetailScreen(
                     false
             },
             onCreateUser = {
-                userName ->
+                user ->
 
-                /*
-                 * Server owns canonical User ID.
-                 */
                 viewModel
                     .createUser(
-                        User(
-                            id =
-                                "",
-                            name =
-                                userName.trim()
-                        )
+                        user
                     )
             }
         )
@@ -1120,167 +1112,5 @@ private fun DeviceUnavailableScreen(
             modifier =
                 Modifier.fillMaxWidth()
         )
-    }
-}
-
-@Composable
-private fun UserAssignmentSheet(
-    users: List<User>,
-    assignedUserId: String?,
-    onDismiss: () -> Unit,
-    onSelectUser: (String) -> Unit,
-    onCreateUser: (String) -> Unit
-) {
-
-    var newUserName by
-        remember {
-            mutableStateOf(
-                ""
-            )
-        }
-
-    HigModalSheet(
-        onDismiss =
-            onDismiss,
-        accessibilityLabel =
-            "Assign User"
-    ) {
-
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal =
-                            24.dp,
-                        vertical =
-                            16.dp
-                    ),
-            verticalArrangement =
-                Arrangement.spacedBy(
-                    16.dp
-                )
-        ) {
-
-            HigSheetHeader(
-                title =
-                    "Assign User",
-                onCancel =
-                    onDismiss
-            )
-
-            GroupedListCard {
-
-                GroupedListRow(
-                    primaryText =
-                        "Unassigned",
-                    secondaryText =
-                        if (
-                            assignedUserId
-                                .isNullOrBlank()
-                        ) {
-                            "Current"
-                        } else {
-                            null
-                        },
-                    onClick = {
-                        onSelectUser(
-                            ""
-                        )
-                    },
-                    showDivider =
-                        users.isNotEmpty()
-                )
-
-                users
-                    .sortedBy {
-                        it.name
-                            .lowercase()
-                    }
-                    .forEachIndexed {
-                            index,
-                            user ->
-
-                        GroupedListRow(
-                            primaryText =
-                                user.name,
-                            secondaryText =
-                                if (
-                                    user.id ==
-                                    assignedUserId
-                                ) {
-                                    "Current"
-                                } else {
-                                    null
-                                },
-                            onClick = {
-                                onSelectUser(
-                                    user.id
-                                )
-                            },
-                            showDivider =
-                                index <
-                                    users.lastIndex
-                        )
-                    }
-            }
-
-            ListSectionHeader(
-                "New User"
-            )
-
-            HigField(
-                value =
-                    newUserName,
-                onValueChange = {
-                    newUserName =
-                        it
-                },
-                label =
-                    "Name",
-                placeholder =
-                    "Family member"
-            )
-
-            HigButton(
-                text =
-                    "Create User",
-                onClick = {
-
-                    val name =
-                        newUserName
-                            .trim()
-
-                    if (
-                        name.isNotBlank()
-                    ) {
-
-                        onCreateUser(
-                            name
-                        )
-
-                        newUserName =
-                            ""
-                    }
-                },
-                enabled =
-                    newUserName
-                        .isNotBlank(),
-                style =
-                    HigButtonStyle.Primary,
-                modifier =
-                    Modifier.fillMaxWidth()
-            )
-
-            CupertinoText(
-                text =
-                    "After LIAS creates the user, select that user above to assign this device.",
-                style =
-                    HigTypography.caption,
-                color =
-                    LiasThemeColors
-                        .tertiaryLabel
-            )
-        }
     }
 }

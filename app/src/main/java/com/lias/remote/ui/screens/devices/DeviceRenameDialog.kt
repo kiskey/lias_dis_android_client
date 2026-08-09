@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/DeviceRenameDialog.kt
-// Version: 7.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Functional Cupertino-style device rename dialog.
@@ -22,7 +22,7 @@ import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigField
 
 @Composable
-fun DeviceRenameDialog(
+fun RenameDeviceDialog(
     currentName: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit

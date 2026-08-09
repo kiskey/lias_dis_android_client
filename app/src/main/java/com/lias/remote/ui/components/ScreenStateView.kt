@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/ScreenStateView.kt
-// Version: 6.0.0
+// Version: 27.2.0
 //
 // Purpose:
 //   Shared HIG-style loading / empty / error / stale presentation.
@@ -98,7 +98,7 @@ fun ScreenStateView(
         CupertinoText(
             text = title,
             style =
-                HigTypography.title3,
+                HigTypography.headline,
             fontWeight =
                 FontWeight.SemiBold,
             color =
