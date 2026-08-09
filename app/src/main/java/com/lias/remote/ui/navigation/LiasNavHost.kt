@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 27.2.0
+// Version: 28.0.0
 //
 // Purpose:
 //   Canonical application navigation graph.
@@ -79,7 +79,6 @@ import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoScaffold
 import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
 import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
@@ -306,31 +305,20 @@ fun LiasNavHost(
     CupertinoScaffold(
         topBar = {
 
-            Column {
+            /*
+             * Each root screen already owns its large title. Keep the
+             * global top area empty during normal operation and surface
+             * only transient connection state here.
+             */
+            if (
+                uiState.connectionState !=
+                ConnectionState.CONNECTED
+            ) {
 
-                CupertinoTopAppBar(
-                    title = {
-                        CupertinoText(
-                            "LIAS Remote"
-                        )
-                    }
+                ConnectionBanner(
+                    state =
+                        uiState.connectionState
                 )
-
-                /*
-                 * Configured != Connected.
-                 *
-                 * Users stay inside the app during temporary SSE loss.
-                 */
-                if (
-                    uiState.connectionState !=
-                    ConnectionState.CONNECTED
-                ) {
-
-                    ConnectionBanner(
-                        state =
-                            uiState.connectionState
-                    )
-                }
             }
         },
         bottomBar = {
@@ -652,7 +640,7 @@ fun LiasNavHost(
                                 if (
                                     showTabBar
                                 ) {
-                                    HigSpec.BottomNavPadding +
+                                    HigSpec.TabBarHeight +
                                         12.dp
                                 } else {
                                     16.dp
@@ -818,7 +806,7 @@ private fun RowScope.TabItem(
                 color,
             modifier =
                 Modifier.size(
-                    HigSpec.IconSizeM
+                    HigSpec.IconSizeL
                 )
         )
 

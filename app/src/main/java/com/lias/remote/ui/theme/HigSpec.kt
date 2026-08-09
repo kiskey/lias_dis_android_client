@@ -16,7 +16,7 @@ object HigSpec {
 
     // Inset Grouped Section
     val GroupedCardCorner = 12.dp
-    val RowMinHeight = 48.dp
+    val RowMinHeight = 50.dp
     val RowHorizontalPadding = 16.dp
     val RowVerticalPadding = 12.dp
 
@@ -26,21 +26,21 @@ object HigSpec {
     val SheetHandleHeight = 5.dp
 
     // Tab Bar (Optimized for 6.1" Pixel 6a)
-    val TabBarHeight = 60.dp
-    val BottomNavPadding = 94.dp
+    val TabBarHeight = 72.dp
+    val BottomNavPadding = 24.dp
 
     // Control Elements
     val IconSizeS = 16.dp
-    val IconSizeM = 26.dp
-    val IconSizeL = 30.dp
-    val IconBubbleSize = 32.dp
+    val IconSizeM = 28.dp
+    val IconSizeL = 32.dp
+    val IconBubbleSize = 36.dp
     val IconBubbleCorner = 8.dp
 
     val ButtonCorner = 10.dp
-    val ButtonHeight = 46.dp
-    val ButtonHeightLarge = 52.dp
+    val ButtonHeight = 48.dp
+    val ButtonHeightLarge = 54.dp
 
-    val SegmentedControlHeight = 34.dp
+    val SegmentedControlHeight = 48.dp
     val SegmentedControlCorner = 9.dp
 
     val SectionHeaderPadding = PaddingValues(start = 32.dp, end = 16.dp, top = 20.dp, bottom = 6.dp)

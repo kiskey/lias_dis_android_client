@@ -68,8 +68,8 @@ object HigTypography {
     val tabLabel = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 13.sp,
+        fontSize = 12.sp,
+        lineHeight = 15.sp,
         letterSpacing = 0.sp
     )
 }

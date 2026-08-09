@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
-// Version: 21.0.0
+// Version: 28.0.0
 //
 // Purpose:
 //   Cupertino-style mutually exclusive segmented control.
@@ -20,6 +20,7 @@ package com.lias.remote.ui.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -100,8 +101,13 @@ fun SegmentedControl(
                 .background(
                     LiasThemeColors.fill2
                 )
+                .border(
+                    width = 0.5.dp,
+                    color = LiasThemeColors.separator,
+                    shape = RoundedCornerShape(HigSpec.SegmentedControlCorner)
+                )
                 .padding(
-                    2.dp
+                    3.dp
                 )
     ) {
 
@@ -138,20 +144,12 @@ fun SegmentedControl(
                     .fillMaxHeight()
                     .shadow(
                         elevation =
-                            if (
-                                isDestructive &&
-                                selectedIndex ==
-                                options.lastIndex
-                            ) {
-                                2.dp
-                            } else {
-                                1.dp
-                            },
+                            2.dp,
                         shape =
                             RoundedCornerShape(
                                 HigSpec
                                     .SegmentedControlCorner -
-                                    2.dp
+                                    3.dp
                             )
                     )
                     .background(
@@ -170,7 +168,7 @@ fun SegmentedControl(
                             RoundedCornerShape(
                                 HigSpec
                                     .SegmentedControlCorner -
-                                    2.dp
+                                    3.dp
                             )
                     )
         )
@@ -201,7 +199,7 @@ fun SegmentedControl(
                             Color.White
 
                         selected ->
-                            LiasThemeColors.label
+                            LiasThemeColors.blue
 
                         else ->
                             LiasThemeColors

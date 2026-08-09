@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt
-// Version: 21.0.0
+// Version: 28.0.0
 //
 // Purpose:
 //   Apple-inspired collapsible large-title application scaffold.
@@ -115,47 +115,54 @@ fun HigLargeTitleScaffold(
                     )
         ) {
 
-            /*
-             * Compact navigation bar.
-             *
-             * Minimum rather than fixed height is important when the
-             * user's system font scale is large.
-             */
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(
-                            min =
-                                44.dp
-                        )
-                        .background(
-                            LiasThemeColors.background
-                        )
-                        .padding(
-                            horizontal =
-                                HigSpec.SpacingS
-                        ),
-                verticalAlignment =
-                    Alignment.CenterVertically
+            if (
+                isCollapsed
             ) {
 
-                Box(
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        ),
-                    contentAlignment =
-                        Alignment.CenterStart
-                ) {
-                    navLeading
-                        ?.invoke()
-                }
-
-                Box(
+                Row(
                     modifier =
                         Modifier
-                            .weight(
+                            .fillMaxWidth()
+                            .heightIn(
+                                min =
+                                    44.dp
+                            )
+                            .background(
+                                LiasThemeColors.background
+                            )
+                            .padding(
+                                horizontal =
+                                    HigSpec.SpacingM
+                            ),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Box(
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        contentAlignment =
+                            Alignment.CenterStart
+                    ) {
+                        navLeading
+                            ?.invoke()
+                    }
+
+                    CupertinoText(
+                        text =
+                            title,
+                        style =
+                            HigTypography.headline,
+                        color =
+                            LiasThemeColors.label,
+                        maxLines =
+                            1,
+                        overflow =
+                            TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier.weight(
                                 if (
                                     isLandscape
                                 ) {
@@ -164,110 +171,47 @@ fun HigLargeTitleScaffold(
                                     2f
                                 }
                             )
-                            .padding(
-                                horizontal =
-                                    8.dp
-                            ),
-                    contentAlignment =
-                        Alignment.Center
-                ) {
+                    )
 
-                    if (
-                        isCollapsed
-                    ) {
-
-                        CupertinoText(
-                            text =
-                                title,
-                            style =
-                                HigTypography.headline,
-                            color =
-                                LiasThemeColors.label,
-                            maxLines =
-                                1,
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Box(
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        ),
-                    contentAlignment =
-                        Alignment.CenterEnd
-                ) {
-                    navTrailing
-                        ?.invoke()
-                }
-            }
-
-            if (
-                !isCollapsed
-            ) {
-
-                if (
-                    isLandscape
-                ) {
-
-                    Row(
+                    Box(
                         modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal =
-                                        HigSpec.SpacingM,
-                                    vertical =
-                                        HigSpec.SpacingXS
-                                ),
-                        verticalAlignment =
-                            Alignment.CenterVertically
+                            Modifier.weight(
+                                1f
+                            ),
+                        contentAlignment =
+                            Alignment.CenterEnd
                     ) {
-
-                        CupertinoText(
-                            text =
-                                title,
-                            style =
-                                HigTypography.largeTitle,
-                            color =
-                                LiasThemeColors.label,
-                            maxLines =
-                                2,
-                            overflow =
-                                TextOverflow.Ellipsis,
-                            modifier =
-                                Modifier
-                                    .weight(
-                                        1f
-                                    )
-                                    .semantics {
-                                        heading()
-                                    }
-                        )
-
-                        if (
-                            searchPlaceholder
-                                .isNotEmpty()
-                        ) {
-
-                            HigSearchField(
-                                query =
-                                    searchQuery,
-                                onQueryChanged =
-                                    onSearchQueryChanged,
-                                placeholder =
-                                    searchPlaceholder,
-                                modifier =
-                                    Modifier.weight(
-                                        1.5f
-                                    )
-                            )
-                        }
+                        navTrailing
+                            ?.invoke()
                     }
+                }
 
-                } else {
+            } else {
+
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start =
+                                    HigSpec.SpacingM,
+                                end =
+                                    HigSpec.SpacingM,
+                                top =
+                                    HigSpec.SpacingS,
+                                bottom =
+                                    HigSpec.SpacingXS
+                            ),
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            HigSpec.SpacingS
+                        )
+                ) {
+
+                    navLeading
+                        ?.invoke()
 
                     CupertinoText(
                         text =
@@ -277,17 +221,19 @@ fun HigLargeTitleScaffold(
                         color =
                             LiasThemeColors.label,
                         maxLines =
-                            3,
+                            if (
+                                isLandscape
+                            ) {
+                                2
+                            } else {
+                                3
+                            },
                         overflow =
                             TextOverflow.Ellipsis,
                         modifier =
                             Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal =
-                                        HigSpec.SpacingM,
-                                    vertical =
-                                        HigSpec.SpacingXS
+                                .weight(
+                                    1f
                                 )
                                 .semantics {
                                     heading()
@@ -295,6 +241,7 @@ fun HigLargeTitleScaffold(
                     )
 
                     if (
+                        isLandscape &&
                         searchPlaceholder
                             .isNotEmpty()
                     ) {
@@ -307,16 +254,39 @@ fun HigLargeTitleScaffold(
                             placeholder =
                                 searchPlaceholder,
                             modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal =
-                                            HigSpec.SpacingM,
-                                        vertical =
-                                            HigSpec.SpacingXS
-                                    )
+                                Modifier.weight(
+                                    1.35f
+                                )
                         )
                     }
+
+                    navTrailing
+                        ?.invoke()
+                }
+
+                if (
+                    !isLandscape &&
+                    searchPlaceholder
+                        .isNotEmpty()
+                ) {
+
+                    HigSearchField(
+                        query =
+                            searchQuery,
+                        onQueryChanged =
+                            onSearchQueryChanged,
+                        placeholder =
+                            searchPlaceholder,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal =
+                                        HigSpec.SpacingM,
+                                    vertical =
+                                        HigSpec.SpacingXS
+                                )
+                    )
                 }
             }
 
@@ -328,7 +298,7 @@ fun HigLargeTitleScaffold(
                 content(
                     PaddingValues(
                         bottom =
-                            HigSpec.BottomNavPadding
+                            HigSpec.SpacingL
                     )
                 )
             }
