@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/repositories/PolicyScheduleMutations.kt
-// Version: 15.0.0
+// Version: 28.4.0
 //
 // Purpose:
 //   Canonical policy/schedule persistence with dependency-safe delete.
@@ -22,6 +22,7 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.ConflictResponse
 import com.lias.remote.core.network.Endpoints
 import com.lias.remote.core.network.PolicyValidateRequest
+import com.lias.remote.core.network.PolicyMutationRequest
 import com.lias.remote.core.util.ConfigurationSafety
 
 suspend fun EventRepository.validatePolicy(
@@ -72,6 +73,56 @@ suspend fun EventRepository.validatePolicy(
             result
     }
 }
+
+private fun Policy.toMutationRequest():
+    PolicyMutationRequest =
+    PolicyMutationRequest(
+        name =
+            name.trim(),
+        type =
+            type.trim().lowercase(),
+        targetId =
+            if (
+                type.equals(
+                    "global",
+                    ignoreCase =
+                        true
+                )
+            ) {
+                ""
+            } else {
+                targetID.trim()
+            },
+        action =
+            action.trim().lowercase(),
+        scheduleIds =
+            if (
+                action.equals(
+                    "schedule",
+                    ignoreCase =
+                        true
+                )
+            ) {
+                resolveScheduleIDs()
+                    .filter {
+                        it.isNotBlank()
+                    }
+                    .distinct()
+            } else {
+                emptyList()
+            },
+        priority =
+            priority,
+        enabled =
+            if (
+                id ==
+                    "global_default"
+            ) {
+                true
+            } else {
+                enabled
+            }
+    )
 
 suspend fun EventRepository.savePolicy(
     policy: Policy
@@ -145,6 +196,9 @@ suspend fun EventRepository.savePolicy(
             "policy:${policy.id}"
         }
 
+    val request =
+        policy.toMutationRequest()
+
     return mutations.mutate(
         resourceKey =
             mutationKey
@@ -157,22 +211,22 @@ suspend fun EventRepository.savePolicy(
 
                 api.post<
                     Policy,
-                    Policy
+                    PolicyMutationRequest
                 >(
                     Endpoints.POLICIES,
-                    policy
+                    request
                 )
 
             } else {
 
                 api.put<
                     Policy,
-                    Policy
+                    PolicyMutationRequest
                 >(
                     Endpoints.policy(
                         policy.id
                     ),
-                    policy
+                    request
                 )
             }
 

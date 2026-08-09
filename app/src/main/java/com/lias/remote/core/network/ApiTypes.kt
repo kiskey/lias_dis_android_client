@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/core/network/ApiTypes.kt
-// Version: 2.0.0
+// Version: 28.4.0
 //
 // Purpose:
 //   REST request/response DTOs exchanged with LIAS.
@@ -34,6 +34,30 @@ data class ConflictResponse(
 data class PolicyValidateRequest(
     @SerialName("schedule_ids")
     val scheduleIds: List<String>
+)
+
+
+/**
+ * Writable permanent-policy payload.
+ *
+ * Deliberately excludes server-owned / response-only fields:
+ * id, created_at, updated_at, expires_at, reason_tag, legacy schedule_id.
+ */
+@Serializable
+data class PolicyMutationRequest(
+    val name: String,
+    val type: String,
+
+    @SerialName("target_id")
+    val targetId: String,
+
+    val action: String,
+
+    @SerialName("schedule_ids")
+    val scheduleIds: List<String>,
+
+    val priority: Int,
+    val enabled: Boolean
 )
 
 @Serializable

@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt
-// Version: 17.0.0
+// Version: 28.4.0
 //
 // Purpose:
 //   Complete LIAS policy editor.
@@ -371,8 +371,7 @@ fun PolicyWizardSheet(
             (
                 isValidating ||
                     localConflicts.isNotEmpty() ||
-                    serverConflicts.isNotEmpty() ||
-                    validationError != null
+                    serverConflicts.isNotEmpty()
                 )
         ) {
             return
@@ -719,9 +718,7 @@ fun PolicyWizardSheet(
                                     localConflicts
                                         .isEmpty() &&
                                     serverConflicts
-                                        .isEmpty() &&
-                                    validationError ==
-                                        null,
+                                        .isEmpty(),
                             style =
                                 HigButtonStyle.Primary,
                             modifier =
