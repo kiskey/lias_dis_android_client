@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt
-// Version: 28.0.0
+// Version: 28.0.1
 //
 // Purpose:
 //   Apple-inspired collapsible large-title application scaffold.
@@ -17,6 +17,7 @@
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
