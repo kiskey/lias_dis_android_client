@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 22.0.0
+// Version: 27.3.0
 //
 // Purpose:
 //   Settings + safe server replacement + diagnostics state.
@@ -12,6 +12,12 @@
 //   - Authentication/network/serialization failures are distinguished.
 //   - Technical diagnostics are retained separately from normal UI.
 //   - Credentials are never included in diagnostics.
+// Stabilization 27.3:
+//   - Restores SettingsScreen server-health contract.
+//   - Adds session-scoped Advanced Controls disclosure.
+//   - Adds authoritative policy export/import orchestration.
+//   - Keeps EventRepository as the LIAS mutation authority.
+//   - Health probes remain isolated from the live connection client.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -25,7 +31,9 @@ import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.core.network.LiasConnectionProbe
 import com.lias.remote.core.store.SettingsRepository
 import com.lias.remote.repositories.EventRepository
+import com.lias.remote.repositories.exportPolicies
 import com.lias.remote.repositories.flushNftables
+import com.lias.remote.repositories.importPolicies
 import com.lias.remote.repositories.toggleVacationMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +62,24 @@ data class SettingsUiState(
     val connectionError: String? = null,
 
     val isFlushing: Boolean = false,
+
+    /*
+     * Advanced Controls is presentation-only progressive disclosure.
+     * It is intentionally not persisted to LIAS or treated as backend
+     * configuration.
+     */
+    val advancedMode: Boolean = false,
+
+    val isExportingPolicies: Boolean = false,
+    val isImportingPolicies: Boolean = false,
+    val isRefreshingServerHealth: Boolean = false,
+
+    /*
+     * Health metadata is observational only. The live EventRepository
+     * remains authoritative for connection state and enforcement data.
+     */
+    val serverVersion: String? = null,
+    val healthLatencyMs: Long? = null,
 
     val diagnostics: List<DiagnosticRecord> =
         emptyList(),
@@ -585,6 +611,242 @@ class SettingsViewModel(
                 diagnostics =
                     emptyList()
             )
+    }
+
+    /**
+     * Progressive-disclosure UI only.
+     *
+     * This does not change LIAS configuration and therefore must not be
+     * sent to the server.
+     */
+    fun setAdvancedMode(
+        enabled: Boolean
+    ) {
+
+        _uiState.value =
+            _uiState.value.copy(
+                advancedMode =
+                    enabled
+            )
+    }
+
+    /**
+     * Refresh server metadata using the isolated probe.
+     *
+     * Critical invariant:
+     * this does not mutate EventRepository.api.baseUrl/authToken and
+     * does not replace SSE state. It only observes the currently saved
+     * LIAS endpoint for Settings/About presentation.
+     */
+    fun refreshServerHealth() {
+
+        val current =
+            _uiState.value
+
+        if (
+            current.savedServerUrl
+                .isBlank() ||
+            current.isRefreshingServerHealth
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isRefreshingServerHealth =
+                        true
+                )
+
+            val startedAt =
+                System.nanoTime()
+
+            val result =
+                connectionProbe.probe(
+                    rawUrl =
+                        _uiState.value
+                            .savedServerUrl,
+                    authToken =
+                        _uiState.value
+                            .savedAuthToken
+                )
+
+            val latencyMs =
+                (
+                    System.nanoTime() -
+                        startedAt
+                    ) /
+                    1_000_000L
+
+            when (
+                result
+            ) {
+
+                is ApiResult.Success -> {
+
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isRefreshingServerHealth =
+                                false,
+                            serverVersion =
+                                result.data
+                                    .health
+                                    .version
+                                    .takeIf {
+                                        it.isNotBlank()
+                                    },
+                            healthLatencyMs =
+                                latencyMs,
+                            connectionError =
+                                null
+                        )
+                }
+
+                else -> {
+
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isRefreshingServerHealth =
+                                false,
+                            serverVersion =
+                                null,
+                            healthLatencyMs =
+                                null
+                        )
+
+                    appendDiagnostic(
+                        ErrorPresentation
+                            .diagnostic(
+                                result,
+                                _uiState.value
+                                    .savedServerUrl
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Export the exact policy payload returned by LIAS.
+     *
+     * Android performs no policy rewriting here; SettingsScreen owns
+     * only the document picker/write operation.
+     */
+    fun exportPolicies(
+        onReady: (String) -> Unit
+    ) {
+
+        if (
+            _uiState.value
+                .isExportingPolicies
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isExportingPolicies =
+                        true
+                )
+
+            val result =
+                eventRepository
+                    .exportPolicies()
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isExportingPolicies =
+                        false
+                )
+
+            when (
+                result
+            ) {
+
+                is ApiResult.Success -> {
+
+                    onReady(
+                        result.data
+                    )
+                }
+
+                else -> {
+
+                    appendDiagnostic(
+                        ErrorPresentation
+                            .diagnostic(
+                                result,
+                                _uiState.value
+                                    .savedServerUrl
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Restore policy JSON through LIAS's dedicated import endpoint.
+     *
+     * The repository performs the authoritative server mutation and
+     * refreshes application state after success.
+     */
+    fun importPolicies(
+        payload: String
+    ) {
+
+        if (
+            _uiState.value
+                .isImportingPolicies
+        ) {
+            return
+        }
+
+        if (
+            payload.isBlank()
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isImportingPolicies =
+                        true
+                )
+
+            val result =
+                eventRepository
+                    .importPolicies(
+                        payload
+                    )
+
+            _uiState.value =
+                _uiState.value.copy(
+                    isImportingPolicies =
+                        false
+                )
+
+            if (
+                result !is
+                ApiResult.Success
+            ) {
+
+                appendDiagnostic(
+                    ErrorPresentation
+                        .diagnostic(
+                            result,
+                            _uiState.value
+                                .savedServerUrl
+                        )
+                )
+            }
+        }
     }
 
     fun toggleVacationMode(
