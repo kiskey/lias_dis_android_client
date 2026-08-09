@@ -121,13 +121,6 @@ fun DevicesScreen(
             )
         }
 
-    var activeDeviceForRename by
-        remember {
-            mutableStateOf<Device?>(
-                null
-            )
-        }
-
     var activeTagForExtend by
         remember {
             mutableStateOf<Tag?>(
@@ -362,10 +355,6 @@ fun DevicesScreen(
                                     device.pdid
                                 )
                         },
-                        onRename = {
-                            activeDeviceForRename =
-                                device
-                        },
                         onDetail = {
                             onNavigateToDeviceDetail(
                                 device.pdid
@@ -536,32 +525,6 @@ fun DevicesScreen(
             }
         }
 
-    activeDeviceForRename
-        ?.let {
-            device ->
-
-            RenameDeviceDialog(
-                currentName =
-                    device.displayName,
-                onDismiss = {
-                    activeDeviceForRename =
-                        null
-                },
-                onConfirm = {
-                    name ->
-
-                    viewModel
-                        .renameDevice(
-                            device.pdid,
-                            name
-                        )
-
-                    activeDeviceForRename =
-                        null
-                }
-            )
-        }
-
     activeTagForExtend
         ?.let {
             tag ->
@@ -653,7 +616,6 @@ private fun DeviceCardItem(
     onExtend: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onRename: () -> Unit,
     onDetail: () -> Unit
 ) {
 
@@ -831,7 +793,7 @@ private fun DeviceCardItem(
 
                         HigButton(
                             text =
-                                "Extend",
+                                "Extend Access",
                             onClick =
                                 onExtend,
                             style =
@@ -872,21 +834,7 @@ private fun DeviceCardItem(
                                 )
                         )
                 }
-
-                HigButton(
-                    text =
-                        "Rename",
-                    onClick =
-                        onRename,
-                    style =
-                        HigButtonStyle.Gray,
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        )
-                )
-
-                if (
+if (
                     presentation.canExtend ||
                     presentation.canPause ||
                     presentation.canResumePause ||

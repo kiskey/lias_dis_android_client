@@ -462,25 +462,39 @@ class LiasViewModel(
     // Policies
     // ----------------------------------------------------------------
 
+    suspend fun savePolicyAwait(
+        policy: Policy
+    ): ApiResult<Policy> {
+
+        val result =
+            eventRepository
+                .savePolicy(
+                    policy
+                )
+
+        presentResult(
+            result,
+            if (
+                policy.id ==
+                "global_default"
+            ) {
+                "Global access mode updated"
+            } else {
+                "Rule saved"
+            }
+        )
+
+        return result
+    }
+
     fun savePolicy(
         policy: Policy
     ) {
 
         viewModelScope.launch {
 
-            presentResult(
-                eventRepository
-                    .savePolicy(
-                        policy
-                    ),
-                if (
-                    policy.id ==
-                    "global_default"
-                ) {
-                    "Global access mode updated"
-                } else {
-                    "Rule saved"
-                }
+            savePolicyAwait(
+                policy
             )
         }
     }

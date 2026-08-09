@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.access.AccessKind
 import com.lias.remote.ui.access.AccessPresentationResolver
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
@@ -160,22 +161,58 @@ fun HomeScreen(
                     true
             }
 
-    val activeDevices =
+    val attentionDevices =
         state.devices
-            .sortedWith(
-                compareByDescending<Device> {
-                    it.online
-                }
-                    .thenBy {
-                        it.displayName
-                            .lowercase()
-                    }
-            )
-            .take(
-                5
-            )
+            .filter {
+                device ->
 
-    HigLargeTitleScaffold(
+                when (
+                    AccessPresentationResolver
+                        .resolve(
+                            device,
+                            state
+                                .effectiveStatusForDevice(
+                                    device.pdid
+                                )
+                        )
+                        .kind
+                ) {
+
+                    AccessKind.PAUSED,
+                    AccessKind.BLOCKED,
+                    AccessKind.EXTENDED ->
+                        true
+
+                    else ->
+                        false
+                }
+            }
+            .sortedWith(
+                compareBy<Device> {
+                    device ->
+
+                    when (
+                        AccessPresentationResolver
+                            .resolve(
+                                device,
+                                state
+                                    .effectiveStatusForDevice(
+                                        device.pdid
+                                    )
+                            )
+                            .kind
+                    ) {
+
+                        AccessKind.PAUSED -> 0
+                        AccessKind.BLOCKED -> 1
+                        AccessKind.EXTENDED -> 2
+                        else -> 3
+                    }
+                }.thenBy {
+                    it.displayName.lowercase()
+                }
+            )
+HigLargeTitleScaffold(
         title =
             "Home",
         scrollState =
@@ -482,22 +519,22 @@ fun HomeScreen(
             }
 
             if (
-                activeDevices.isNotEmpty()
+                attentionDevices.isNotEmpty()
             ) {
 
                 item {
 
                     ListSectionHeader(
-                        "Devices"
+                        "Access Attention · ${attentionDevices.size}"
                     )
                 }
 
-                activeDevices.forEach {
+                attentionDevices.forEach {
                     device ->
 
                     item(
                         key =
-                            "home_${device.pdid}"
+                            "home_attention_${device.pdid}"
                     ) {
 
                         val status =
@@ -653,7 +690,7 @@ fun HomeScreen(
                                                     ) {
                                                         "Manage"
                                                     } else {
-                                                        "Extend"
+                                                        "Extend Access"
                                                     },
                                                 onClick = {
                                                     activeDeviceForExtend =

@@ -27,10 +27,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.policy.PolicyPresentation
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
@@ -54,6 +56,7 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
 import io.github.alexzhirkevich.cupertino.icons.outlined.Pencil
 import io.github.alexzhirkevich.cupertino.icons.outlined.Trash
+import kotlinx.coroutines.launch
 
 @Composable
 fun RulesScreen(
@@ -66,6 +69,9 @@ fun RulesScreen(
 
     val scrollState =
         rememberLazyListState()
+
+    val scope =
+        rememberCoroutineScope()
 
     var showWizard by
         remember {
@@ -85,6 +91,13 @@ fun RulesScreen(
         remember {
             mutableStateOf<Policy?>(
                 null
+            )
+        }
+
+    var policySaveInFlight by
+        remember {
+            mutableStateOf(
+                false
             )
         }
 
@@ -534,15 +547,37 @@ fun RulesScreen(
             onSave = {
                 policy ->
 
-                viewModel.savePolicy(
-                    policy
-                )
+                if (
+                    !policySaveInFlight
+                ) {
 
-                showWizard =
-                    false
+                    policySaveInFlight =
+                        true
 
-                editingPolicy =
-                    null
+                    scope.launch {
+
+                        val result =
+                            viewModel
+                                .savePolicyAwait(
+                                    policy
+                                )
+
+                        policySaveInFlight =
+                            false
+
+                        if (
+                            result is
+                            ApiResult.Success
+                        ) {
+
+                            showWizard =
+                                false
+
+                            editingPolicy =
+                                null
+                        }
+                    }
+                }
             }
         )
     }

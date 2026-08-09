@@ -191,6 +191,13 @@ fun DeviceDetailScreen(
             )
         }
 
+    var showTagAssignmentSheet by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
     LaunchedEffect(
         pdid
     ) {
@@ -443,7 +450,7 @@ fun DeviceDetailScreen(
 
                                     HigButton(
                                         text =
-                                            "Extend",
+                                            "Extend Access",
                                         onClick = {
                                             showExtendSheet =
                                                 true
@@ -766,6 +773,27 @@ fun DeviceDetailScreen(
             }
 
             item {
+
+                HigButton(
+                    text =
+                        "Manage Tags",
+                    onClick = {
+                        showTagAssignmentSheet =
+                            true
+                    },
+                    style =
+                        HigButtonStyle.Secondary,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal =
+                                    16.dp
+                            )
+                )
+            }
+
+            item {
                 ListSectionHeader(
                     "Activity · Last 24 Hours"
                 )
@@ -941,6 +969,34 @@ fun DeviceDetailScreen(
                     )
 
                 showPauseSheet =
+                    false
+            }
+        )
+    }
+
+    if (
+        showTagAssignmentSheet
+    ) {
+
+        MoveTagSheet(
+            device =
+                device,
+            allTags =
+                state.tags,
+            onDismiss = {
+                showTagAssignmentSheet =
+                    false
+            },
+            onConfirm = {
+                tagIds ->
+
+                viewModel
+                    .assignTags(
+                        device.pdid,
+                        tagIds
+                    )
+
+                showTagAssignmentSheet =
                     false
             }
         )
