@@ -235,7 +235,7 @@ fun ScheduleRuleEditorCard(
 
     timeTarget?.let { target ->
         ScheduleTimePickerSheet(
-            title = if (target == TimeTarget.START) "Start Time" else "End Time",
+            title = "Window ${index + 1} · " + if (target == TimeTarget.START) "Start Time" else "End Time",
             initialValue = if (target == TimeTarget.START) rule.startTime else rule.endTime,
             onDismiss = { timeTarget = null },
             onConfirm = { value ->
@@ -256,7 +256,7 @@ fun ScheduleRuleEditorCard(
 
     dateTarget?.let { target ->
         ScheduleDatePickerSheet(
-            title = if (target == DateTarget.START) "Start Date" else "End Date",
+            title = "Window ${index + 1} · " + if (target == DateTarget.START) "Start Date" else "End Date",
             initialValue = if (target == DateTarget.START) {
                 rule.startDate
             } else {
