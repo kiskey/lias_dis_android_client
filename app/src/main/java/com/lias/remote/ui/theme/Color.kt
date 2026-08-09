@@ -23,8 +23,8 @@ val SystemSecondaryBackgroundLight = Color(0xFFFFFFFF)
 val SystemTertiaryBackgroundLight = Color(0xFFE5E5EA)
 
 val SystemLabelLight = Color(0xFF1C1C1E)
-val SystemSecondaryLabelLight = Color(0xFF3C3C43)
-val SystemTertiaryLabelLight = Color(0xFF8E8E93)
+val SystemSecondaryLabelLight = Color(0x993C3C43)
+val SystemTertiaryLabelLight = Color(0x4D3C3C43)
 
 val SystemSeparatorLight = Color(0x2E3C3C43)
 val FillLight = Color(0x1F767680)
@@ -46,8 +46,8 @@ val SystemSecondaryBackgroundDark = Color(0xFF1C1C1E)
 val SystemTertiaryBackgroundDark = Color(0xFF2C2C2E)
 
 val SystemLabelDark = Color(0xFFFFFFFF)
-val SystemSecondaryLabelDark = Color(0xEBEBF5)
-val SystemTertiaryLabelDark = Color(0xFF8E8E93)
+val SystemSecondaryLabelDark = Color(0x99EBEBF5)
+val SystemTertiaryLabelDark = Color(0x99EBEBF5)
 
 val SystemSeparatorDark = Color(0x99545458)
 val FillDark = Color(0x3D767680)

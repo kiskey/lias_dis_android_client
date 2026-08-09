@@ -152,7 +152,8 @@ fun MoveTagSheet(
                         style =
                             HigTypography.headline,
                         fontWeight =
-                            FontWeight.Bold
+                            FontWeight.Bold,
+            color = LiasThemeColors.label
                     )
 
                     CupertinoText(

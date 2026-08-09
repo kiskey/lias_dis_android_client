@@ -33,6 +33,7 @@ import io.github.alexzhirkevich.cupertino.CupertinoText
 @Composable
 fun ScheduleDeleteSheet(
     impact: ScheduleDependencyImpact,
+    authError: String? = null,
     onDismiss: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -173,6 +174,21 @@ fun ScheduleDeleteSheet(
                     style = HigTypography.body,
                     color = LiasThemeColors.secondaryLabel
                 )
+
+                authError
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?.let {
+                        message ->
+
+                        DependencyWarning(
+                            title =
+                                "Biometric Verification Required",
+                            message =
+                                message
+                        )
+                    }
 
                 HigButton(
                     text = "Delete Schedule",

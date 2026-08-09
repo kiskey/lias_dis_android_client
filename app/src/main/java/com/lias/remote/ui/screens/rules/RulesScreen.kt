@@ -30,12 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Policy
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.policy.PolicyPresentation
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.DestructiveBiometricAuth
+import com.lias.remote.ui.components.findFragmentActivity
+import com.lias.remote.ui.components.requiresProtectedDelete
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigAlertDialog
@@ -70,6 +74,10 @@ fun RulesScreen(
     val scrollState =
         rememberLazyListState()
 
+    val hostActivity =
+        LocalContext.current
+            .findFragmentActivity()
+
     val scope =
         rememberCoroutineScope()
 
@@ -90,6 +98,13 @@ fun RulesScreen(
     var policyToDelete by
         remember {
             mutableStateOf<Policy?>(
+                null
+            )
+        }
+
+    var policyDeleteAuthError by
+        remember {
+            mutableStateOf<String?>(
                 null
             )
         }
@@ -375,6 +390,9 @@ fun RulesScreen(
                                     },
                                     onDelete = {
 
+                                        policyDeleteAuthError =
+                                            null
+
                                         policyToDelete =
                                             policy
                                     },
@@ -443,6 +461,9 @@ fun RulesScreen(
                                             true
                                     },
                                     onDelete = {
+
+                                        policyDeleteAuthError =
+                                            null
 
                                         policyToDelete =
                                             policy
@@ -587,6 +608,9 @@ fun RulesScreen(
 
             HigAlertDialog(
                 onDismissRequest = {
+                    policyDeleteAuthError =
+                        null
+
                     policyToDelete =
                         null
                 },
@@ -626,19 +650,60 @@ fun RulesScreen(
                                     "This rule will be permanently removed."
                                 )
                         }
+
+                        policyDeleteAuthError
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?.let {
+                                error ->
+
+                                append("\n\n")
+                                append(error)
+                            }
                     },
                 confirmText =
                     "Delete Rule",
                 onConfirm = {
 
-                    viewModel.deletePolicy(
-                        policy.id,
-                        policy.name,
-                        policy
-                    )
+                    if (
+                        !requiresProtectedDelete(
+                            policy.id
+                        )
+                    ) {
 
-                    policyToDelete =
-                        null
+                        policyDeleteAuthError =
+                            "Only saved rules can be deleted."
+
+                    } else {
+
+                        DestructiveBiometricAuth.authenticate(
+                            activity =
+                                hostActivity,
+                            objectLabel =
+                                "rule “${policy.name}”",
+                            onAuthenticated = {
+
+                                viewModel.deletePolicy(
+                                    policy.id,
+                                    policy.name,
+                                    policy
+                                )
+
+                                policyDeleteAuthError =
+                                    null
+
+                                policyToDelete =
+                                    null
+                            },
+                            onUnavailable = {
+                                message ->
+
+                                policyDeleteAuthError =
+                                    message
+                            }
+                        )
+                    }
                 },
                 isDestructive =
                     true

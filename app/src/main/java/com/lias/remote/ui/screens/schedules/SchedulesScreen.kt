@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
@@ -41,6 +42,9 @@ import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.core.util.ScheduleFormatting
 import com.lias.remote.repositories.SyncState
 import com.lias.remote.ui.LiasViewModel
+import com.lias.remote.ui.components.DestructiveBiometricAuth
+import com.lias.remote.ui.components.findFragmentActivity
+import com.lias.remote.ui.components.requiresProtectedDelete
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigSwipeRow
@@ -73,6 +77,10 @@ fun SchedulesScreen(
     val scrollState =
         rememberLazyListState()
 
+    val hostActivity =
+        LocalContext.current
+            .findFragmentActivity()
+
     var showEditor by
         remember {
             mutableStateOf(false)
@@ -86,6 +94,11 @@ fun SchedulesScreen(
     var scheduleToDelete by
         remember {
             mutableStateOf<Schedule?>(null)
+        }
+
+    var scheduleDeleteAuthError by
+        remember {
+            mutableStateOf<String?>(null)
         }
 
     HigLargeTitleScaffold(
@@ -264,6 +277,9 @@ fun SchedulesScreen(
                                         LiasThemeColors.orange
                                     },
                                 onTrigger = {
+                                    scheduleDeleteAuthError =
+                                        null
+
                                     scheduleToDelete =
                                         schedule
                                 }
@@ -516,6 +532,9 @@ fun SchedulesScreen(
                                             "Dependencies"
                                         },
                                     onClick = {
+                                        scheduleDeleteAuthError =
+                                            null
+
                                         scheduleToDelete =
                                             schedule
                                     },
@@ -575,18 +594,53 @@ fun SchedulesScreen(
             ScheduleDeleteSheet(
                 impact =
                     impact,
+                authError =
+                    scheduleDeleteAuthError,
                 onDismiss = {
+                    scheduleDeleteAuthError =
+                        null
+
                     scheduleToDelete =
                         null
                 },
                 onDelete = {
 
-                    viewModel.deleteSchedule(
-                        schedule.id
-                    )
+                    if (
+                        !requiresProtectedDelete(
+                            schedule.id
+                        )
+                    ) {
 
-                    scheduleToDelete =
-                        null
+                        scheduleDeleteAuthError =
+                            "Only saved schedules can be deleted."
+
+                    } else {
+
+                        DestructiveBiometricAuth.authenticate(
+                            activity =
+                                hostActivity,
+                            objectLabel =
+                                "schedule “${schedule.name}”",
+                            onAuthenticated = {
+
+                                viewModel.deleteSchedule(
+                                    schedule.id
+                                )
+
+                                scheduleDeleteAuthError =
+                                    null
+
+                                scheduleToDelete =
+                                    null
+                            },
+                            onUnavailable = {
+                                message ->
+
+                                scheduleDeleteAuthError =
+                                    message
+                            }
+                        )
+                    }
                 }
             )
         }

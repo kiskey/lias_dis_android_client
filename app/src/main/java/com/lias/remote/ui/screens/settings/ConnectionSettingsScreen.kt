@@ -83,7 +83,8 @@ fun ConnectionSettingsScreen(
                 title = {
 
                     CupertinoText(
-                        "Connection"
+                        "Connection",
+            color = LiasThemeColors.label
                     )
                 },
                 navigationIcon = {

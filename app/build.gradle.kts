@@ -153,6 +153,10 @@ dependencies {
         libs.androidx.activity.compose
     )
 
+    implementation(
+        libs.androidx.biometric
+    )
+
 
     // ----------------------------------------------------------------
     // Compose

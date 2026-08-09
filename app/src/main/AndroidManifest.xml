@@ -25,6 +25,9 @@ Integrated contracts:
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <uses-permission
+        android:name="android.permission.USE_BIOMETRIC" />
+
     <application
         android:name=".LiasApplication"
         android:allowBackup="false"
