@@ -1,8 +1,16 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt
-// Version: 1.0.0
-// Purpose: Cupertino HIG modal bottom sheet to switch or move a device
-//          between built-in and custom tag groups.
+// Version: 19.0.0
+//
+// Purpose:
+//   Safe multi-tag classification editor.
+//
+// Batch 19:
+//   - Clear multi-tag semantics.
+//   - generic disappears when meaningful tags exist.
+//   - infrastructure cannot be granted or removed here.
+//   - Explicitly explains that all selected tags affect policies even
+//     though Devices screen groups each device only once.
 // ====================================================================
 
 package com.lias.remote.ui.screens.devices
@@ -18,20 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,13 +36,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lias.remote.core.device.DevicePresentation
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Tag
+import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
-import com.lias.remote.ui.theme.HigSpec
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigTextButton
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Checkmark
+import io.github.alexzhirkevich.cupertino.icons.outlined.Lock
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoveTagSheet(
     device: Device,
@@ -54,131 +59,380 @@ fun MoveTagSheet(
     onDismiss: () -> Unit,
     onConfirm: (tagIds: List<String>) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val assignedTags = remember(device) {
-        device.safeTags.ifEmpty { listOf("generic") }
-    }
-
-    val selectedTagIds = remember {
-        mutableStateListOf<String>().apply { addAll(assignedTags) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = HigSpec.SheetCorner, topEnd = HigSpec.SheetCorner)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    val originalTags =
+        remember(
+            device
         ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Move Tag Group",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+            DevicePresentation
+                .normalizedTagIds(
+                    device
+                )
+        }
+
+    val infrastructureDevice =
+        ConfigurationSafety
+            .INFRASTRUCTURE_TAG_ID in
+            originalTags
+
+    val selected =
+        remember(
+            device
+        ) {
+
+            mutableStateListOf<String>()
+                .apply {
+                    addAll(
+                        originalTags
                     )
-                    Text(
-                        text = device.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-                TextButton(
-                    onClick = {
-                        val finalTags = if (selectedTagIds.isEmpty()) listOf("generic") else selectedTagIds.toList()
-                        onConfirm(finalTags)
+        }
+
+    val sortedTags =
+        remember(
+            allTags
+        ) {
+
+            allTags.sortedWith(
+                compareByDescending<Tag> {
+                    it.precedence
+                }
+                    .thenBy {
+                        it.name.lowercase()
                     }
+            )
+        }
+
+    HigModalSheet(
+        onDismiss =
+            onDismiss
+    ) {
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 24.dp,
+                        vertical = 16.dp
+                    )
+                    .verticalScroll(
+                        rememberScrollState()
+                    ),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    16.dp
+                )
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                HigTextButton(
+                    text =
+                        "Cancel",
+                    onClick =
+                        onDismiss
+                )
+
+                Column(
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "Done",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+
+                    CupertinoText(
+                        text =
+                            "Device Tags",
+                        style =
+                            HigTypography.headline,
+                        fontWeight =
+                            FontWeight.Bold,
+            color = LiasThemeColors.label
+                    )
+
+                    CupertinoText(
+                        text =
+                            device.displayName,
+                        style =
+                            HigTypography.caption,
+                        color =
+                            LiasThemeColors.tertiaryLabel
                     )
                 }
+
+                HigTextButton(
+                    text =
+                        "Done",
+                    onClick = {
+
+                        val finalTags =
+                            selected
+                                .filter {
+                                    it.isNotBlank()
+                                }
+                                .distinct()
+                                .toMutableList()
+
+                        if (
+                            infrastructureDevice &&
+                            ConfigurationSafety
+                                .INFRASTRUCTURE_TAG_ID !in
+                            finalTags
+                        ) {
+                            finalTags.add(
+                                ConfigurationSafety
+                                    .INFRASTRUCTURE_TAG_ID
+                            )
+                        }
+
+                        if (
+                            finalTags.size >
+                            1
+                        ) {
+                            finalTags.remove(
+                                ConfigurationSafety
+                                    .GENERIC_TAG_ID
+                            )
+                        }
+
+                        if (
+                            finalTags.isEmpty()
+                        ) {
+                            finalTags.add(
+                                ConfigurationSafety
+                                    .GENERIC_TAG_ID
+                            )
+                        }
+
+                        onConfirm(
+                            finalTags
+                        )
+                    }
+                )
             }
 
-            Text(
-                text = "SELECT TAG GROUP",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            CupertinoText(
+                text =
+                    if (
+                        infrastructureDevice
+                    ) {
+                        "Infrastructure protection is locked. You may change other classifications, but this device remains always online."
+                    } else {
+                        "A device can belong to several groups. Every selected tag can participate in LIAS policy evaluation."
+                    },
+                style =
+                    HigTypography.subheadline,
+                color =
+                    LiasThemeColors.secondaryLabel
+            )
+
+            CupertinoText(
+                text =
+                    "The Devices screen displays a multi-tag device once under its highest-precedence group; its other tags are still active.",
+                style =
+                    HigTypography.caption,
+                color =
+                    LiasThemeColors.tertiaryLabel
             )
 
             GroupedListCard {
-                allTags.forEachIndexed { index, tag ->
-                    val isChecked = selectedTagIds.contains(tag.id)
-                    val tagColor = try {
-                        Color(android.graphics.Color.parseColor(tag.color))
-                    } catch (_: Exception) {
-                        Color.Gray
-                    }
 
-                    GroupedListRow(
-                        primaryText = tag.name + if (tag.id == "infrastructure") " (Immune)" else "",
-                        secondaryText = if (tag.builtin) "Built-in System Tag" else "Custom Tag",
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(CircleShape)
-                                    .background(tagColor)
-                            )
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (tag.id == "infrastructure") {
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = "Immune",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.size(6.dp))
-                                }
-                                if (isChecked) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
+                sortedTags
+                    .forEachIndexed {
+                            index,
+                            tag ->
+
+                        val isInfrastructure =
+                            tag.id ==
+                                ConfigurationSafety
+                                    .INFRASTRUCTURE_TAG_ID
+
+                        val checked =
+                            tag.id in
+                                selected
+
+                        val color =
+                            try {
+
+                                Color(
+                                    android.graphics.Color
+                                        .parseColor(
+                                            tag.color
+                                        )
+                                )
+
+                            } catch (
+                                _: Exception
+                            ) {
+                                Color.Gray
                             }
-                        },
-                        showDivider = index < allTags.size - 1,
-                        onClick = {
-                            if (tag.id == "generic") {
-                                selectedTagIds.clear()
-                                selectedTagIds.add("generic")
-                            } else {
-                                selectedTagIds.remove("generic")
-                                if (isChecked) {
-                                    selectedTagIds.remove(tag.id)
-                                    if (selectedTagIds.isEmpty()) {
-                                        selectedTagIds.add("generic")
+
+                        GroupedListRow(
+                            primaryText =
+                                tag.name,
+                            secondaryText =
+                                when {
+
+                                    isInfrastructure &&
+                                        infrastructureDevice ->
+                                        "Protected · Always online"
+
+                                    isInfrastructure ->
+                                        "Protected system classification"
+
+                                    tag.builtin ->
+                                        "Built-in classification"
+
+                                    else ->
+                                        "Custom classification"
+                                },
+                            leadingContent = {
+
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(
+                                                12.dp
+                                            )
+                                            .clip(
+                                                CircleShape
+                                            )
+                                            .background(
+                                                color
+                                            )
+                                )
+                            },
+                            trailingContent = {
+
+                                Row(
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
+                                ) {
+
+                                    if (
+                                        isInfrastructure
+                                    ) {
+
+                                        CupertinoIcon(
+                                            imageVector =
+                                                CupertinoIcons
+                                                    .Outlined
+                                                    .Lock,
+                                            contentDescription =
+                                                "Protected infrastructure",
+                                            tint =
+                                                LiasThemeColors
+                                                    .tertiaryLabel,
+                                            modifier =
+                                                Modifier.size(
+                                                    16.dp
+                                                )
+                                        )
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.size(
+                                                    6.dp
+                                                )
+                                        )
                                     }
+
+                                    if (
+                                        checked
+                                    ) {
+
+                                        CupertinoIcon(
+                                            imageVector =
+                                                CupertinoIcons
+                                                    .Outlined
+                                                    .Checkmark,
+                                            contentDescription =
+                                                "Selected",
+                                            tint =
+                                                if (
+                                                    isInfrastructure
+                                                ) {
+                                                    LiasThemeColors
+                                                        .secondaryLabel
+                                                } else {
+                                                    LiasThemeColors.blue
+                                                }
+                                        )
+                                    }
+                                }
+                            },
+                            showDivider =
+                                index <
+                                    sortedTags.lastIndex,
+                            onClick =
+                                if (
+                                    isInfrastructure
+                                ) {
+                                    null
                                 } else {
-                                    if (!selectedTagIds.contains(tag.id)) {
-                                        selectedTagIds.add(tag.id)
+                                    {
+
+                                        if (
+                                            tag.id ==
+                                            ConfigurationSafety
+                                                .GENERIC_TAG_ID
+                                        ) {
+
+                                            selected.clear()
+
+                                            if (
+                                                infrastructureDevice
+                                            ) {
+                                                selected.add(
+                                                    ConfigurationSafety
+                                                        .INFRASTRUCTURE_TAG_ID
+                                                )
+                                            } else {
+                                                selected.add(
+                                                    ConfigurationSafety
+                                                        .GENERIC_TAG_ID
+                                                )
+                                            }
+
+                                        } else {
+
+                                            selected.remove(
+                                                ConfigurationSafety
+                                                    .GENERIC_TAG_ID
+                                            )
+
+                                            if (
+                                                tag.id in
+                                                selected
+                                            ) {
+                                                selected.remove(
+                                                    tag.id
+                                                )
+                                            } else {
+                                                selected.add(
+                                                    tag.id
+                                                )
+                                            }
+
+                                            if (
+                                                selected.isEmpty()
+                                            ) {
+                                                selected.add(
+                                                    ConfigurationSafety
+                                                        .GENERIC_TAG_ID
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
-                    )
-                }
+                        )
+                    }
             }
         }
     }

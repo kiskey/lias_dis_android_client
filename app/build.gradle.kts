@@ -1,9 +1,17 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 1.6.0
-// Audit Fixes:
-//   1. Incremented versionCode to 5 and versionName to 1.6.0.
-//   2. Retained compileSdk 36 and targetSdk 35 for Cupertino 3.3.1 compatibility.
+// Version: 27.0.0
+//
+// Purpose:
+//   Final application build configuration.
+//
+// Batch 27:
+//   - compileSdk 36 now paired with AGP 8.9.3.
+//   - JDK/JVM 17.
+//   - Batch-23 MockWebServer tests restored.
+//   - Coroutine tests restored.
+//   - Robolectric navigation/deep-link tests restored.
+//   - Android resources enabled for local Robolectric tests.
 // ====================================================================
 
 plugins {
@@ -14,90 +22,260 @@ plugins {
 }
 
 android {
-    namespace = "com.lias.remote"
-    compileSdk = 36
+
+    namespace =
+        "com.lias.remote"
+
+    compileSdk =
+        36
 
     defaultConfig {
-        applicationId = "com.lias.remote"
-        minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "1.6.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationId =
+            "com.lias.remote"
+
+        minSdk =
+            26
+
+        targetSdk =
+            35
+
+        versionCode =
+            6
+
+        versionName =
+            "2.0.0"
+
+        testInstrumentationRunner =
+            "androidx.test.runner.AndroidJUnitRunner"
+
         vectorDrawables {
-            useSupportLibrary = true
+            useSupportLibrary =
+                true
         }
     }
 
     buildTypes {
+
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+
+            isMinifyEnabled =
+                true
+
+            isShrinkResources =
+                true
+
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
+                getDefaultProguardFile(
+                    "proguard-android-optimize.txt"
+                ),
                 "proguard-rules.pro"
             )
-            
-            val keystoreFile = file("release.keystore")
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release").apply {
-                    storeFile = keystoreFile
-                    storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                    keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                    keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-                }
-            }
         }
+
         debug {
-            isMinifyEnabled = false
+
+            isMinifyEnabled =
+                false
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+
+        sourceCompatibility =
+            JavaVersion.VERSION_17
+
+        targetCompatibility =
+            JavaVersion.VERSION_17
     }
+
     kotlinOptions {
-        jvmTarget = "17"
+
+        jvmTarget =
+            "17"
     }
+
     buildFeatures {
-        compose = true
-        buildConfig = true
+
+        compose =
+            true
+
+        buildConfig =
+            true
     }
+
     packaging {
+
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
+            excludes +=
+                "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    /*
+     * NavigationRoutesTest and other Android-framework unit tests use
+     * Robolectric.
+     */
+    testOptions {
+
+        unitTests {
+
+            isIncludeAndroidResources =
+                true
         }
     }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
-    implementation(libs.androidx.navigation.compose)
-    
-    implementation(libs.okhttp)
-    implementation(libs.okhttp.sse)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.coroutines.android)
-    
-    implementation(libs.androidx.datastore.preferences)
-    
-    // Cupertino library (RobinPcrd fork - active maintenance)
-    implementation(libs.cupertino)
-    implementation(libs.cupertino.icons.extended)
-    
-    testImplementation(libs.junit)
-    debugImplementation(libs.androidx.ui.tooling)
+
+    // ----------------------------------------------------------------
+    // Android / lifecycle
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.androidx.core.ktx
+    )
+
+    implementation(
+        libs.androidx.lifecycle.runtime.ktx
+    )
+
+    implementation(
+        libs.androidx.lifecycle.viewmodel.compose
+    )
+
+    implementation(
+        libs.androidx.lifecycle.runtime.compose
+    )
+
+    implementation(
+        libs.androidx.activity.compose
+    )
+
+    implementation(
+        libs.androidx.biometric
+    )
+
+
+    // ----------------------------------------------------------------
+    // Compose
+    // ----------------------------------------------------------------
+
+    implementation(
+        platform(
+            libs.androidx.compose.bom
+        )
+    )
+
+    implementation(
+        libs.androidx.ui
+    )
+
+    implementation(
+        libs.androidx.ui.graphics
+    )
+
+    implementation(
+        libs.androidx.ui.tooling.preview
+    )
+
+    implementation(
+        "androidx.compose.foundation:foundation"
+    )
+
+    implementation(
+        "androidx.compose.foundation:foundation-layout"
+    )
+
+
+    // ----------------------------------------------------------------
+    // Navigation
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.androidx.navigation.compose
+    )
+
+
+    // ----------------------------------------------------------------
+    // Networking
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.okhttp
+    )
+
+    implementation(
+        libs.okhttp.sse
+    )
+
+
+    // ----------------------------------------------------------------
+    // Kotlin
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.kotlinx.serialization.json
+    )
+
+    implementation(
+        libs.kotlinx.coroutines.android
+    )
+
+
+    // ----------------------------------------------------------------
+    // Persistence
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.androidx.datastore.preferences
+    )
+
+
+    // ----------------------------------------------------------------
+    // Cupertino
+    // ----------------------------------------------------------------
+
+    implementation(
+        libs.cupertino
+    )
+
+    implementation(
+        libs.cupertino.icons.extended
+    )
+
+
+    // ----------------------------------------------------------------
+    // Local unit / contract tests
+    // ----------------------------------------------------------------
+
+    testImplementation(
+        libs.junit
+    )
+
+    testImplementation(
+        libs.mockwebserver
+    )
+
+    testImplementation(
+        libs.kotlinx.coroutines.test
+    )
+
+    testImplementation(
+        libs.robolectric
+    )
+
+    testImplementation(
+        libs.androidx.arch.core.testing
+    )
+
+
+    // ----------------------------------------------------------------
+    // Debug
+    // ----------------------------------------------------------------
+
+    debugImplementation(
+        libs.androidx.ui.tooling
+    )
 }

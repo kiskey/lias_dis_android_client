@@ -1,12 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/DetailedWeekGrid.kt
-// Version: 2.0.0
-// Audit Fixes:
-//   1. Renamed from WeeklyTimeline to DetailedWeekGrid for Policy Wizard step 3 preview.
-//   2. Replaced hardcoded hexes with theme-resolved HIG system colors.
-//   3. Provided backward-compatible `WeeklyTimeline` alias.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.Canvas
@@ -20,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -30,16 +19,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+// NOTE: drawRect is a DrawScope interface member and is in scope automatically inside Canvas { ... }.
+// Top-level import removed to fix 'Unresolved reference drawRect'.
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.util.ScheduleProjection
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemGreenDark
 import com.lias.remote.ui.theme.SystemIndigoDark
 import com.lias.remote.ui.theme.SystemOrangeDark
 import com.lias.remote.ui.theme.SystemPinkDark
 import com.lias.remote.ui.theme.SystemTealDark
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun DetailedWeekGrid(
@@ -62,7 +56,7 @@ fun DetailedWeekGrid(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(LiasThemeColors.tertiaryBackground)
             .padding(12.dp)
     ) {
         days.forEachIndexed { dayIdx, dayLabel ->
@@ -72,10 +66,10 @@ fun DetailedWeekGrid(
                     .fillMaxWidth()
                     .padding(vertical = 2.dp)
             ) {
-                Text(
+                CupertinoText(
                     text = dayLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = HigTypography.caption,
+                    color = LiasThemeColors.secondaryLabel,
                     modifier = Modifier.width(36.dp)
                 )
                 Box(
@@ -83,7 +77,7 @@ fun DetailedWeekGrid(
                         .weight(1f)
                         .height(20.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surface)
+                        .background(LiasThemeColors.secondaryBackground)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val canvasHeight = size.height
@@ -101,11 +95,12 @@ fun DetailedWeekGrid(
                                 val schedIdx = schedules.indexOfFirst { it.id == seg.scheduleId }
                                 val color = palette[if (schedIdx != -1) schedIdx % palette.size else 0]
 
-                                val left = (startMin / 1440f) * canvasWidth
+                                val left = (startMin.toFloat() / 1440f) * canvasWidth
                                 val durationMinutes = (endMin - startMin).coerceAtLeast(0)
-                                val width = (durationMinutes / 1440f) * canvasWidth
+                                val width = (durationMinutes.toFloat() / 1440f) * canvasWidth
 
                                 if (width > 0f) {
+                                    // drawRect called as DrawScope member method
                                     drawRect(
                                         color = color,
                                         topLeft = Offset(left, 2f),
@@ -125,11 +120,12 @@ fun DetailedWeekGrid(
                                 endMin = 1440
                             }
 
-                            val left = (startMin / 1440f) * canvasWidth
+                            val left = (startMin.toFloat() / 1440f) * canvasWidth
                             val durationMinutes = (endMin - startMin).coerceAtLeast(0)
-                            val width = (durationMinutes / 1440f) * canvasWidth
+                            val width = (durationMinutes.toFloat() / 1440f) * canvasWidth
 
                             if (width > 0f) {
+                                // drawRect called as DrawScope member method
                                 drawRect(
                                     color = Color.Red.copy(alpha = 0.6f),
                                     topLeft = Offset(left, 0f),

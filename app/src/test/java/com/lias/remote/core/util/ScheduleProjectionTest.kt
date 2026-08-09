@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/test/java/com/lias/remote/core/util/ScheduleProjectionTest.kt
-// Version: 1.3.0
+// Version: 27.6.1
 // Audit Fixes: 
 //   1. Added unit tests for expandDayRange and verified overnight boundary calculations.
 // ====================================================================
@@ -58,14 +58,48 @@ class ScheduleProjectionTest {
 
         val conflicts = ScheduleProjection.detectConflicts(listOf(schedA, schedB))
         
-        assertEquals("Expected 1 conflict", 1, conflicts.size)
-        
-        val conflict = conflicts.first()
-        assertEquals("monday", conflict.day)
-        assertEquals("22:00", conflict.overlapStart)
-        assertEquals("23:00", conflict.overlapEnd)
-        assertEquals("block", conflict.actionA)
-        assertEquals("allow", conflict.actionB)
+        assertEquals(
+            "Expected one conflict for each weekday",
+            5,
+            conflicts.size
+        )
+
+        assertEquals(
+            listOf(
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+            ),
+            conflicts.map {
+                it.day
+            }
+        )
+
+        conflicts.forEach {
+            conflict ->
+
+            assertEquals(
+                "22:00",
+                conflict.overlapStart
+            )
+
+            assertEquals(
+                "23:00",
+                conflict.overlapEnd
+            )
+
+            assertEquals(
+                "block",
+                conflict.actionA
+            )
+
+            assertEquals(
+                "allow",
+                conflict.actionB
+            )
+        }
     }
 
     @Test

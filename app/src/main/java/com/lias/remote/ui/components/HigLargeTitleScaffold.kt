@@ -1,123 +1,343 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt
-// Version: 2.0.0
-// Purpose: Two-tier iOS large title navigation bar scaffold and CupertinoSearchTextField.
-// Audit Fixes:
-//   1. Replaced search pill with native CupertinoSearchTextField.
+// Version: 28.0.1
+//
+// Purpose:
+//   Apple-inspired collapsible large-title application scaffold.
+//
+// Batch 21:
+//   - Large titles may wrap under large font scale.
+//   - Landscape layout remains compact.
+//   - Search controls use >=48dp interaction height.
+//   - Title is exposed as a semantic heading.
+//   - Collapsed navbar stays compact and single-line.
+//   - Removes assumptions that large text always fits one line.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
-import io.github.robinpcrd.cupertino.CupertinoSearchTextField
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoScaffold
+import io.github.alexzhirkevich.cupertino.CupertinoSearchTextField
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun HigLargeTitleScaffold(
     title: String,
     modifier: Modifier = Modifier,
-    navLeading: (@Composable () -> Unit)? = null,
-    navTrailing: (@Composable () -> Unit)? = null,
-    searchField: (@Composable () -> Unit)? = null,
-    floatingActionButton: (@Composable () -> Unit)? = null,
-    bottomBar: (@Composable () -> Unit)? = null,
-    content: @Composable (PaddingValues) -> Unit
+    scrollState: LazyListState? = null,
+    navLeading:
+        (@Composable () -> Unit)? =
+        null,
+    navTrailing:
+        (@Composable () -> Unit)? =
+        null,
+    searchPlaceholder: String = "",
+    searchQuery: String = "",
+    onSearchQueryChanged:
+        (String) -> Unit = {},
+    bottomBar:
+        (@Composable () -> Unit)? =
+        null,
+    content:
+        @Composable (PaddingValues) ->
+            Unit
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = { floatingActionButton?.invoke() },
-        bottomBar = { bottomBar?.invoke() }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+
+    val configuration =
+        LocalConfiguration.current
+
+    val isLandscape =
+        configuration.screenWidthDp >
+            configuration.screenHeightDp
+
+    val isCollapsed by
+        remember(
+            scrollState
         ) {
-            // Tier 1: Secondary Navigation Bar Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(HigSpec.RowMinHeight)
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    navLeading?.invoke()
-                }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    navTrailing?.invoke()
-                }
-            }
 
-            // Tier 2: Large Title
-            if (title.isNotBlank()) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = HigSpec.RowHorizontalPadding, vertical = 2.dp)
-                )
-            }
+            derivedStateOf {
 
-            // Optional Search Field Slot
-            searchField?.let {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = HigSpec.RowHorizontalPadding, vertical = 4.dp)
-                ) {
-                    it()
-                }
+                scrollState
+                    ?.firstVisibleItemIndex !=
+                    0 ||
+                    (
+                        scrollState
+                            ?.firstVisibleItemScrollOffset
+                            ?: 0
+                        ) >
+                    50
             }
+        }
 
-            // Main Content Area
-            Box(
-                modifier = Modifier
+    CupertinoScaffold(
+        modifier =
+            modifier.fillMaxSize(),
+        bottomBar = {
+            bottomBar
+                ?.invoke()
+        }
+    ) {
+        innerPadding ->
+
+        Column(
+            modifier =
+                Modifier
                     .fillMaxSize()
-                    .weight(1f)
+                    .background(
+                        LiasThemeColors.background
+                    )
+                    .padding(
+                        innerPadding
+                    )
+        ) {
+
+            if (
+                isCollapsed
             ) {
-                content(PaddingValues(0.dp))
+
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(
+                                min =
+                                    44.dp
+                            )
+                            .background(
+                                LiasThemeColors.background
+                            )
+                            .padding(
+                                horizontal =
+                                    HigSpec.SpacingM
+                            ),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Box(
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        contentAlignment =
+                            Alignment.CenterStart
+                    ) {
+                        navLeading
+                            ?.invoke()
+                    }
+
+                    CupertinoText(
+                        text =
+                            title,
+                        style =
+                            HigTypography.headline,
+                        color =
+                            LiasThemeColors.label,
+                        maxLines =
+                            1,
+                        overflow =
+                            TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier.weight(
+                                if (
+                                    isLandscape
+                                ) {
+                                    1f
+                                } else {
+                                    2f
+                                }
+                            )
+                    )
+
+                    Box(
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        contentAlignment =
+                            Alignment.CenterEnd
+                    ) {
+                        navTrailing
+                            ?.invoke()
+                    }
+                }
+
+            } else {
+
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start =
+                                    HigSpec.SpacingM,
+                                end =
+                                    HigSpec.SpacingM,
+                                top =
+                                    HigSpec.SpacingS,
+                                bottom =
+                                    HigSpec.SpacingXS
+                            ),
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            HigSpec.SpacingS
+                        )
+                ) {
+
+                    navLeading
+                        ?.invoke()
+
+                    CupertinoText(
+                        text =
+                            title,
+                        style =
+                            HigTypography.largeTitle,
+                        color =
+                            LiasThemeColors.label,
+                        maxLines =
+                            if (
+                                isLandscape
+                            ) {
+                                2
+                            } else {
+                                3
+                            },
+                        overflow =
+                            TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .weight(
+                                    1f
+                                )
+                                .semantics {
+                                    heading()
+                                }
+                    )
+
+                    if (
+                        isLandscape &&
+                        searchPlaceholder
+                            .isNotEmpty()
+                    ) {
+
+                        HigSearchField(
+                            query =
+                                searchQuery,
+                            onQueryChanged =
+                                onSearchQueryChanged,
+                            placeholder =
+                                searchPlaceholder,
+                            modifier =
+                                Modifier.weight(
+                                    1.35f
+                                )
+                        )
+                    }
+
+                    navTrailing
+                        ?.invoke()
+                }
+
+                if (
+                    !isLandscape &&
+                    searchPlaceholder
+                        .isNotEmpty()
+                ) {
+
+                    HigSearchField(
+                        query =
+                            searchQuery,
+                        onQueryChanged =
+                            onSearchQueryChanged,
+                        placeholder =
+                            searchPlaceholder,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal =
+                                        HigSpec.SpacingM,
+                                    vertical =
+                                        HigSpec.SpacingXS
+                                )
+                    )
+                }
+            }
+
+            Box(
+                modifier =
+                    Modifier.fillMaxSize()
+            ) {
+
+                content(
+                    PaddingValues(
+                        bottom =
+                            HigSpec.SpacingL
+                    )
+                )
             }
         }
     }
 }
 
 @Composable
-fun HigSearchPill(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    placeholder: String = "Search devices"
+fun HigSearchField(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
 ) {
+
     CupertinoSearchTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value =
+            query,
+        onValueChange =
+            onQueryChanged,
         placeholder = {
-            Text(
-                text = placeholder,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+
+            CupertinoText(
+                text =
+                    placeholder,
+                style =
+                    HigTypography.body,
+                color =
+                    LiasThemeColors
+                        .tertiaryLabel
             )
         },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(38.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min =
+                        48.dp
+                )
     )
 }

@@ -1,31 +1,47 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/theme/HigSpec.kt
-// Version: 1.2.0
-// Purpose: Codifies Apple HIG layout, radius, dimension, and spacing
-//          constants optimized for tall 20:9 displays (Pixel 6a).
-// Audit Fixes:
-//   1. Scaled SegmentedControlHeight to 48dp for comfortable thumb touch target on Pixel 6a.
-// ====================================================================
-
 package com.lias.remote.ui.theme
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 
+/**
+ * Native Apple HIG Layout & Geometry Token Specifications.
+ * Optimized for Pixel 6a (429 dpi) & Modern Devices.
+ */
 object HigSpec {
-    val ScreenBgCornerNone = 0.dp
-    val GroupedListCorner = 16.dp      // Spec .glist border-radius: 16px
-    val RowMinHeight = 48.dp           // Spec .grow min-height: 48px (generous touch targets)
-    val RowHorizontalPadding = 16.dp   // Spec .grow padding: 12px 16px
+    val SpacingXS = 4.dp
+    val SpacingS = 8.dp
+    val SpacingM = 16.dp
+    val SpacingL = 24.dp
+    val SpacingXL = 32.dp
+
+    // Inset Grouped Section
+    val GroupedCardCorner = 12.dp
+    val RowMinHeight = 50.dp
+    val RowHorizontalPadding = 16.dp
     val RowVerticalPadding = 12.dp
-    val SheetCorner = 22.dp            // Spec sheet border-radius: 22px 22px 0 0
-    val CardCorner = 18.dp             // Spec .hero-card / .card-lite
-    val IconBubbleSize = 28.dp         // Spec .ibubble 28x28, radius 8
+
+    // Modal Sheet
+    val SheetCorner = 14.dp
+    val SheetHandleWidth = 36.dp
+    val SheetHandleHeight = 5.dp
+
+    // Tab Bar (Optimized for 6.1" Pixel 6a)
+    val TabBarHeight = 72.dp
+    val BottomNavPadding = 24.dp
+
+    // Control Elements
+    val IconSizeS = 16.dp
+    val IconSizeM = 28.dp
+    val IconSizeL = 32.dp
+    val IconBubbleSize = 36.dp
     val IconBubbleCorner = 8.dp
-    val StatusDotSize = 10.dp          // Spec .dot 10x10
-    val SegmentedControlHeight = 48.dp // Spec .segctrl height: 48px (iOS Large Segmented Control)
-    val FabSize = 56.dp                // Spec .fab width/height: 56px
-    val FabOffsetFromTabBar = 16.dp    // Spec bottom offset
-    val TabBarHeight = 84.dp           // Spec .tabbar height: 84px
-    val SectionLabelPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+
+    val ButtonCorner = 10.dp
+    val ButtonHeight = 48.dp
+    val ButtonHeightLarge = 54.dp
+
+    val SegmentedControlHeight = 48.dp
+    val SegmentedControlCorner = 9.dp
+
+    val SectionHeaderPadding = PaddingValues(start = 32.dp, end = 16.dp, top = 20.dp, bottom = 6.dp)
 }

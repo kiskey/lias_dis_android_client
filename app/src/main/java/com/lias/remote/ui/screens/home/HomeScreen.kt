@@ -1,17 +1,24 @@
 // ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
-// Version: 3.1.0
-// Purpose: Home Dashboard Screen with full-width 48dp segmented control hero card.
-// Audit Fixes:
-//   1. Ensured GlobalSwitchHero fills 100% available card width for thumb control.
+// File:
+// app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt
+// Version: 26.0.0
+//
+// Purpose:
+//   LIAS operational overview.
+//
+// Batch 26:
+//   - Server-authoritative device actions.
+//   - No pause-policy ID inspection.
+//   - No fake status calculation.
+//   - No emoji action labels.
+//   - Quick navigation remains lightweight.
+//   - Global policy remains server-owned global_default.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,16 +31,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,120 +41,704 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.Policy
-import com.lias.remote.core.models.Schedule
-import com.lias.remote.core.models.Tag
-import com.lias.remote.core.util.ExtendHelper
-import com.lias.remote.core.util.ScheduleProjection
 import com.lias.remote.ui.LiasViewModel
-import com.lias.remote.ui.components.ConnectionStatusBanner
+import com.lias.remote.ui.access.AccessKind
+import com.lias.remote.ui.access.AccessPresentationResolver
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
+import com.lias.remote.ui.components.HigButton
+import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
-import com.lias.remote.ui.components.MiniWeekStrip
 import com.lias.remote.ui.components.PillTone
-import com.lias.remote.ui.components.SegmentedControl
-import com.lias.remote.ui.components.SkeletonGroupedList
+import com.lias.remote.ui.components.StatusDot
 import com.lias.remote.ui.components.StatusPill
-import com.lias.remote.ui.screens.policies.PolicyWizardSheet
-import com.lias.remote.ui.theme.HigSpec
-import com.lias.remote.ui.theme.SystemGreenDark
-import java.util.Calendar
-import java.util.TimeZone
+import com.lias.remote.ui.navigation.LiasScreen
+import com.lias.remote.ui.screens.ExtendAccessSheet
+import com.lias.remote.ui.screens.GlobalSwitchSheet
+import com.lias.remote.ui.screens.PauseSheet
+import com.lias.remote.ui.theme.HigTypography
+import com.lias.remote.ui.theme.LiasThemeColors
+import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import io.github.alexzhirkevich.cupertino.CupertinoText
+import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
+import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
+import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 
-data class ActiveEnforcementItem(
-    val policyName: String,
-    val targetName: String,
-    val targetColor: Color,
-    val scheduleName: String,
-    val action: String,
-    val timezone: String = "UTC",
-    val isDST: Boolean = false,
-    val isGlobal: Boolean = false
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: LiasViewModel,
-    onNavigateToDeviceDetail: (String) -> Unit
+    onNavigateToDeviceDetail: (String) -> Unit,
+    onNavigateToTab: (LiasScreen) -> Unit
 ) {
-    val state by viewModel.state.collectAsState()
-    var isRefreshing by remember { mutableStateOf(false) }
-    var showGlobalWizard by remember { mutableStateOf(false) }
 
-    val activeEnforcements = remember(state.policies, state.schedules, state.tags, state.devices) {
-        computeActiveEnforcements(state.policies, state.schedules, state.tags, state.devices)
-    }
+    val state by
+        viewModel.state
+            .collectAsState()
 
-    HigLargeTitleScaffold(
-        title = "Home"
+    val scrollState =
+        rememberLazyListState()
+
+    var showGlobalSheet by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var activeDeviceForExtend by
+        remember {
+            mutableStateOf<Device?>(
+                null
+            )
+        }
+
+    var activeDeviceForPause by
+        remember {
+            mutableStateOf<Device?>(
+                null
+            )
+        }
+
+    val globalPolicy =
+        state.policies
+            .find {
+                it.id ==
+                    "global_default"
+            }
+            ?: Policy(
+                id =
+                    "global_default",
+                name =
+                    "Global Access",
+                type =
+                    "global",
+                targetID =
+                    "",
+                action =
+                    "allow",
+                priority =
+                    0,
+                enabled =
+                    true
+            )
+
+    val totalDevices =
+        state.devices.size
+
+    val onlineDevices =
+        state.devices
+            .count {
+                it.online
+            }
+
+    val blockedDevices =
+        state.devices
+            .count {
+                device ->
+
+                state
+                    .effectiveStatusForDevice(
+                        device.pdid
+                    )
+                    ?.action
+                    ?.equals(
+                        "block",
+                        ignoreCase =
+                            true
+                    ) ==
+                    true
+            }
+
+    val attentionDevices =
+        state.devices
+            .filter {
+                device ->
+
+                when (
+                    AccessPresentationResolver
+                        .resolve(
+                            device,
+                            state
+                                .effectiveStatusForDevice(
+                                    device.pdid
+                                )
+                        )
+                        .kind
+                ) {
+
+                    AccessKind.PAUSED,
+                    AccessKind.BLOCKED,
+                    AccessKind.EXTENDED ->
+                        true
+
+                    else ->
+                        false
+                }
+            }
+            .sortedWith(
+                compareBy<Device> {
+                    device ->
+
+                    when (
+                        AccessPresentationResolver
+                            .resolve(
+                                device,
+                                state
+                                    .effectiveStatusForDevice(
+                                        device.pdid
+                                    )
+                            )
+                            .kind
+                    ) {
+
+                        AccessKind.PAUSED -> 0
+                        AccessKind.BLOCKED -> 1
+                        AccessKind.EXTENDED -> 2
+                        else -> 3
+                    }
+                }.thenBy {
+                    it.displayName.lowercase()
+                }
+            )
+HigLargeTitleScaffold(
+        title =
+            "Home",
+        scrollState =
+            scrollState
     ) {
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = { isRefreshing = true }
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item { ConnectionStatusBanner(state.connectionState) }
+        padding ->
 
-                if (!state.isInitialLoaded && state.devices.isEmpty()) {
-                    item { SkeletonGroupedList(count = 4) }
-                } else {
-                    item {
-                        GlobalSwitchHero(
-                            globalPolicy = state.policies.find { it.id == "global_default" },
-                            schedules = state.schedules,
-                            onSavePolicy = { viewModel.savePolicy(it) },
-                            onManageSchedules = { showGlobalWizard = true }
+        LazyColumn(
+            state =
+                scrollState,
+            modifier =
+                Modifier.fillMaxSize(),
+            contentPadding =
+                padding
+        ) {
+
+            item {
+
+                ListSectionHeader(
+                    "Access"
+                )
+            }
+
+            item {
+
+                GroupedListCard(
+                    modifier =
+                        Modifier.padding(
+                            horizontal =
+                                16.dp
+                        )
+                ) {
+
+                    GroupedListRow(
+                        primaryText =
+                            "Global Access",
+                        secondaryText =
+                            when (
+                                globalPolicy.action
+                            ) {
+
+                                "block" ->
+                                    "Block All"
+
+                                "schedule" ->
+                                    "Schedule"
+
+                                else ->
+                                    "Allow All"
+                            },
+                        trailingContent = {
+
+                            StatusPill(
+                                text =
+                                    when (
+                                        globalPolicy.action
+                                    ) {
+
+                                        "block" ->
+                                            "Block All"
+
+                                        "schedule" ->
+                                            "Scheduled"
+
+                                        else ->
+                                            "Allow All"
+                                    },
+                                tone =
+                                    when (
+                                        globalPolicy.action
+                                    ) {
+
+                                        "block" ->
+                                            PillTone.BLOCKED
+
+                                        "schedule" ->
+                                            PillTone.SCHEDULED
+
+                                        else ->
+                                            PillTone.ALLOWED
+                                    }
+                            )
+                        },
+                        onClick = {
+                            showGlobalSheet =
+                                true
+                        }
+                    )
+                }
+            }
+
+            item {
+
+                ListSectionHeader(
+                    "Quick Access"
+                )
+            }
+
+            item {
+
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal =
+                                    16.dp
+                            ),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            10.dp
+                        )
+                ) {
+
+                    QuickTile(
+                        icon =
+                            CupertinoIcons
+                                .Outlined
+                                .Iphone,
+                        label =
+                            "Devices",
+                        color =
+                            LiasThemeColors.blue,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        onClick = {
+                            onNavigateToTab(
+                                LiasScreen.Devices
+                            )
+                        }
+                    )
+
+                    QuickTile(
+                        icon =
+                            CupertinoIcons
+                                .Outlined
+                                .Clock,
+                        label =
+                            "Schedules",
+                        color =
+                            LiasThemeColors.orange,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        onClick = {
+                            onNavigateToTab(
+                                LiasScreen.Schedules
+                            )
+                        }
+                    )
+
+                    QuickTile(
+                        icon =
+                            CupertinoIcons
+                                .Outlined
+                                .Shield,
+                        label =
+                            "Rules",
+                        color =
+                            LiasThemeColors.green,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            ),
+                        onClick = {
+                            onNavigateToTab(
+                                LiasScreen.Rules
+                            )
+                        }
+                    )
+                }
+            }
+
+            item {
+
+                ListSectionHeader(
+                    "Network Snapshot"
+                )
+            }
+
+            item {
+
+                GroupedListCard(
+                    modifier =
+                        Modifier.padding(
+                            horizontal =
+                                16.dp
+                        )
+                ) {
+
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    vertical =
+                                        16.dp
+                                ),
+                        horizontalArrangement =
+                            Arrangement.SpaceEvenly
+                    ) {
+
+                        MetricColumn(
+                            value =
+                                totalDevices
+                                    .toString(),
+                            label =
+                                "Total"
+                        )
+
+                        MetricColumn(
+                            value =
+                                onlineDevices
+                                    .toString(),
+                            label =
+                                "Online"
+                        )
+
+                        MetricColumn(
+                            value =
+                                blockedDevices
+                                    .toString(),
+                            label =
+                                "Blocked"
                         )
                     }
+                }
+            }
 
-                    if (activeEnforcements.isNotEmpty()) {
-                        item {
-                            Column {
-                                ListSectionHeader("Active Enforcements")
-                                ActiveEnforcementsList(items = activeEnforcements)
-                            }
-                        }
+            if (
+                state.errorMessage !=
+                null
+            ) {
+
+                item {
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal =
+                                        16.dp,
+                                    vertical =
+                                        8.dp
+                                )
+                                .background(
+                                    color =
+                                        LiasThemeColors.orange
+                                            .copy(
+                                                alpha =
+                                                    0.10f
+                                            ),
+                                    shape =
+                                        RoundedCornerShape(
+                                            12.dp
+                                        )
+                                )
+                                .padding(
+                                    12.dp
+                                )
+                    ) {
+
+                        CupertinoText(
+                            text =
+                                "Some LIAS data could not be refreshed.",
+                            style =
+                                HigTypography.headline,
+                            color =
+                                LiasThemeColors.label
+                        )
+
+                        CupertinoText(
+                            text =
+                                state.errorMessage
+                                    .orEmpty(),
+                            style =
+                                HigTypography.subheadline,
+                            color =
+                                LiasThemeColors
+                                    .secondaryLabel
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(
+                                    8.dp
+                                )
+                        )
+
+                        HigButton(
+                            text =
+                                "Retry",
+                            onClick =
+                                viewModel::refresh,
+                            style =
+                                HigButtonStyle.Secondary
+                        )
                     }
+                }
+            }
 
-                    item { MetricsRow(devices = state.devices) }
+            if (
+                attentionDevices.isNotEmpty()
+            ) {
 
-                    item { ListSectionHeader("Recent Devices") }
+                item {
 
-                    item {
-                        GroupedListCard {
-                            state.devices.take(8).forEachIndexed { index, device ->
-                                GroupedListRow(
-                                    primaryText = device.displayName,
-                                    secondaryText = "${device.currentIP.ifBlank { "No IP" }} · ${device.vendor.ifBlank { "Unknown Vendor" }}",
-                                    leadingContent = {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .background(
-                                                    color = if (device.online) SystemGreenDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                                    shape = CircleShape
+                    ListSectionHeader(
+                        "Access Attention · ${attentionDevices.size}"
+                    )
+                }
+
+                attentionDevices.forEach {
+                    device ->
+
+                    item(
+                        key =
+                            "home_attention_${device.pdid}"
+                    ) {
+
+                        val status =
+                            state
+                                .effectiveStatusForDevice(
+                                    device.pdid
+                                )
+
+                        val presentation =
+                            AccessPresentationResolver
+                                .resolve(
+                                    device,
+                                    status
+                                )
+
+                        GroupedListCard(
+                            modifier =
+                                Modifier.padding(
+                                    horizontal =
+                                        16.dp,
+                                    vertical =
+                                        4.dp
+                                )
+                        ) {
+
+                            Column(
+                                modifier =
+                                    Modifier.padding(
+                                        14.dp
+                                    )
+                            ) {
+
+                                Row(
+                                    modifier =
+                                        Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.SpaceBetween,
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
+                                ) {
+
+                                    Row(
+                                        modifier =
+                                            Modifier.weight(
+                                                1f
+                                            ),
+                                        verticalAlignment =
+                                            Alignment.CenterVertically
+                                    ) {
+
+                                        StatusDot(
+                                            isOnline =
+                                                device.online,
+                                            isPaused =
+                                                presentation
+                                                    .isPaused
+                                        )
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.size(
+                                                    8.dp
                                                 )
                                         )
-                                    },
-                                    trailingContent = {
-                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    },
-                                    showDivider = index < state.devices.take(8).size - 1,
-                                    onClick = { onNavigateToDeviceDetail(device.pdid) }
+
+                                        Column {
+
+                                            CupertinoText(
+                                                text =
+                                                    device.displayName,
+                                                style =
+                                                    HigTypography.headline,
+                                                color =
+                                                    LiasThemeColors.label
+                                            )
+
+                                            CupertinoText(
+                                                text =
+                                                    device.currentIP
+                                                        .ifBlank {
+                                                            if (
+                                                                device.online
+                                                            ) {
+                                                                "Online"
+                                                            } else {
+                                                                "Offline"
+                                                            }
+                                                        },
+                                                style =
+                                                    HigTypography.caption,
+                                                color =
+                                                    LiasThemeColors
+                                                        .tertiaryLabel
+                                            )
+                                        }
+                                    }
+
+                                    StatusPill(
+                                        text =
+                                            presentation.label,
+                                        tone =
+                                            presentation.tone
+                                    )
+                                }
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(
+                                            10.dp
+                                        )
                                 )
+
+                                Row(
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(
+                                            8.dp
+                                        )
+                                ) {
+
+                                    when {
+
+                                        presentation
+                                            .canResumePause ->
+
+                                            HigButton(
+                                                text =
+                                                    "Resume",
+                                                onClick = {
+
+                                                    viewModel
+                                                        .unpauseDeviceInternet(
+                                                            device.pdid
+                                                        )
+                                                },
+                                                style =
+                                                    HigButtonStyle.Primary,
+                                                modifier =
+                                                    Modifier.weight(
+                                                        1f
+                                                    )
+                                            )
+
+                                        presentation
+                                            .canManageExtension ||
+                                            presentation
+                                                .canExtend ->
+
+                                            HigButton(
+                                                text =
+                                                    if (
+                                                        presentation
+                                                            .canManageExtension
+                                                    ) {
+                                                        "Manage"
+                                                    } else {
+                                                        "Extend Access"
+                                                    },
+                                                onClick = {
+                                                    activeDeviceForExtend =
+                                                        device
+                                                },
+                                                style =
+                                                    HigButtonStyle.Secondary,
+                                                modifier =
+                                                    Modifier.weight(
+                                                        1f
+                                                    )
+                                            )
+
+                                        presentation
+                                            .canPause ->
+
+                                            HigButton(
+                                                text =
+                                                    "Pause",
+                                                onClick = {
+                                                    activeDeviceForPause =
+                                                        device
+                                                },
+                                                style =
+                                                    HigButtonStyle.Gray,
+                                                modifier =
+                                                    Modifier.weight(
+                                                        1f
+                                                    )
+                                            )
+                                    }
+
+                                    HigButton(
+                                        text =
+                                            "Details",
+                                        onClick = {
+                                            onNavigateToDeviceDetail(
+                                                device.pdid
+                                            )
+                                        },
+                                        style =
+                                            HigButtonStyle.Gray,
+                                        modifier =
+                                            Modifier.weight(
+                                                1f
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
@@ -164,254 +747,285 @@ fun HomeScreen(
         }
     }
 
-    if (showGlobalWizard) {
-        PolicyWizardSheet(
-            viewModel = viewModel,
-            initialPolicy = state.policies.find { it.id == "global_default" },
-            tags = state.tags,
-            schedules = state.schedules,
-            existingPolicies = state.policies,
-            onDismiss = { showGlobalWizard = false },
-            onSave = { 
-                viewModel.savePolicy(it) 
-                showGlobalWizard = false
+    if (
+        showGlobalSheet
+    ) {
+
+        GlobalSwitchSheet(
+            currentPolicy =
+                globalPolicy,
+            onDismiss = {
+                showGlobalSheet =
+                    false
+            },
+            onSave = {
+                policy ->
+
+                viewModel
+                    .savePolicy(
+                        policy
+                    )
+
+                showGlobalSheet =
+                    false
             }
+        )
+    }
+
+    activeDeviceForExtend
+        ?.let {
+            device ->
+
+            val status =
+                state
+                    .effectiveStatusForDevice(
+                        device.pdid
+                    )
+
+            val presentation =
+                AccessPresentationResolver
+                    .resolve(
+                        device,
+                        status
+                    )
+
+            if (
+                presentation.canExtend ||
+                presentation.canManageExtension
+            ) {
+
+                ExtendAccessSheet(
+                    targetLabel =
+                        device.displayName,
+                    targetSubtitle =
+                        device.currentIP
+                            .ifBlank {
+                                device.pdid
+                            },
+                    currentExtension =
+                        status
+                            ?.activeExtension,
+                    onDismiss = {
+                        activeDeviceForExtend =
+                            null
+                    },
+                    onConfirm = {
+                        minutes ->
+
+                        viewModel
+                            .extendDeviceAccess(
+                                device.pdid,
+                                minutes
+                            )
+
+                        activeDeviceForExtend =
+                            null
+                    },
+                    onCancelExtension =
+                        if (
+                            presentation
+                                .canManageExtension
+                        ) {
+
+                            {
+                                viewModel
+                                    .cancelDeviceExtension(
+                                        device.pdid
+                                    )
+
+                                activeDeviceForExtend =
+                                    null
+                            }
+
+                        } else {
+                            null
+                        }
+                )
+
+            } else {
+
+                activeDeviceForExtend =
+                    null
+            }
+        }
+
+    activeDeviceForPause
+        ?.let {
+            device ->
+
+            val presentation =
+                AccessPresentationResolver
+                    .resolve(
+                        device,
+                        state
+                            .effectiveStatusForDevice(
+                                device.pdid
+                            )
+                    )
+
+            if (
+                presentation.canPause
+            ) {
+
+                PauseSheet(
+                    targetLabel =
+                        device.displayName,
+                    onDismiss = {
+                        activeDeviceForPause =
+                            null
+                    },
+                    onConfirm = {
+                        _ ->
+
+                        viewModel
+                            .pauseDeviceInternet(
+                                device.pdid
+                            )
+
+                        activeDeviceForPause =
+                            null
+                    }
+                )
+
+            } else {
+
+                activeDeviceForPause =
+                    null
+            }
+        }
+}
+
+@Composable
+private fun QuickTile(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+
+    Column(
+        modifier =
+            modifier
+                .background(
+                    color =
+                        LiasThemeColors
+                            .secondaryBackground,
+                    shape =
+                        RoundedCornerShape(
+                            14.dp
+                        )
+                )
+                .border(
+                    width =
+                        0.5.dp,
+                    color =
+                        LiasThemeColors.separator,
+                    shape =
+                        RoundedCornerShape(
+                            14.dp
+                        )
+                )
+                .semantics {
+                    role =
+                        Role.Button
+                }
+                .clickable(
+                    onClick =
+                        onClick
+                )
+                .padding(
+                    vertical =
+                        14.dp,
+                    horizontal =
+                        8.dp
+                ),
+        horizontalAlignment =
+            Alignment.CenterHorizontally
+    ) {
+
+        Box(
+            modifier =
+                Modifier
+                    .size(
+                        36.dp
+                    )
+                    .background(
+                        color =
+                            color,
+                        shape =
+                            RoundedCornerShape(
+                                9.dp
+                            )
+                    ),
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            CupertinoIcon(
+                imageVector =
+                    icon,
+                contentDescription =
+                    null,
+                tint =
+                    Color.White,
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    )
+            )
+        }
+
+        Spacer(
+            modifier =
+                Modifier.height(
+                    6.dp
+                )
+        )
+
+        CupertinoText(
+            text =
+                label,
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors.label,
+            textAlign =
+                TextAlign.Center
         )
     }
 }
 
 @Composable
-private fun GlobalSwitchHero(
-    globalPolicy: Policy?,
-    schedules: List<Schedule>,
-    onSavePolicy: (Policy) -> Unit,
-    onManageSchedules: () -> Unit
+private fun MetricColumn(
+    value: String,
+    label: String
 ) {
-    val pol = globalPolicy ?: Policy(id = "global_default", name = "Global Access Switch", type = "global", action = "schedule")
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(HigSpec.CardCorner)),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(HigSpec.CardCorner)
+    Column(
+        horizontalAlignment =
+            Alignment.CenterHorizontally
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("All Access", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Master switch for every managed device", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(16.dp))
 
-            SegmentedControl(
-                selected = pol.action,
-                onSelected = { newAction ->
-                    onSavePolicy(pol.copy(action = newAction))
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+        CupertinoText(
+            text =
+                value,
+            style =
+                HigTypography.title2,
+            fontWeight =
+                FontWeight.Bold,
+            color =
+                LiasThemeColors.label
+        )
 
-            AnimatedVisibility(
-                visible = pol.action == "schedule",
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    val attachedSchedules = schedules.filter { it.id in pol.resolveScheduleIDs() }
-                    if (attachedSchedules.isNotEmpty()) {
-                        MiniWeekStrip(schedules = attachedSchedules)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Manage Schedules",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier
-                            .clickable { onManageSchedules() }
-                            .padding(vertical = 4.dp)
-                    )
-                }
-            }
-        }
+        CupertinoText(
+            text =
+                label,
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors
+                    .secondaryLabel
+        )
     }
-}
-
-@Composable
-private fun ActiveEnforcementsList(items: List<ActiveEnforcementItem>) {
-    GroupedListCard {
-        items.forEachIndexed { index, item ->
-            val isBlock = item.action == "block"
-            GroupedListRow(
-                primaryText = item.targetName,
-                secondaryText = item.scheduleName,
-                leadingContent = {
-                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(item.targetColor))
-                },
-                trailingContent = {
-                    StatusPill(
-                        text = if (item.isGlobal) "Global " + item.action else item.action,
-                        tone = if (isBlock) PillTone.Blocked else PillTone.Allowed
-                    )
-                },
-                showDivider = index < items.size - 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun MetricsRow(devices: List<Device>) {
-    val total = devices.size
-    val online = devices.count { it.online }
-    val offline = total - online
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        MetricCard("TOTAL", total.toString(), MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
-        MetricCard("ONLINE", online.toString(), SystemGreenDark, Modifier.weight(1f))
-        MetricCard("OFFLINE", offline.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun MetricCard(label: String, value: String, textColor: Color, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.clip(RoundedCornerShape(14.dp)),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(value, style = MaterialTheme.typography.headlineMedium, color = textColor, fontWeight = FontWeight.W800)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-private fun computeActiveEnforcements(
-    policies: List<Policy>,
-    schedules: List<Schedule>,
-    tags: List<Tag>,
-    devices: List<Device>
-): List<ActiveEnforcementItem> {
-    val items = mutableListOf<ActiveEnforcementItem>()
-
-    val globalPol = policies.find { it.id == "global_default" }
-    if (globalPol != null && globalPol.enabled) {
-        if (globalPol.action == "block") {
-            items.add(
-                ActiveEnforcementItem(
-                    policyName = "Global Kill-Switch",
-                    targetName = "Entire Network",
-                    targetColor = Color.Red,
-                    scheduleName = "Vacation Mode / Block All",
-                    action = "block",
-                    isGlobal = true
-                )
-            )
-            return items
-        } else if (globalPol.action == "allow") {
-            items.add(
-                ActiveEnforcementItem(
-                    policyName = "Global Allow Override",
-                    targetName = "Entire Network",
-                    targetColor = Color.Green,
-                    scheduleName = "Allow All Active",
-                    action = "allow",
-                    isGlobal = true
-                )
-            )
-            return items
-        }
-    }
-
-    policies.forEach { p ->
-        if (!p.enabled || p.type == "global" || p.targetID == "infrastructure") return@forEach
-
-        if (p.expiresAt != null) {
-            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
-            if (minsLeft <= 0) return@forEach
-        }
-
-        val targetTag = tags.find { it.id == p.targetID }
-        val targetName = if (p.type == "tag") (targetTag?.name ?: p.targetID) else (devices.find { it.pdid == p.targetID }?.displayName ?: p.targetID)
-        val targetColor = if (p.type == "tag") parseColor(targetTag?.color) else Color(0xFF0A84FF)
-
-        if (p.action == "allow") {
-            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
-            val schedLabel = if (p.id.startsWith("pol_extend_")) "Extended Access (${minsLeft}m left)" else "Allow Always"
-            items.add(
-                ActiveEnforcementItem(
-                    policyName = p.name,
-                    targetName = targetName,
-                    targetColor = targetColor,
-                    scheduleName = schedLabel,
-                    action = "allow"
-                )
-            )
-        } else if (p.action == "block") {
-            val minsLeft = ExtendHelper.minutesUntil(p.expiresAt)
-            val schedLabel = if (p.id.startsWith("pol_pause_")) "Paused Internet (${minsLeft}m left)" else "Block Always"
-            items.add(
-                ActiveEnforcementItem(
-                    policyName = p.name,
-                    targetName = targetName,
-                    targetColor = targetColor,
-                    scheduleName = schedLabel,
-                    action = "block"
-                )
-            )
-        } else if (p.action == "schedule") {
-            val schedIDs = p.resolveScheduleIDs()
-            val attachedScheds = schedules.filter { it.id in schedIDs }
-
-            for (s in attachedScheds) {
-                val activeAction = evaluateScheduleActiveAction(s)
-                if (activeAction != null) {
-                    val isDST = try {
-                        TimeZone.getTimeZone(s.timezone).inDaylightTime(Calendar.getInstance().time)
-                    } catch (e: Exception) { false }
-
-                    items.add(
-                        ActiveEnforcementItem(
-                            policyName = p.name,
-                            targetName = targetName,
-                            targetColor = targetColor,
-                            scheduleName = "${s.name} (${activeAction.uppercase()})",
-                            action = activeAction,
-                            timezone = s.timezone,
-                            isDST = isDST
-                        )
-                    )
-                    break
-                }
-            }
-        }
-    }
-    return items
-}
-
-private fun evaluateScheduleActiveAction(s: Schedule): String? {
-    try {
-        val cal = Calendar.getInstance(TimeZone.getTimeZone(s.timezone))
-        val currentDayIdx = cal.get(Calendar.DAY_OF_WEEK) - 1
-        val currentMin = currentDayIdx * 1440 + cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-
-        val segments = ScheduleProjection.projectSchedule(s)
-        for (seg in segments) {
-            if (currentMin >= seg.start && currentMin < seg.end) {
-                return seg.action
-            }
-        }
-    } catch (_: Exception) {}
-    return null
-}
-
-private fun parseColor(colorHex: String?): Color {
-    if (colorHex.isNullOrBlank()) return Color.Gray
-    return try {
-        Color(android.graphics.Color.parseColor(colorHex))
-    } catch (_: Exception) { Color.Gray }
 }

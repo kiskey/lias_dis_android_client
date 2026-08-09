@@ -1,10 +1,3 @@
-// ====================================================================
-// File: app/src/main/java/com/lias/remote/ui/components/MiniWeekStrip.kt
-// Version: 1.0.0
-// Purpose: Compact 7-cell weekly timeline strip (.timeline) for hero card
-//          and inline schedule row visualization.
-// ====================================================================
-
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
@@ -14,8 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -25,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.util.ScheduleProjection
+import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemGreenDark
@@ -32,6 +24,7 @@ import com.lias.remote.ui.theme.SystemIndigoDark
 import com.lias.remote.ui.theme.SystemOrangeDark
 import com.lias.remote.ui.theme.SystemPinkDark
 import com.lias.remote.ui.theme.SystemTealDark
+import io.github.alexzhirkevich.cupertino.CupertinoText
 
 @Composable
 fun MiniWeekStrip(
@@ -53,7 +46,7 @@ fun MiniWeekStrip(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(22.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -75,7 +68,7 @@ fun MiniWeekStrip(
             val cellColor = if (activeSegment != null) {
                 val schedIdx = schedules.indexOfFirst { it.id == activeSegment.scheduleId }
                 if (activeSegment.action == "block") {
-                    MaterialTheme.colorScheme.error
+                    LiasThemeColors.red
                 } else {
                     palette[if (schedIdx != -1) schedIdx % palette.size else 0]
                 }
@@ -86,15 +79,15 @@ fun MiniWeekStrip(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(20.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(5.dp))
                     .background(cellColor),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                CupertinoText(
                     text = dayLabels[dayIdx],
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (activeSegment != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    style = HigTypography.tabLabel,
+                    color = if (activeSegment != null) Color.White else LiasThemeColors.tertiaryLabel
                 )
             }
         }

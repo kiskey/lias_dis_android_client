@@ -1,8 +1,23 @@
 # ====================================================================
 # File: .github/workflows/release.yml
-# Version: 1.1.0
-# Audit Fixes:
-#   1. Updated Gradle wrapper generation to 8.10.2 for AGP 8.8.0 compatibility.
+# Version: 2.1.0
+#
+# Purpose:
+#   Verify and publish a LIAS Remote debug APK.
+#
+# Build environment:
+#   Java:   17
+#   Gradle: 8.11.1
+#   AGP:    8.9.3
+#
+# Wrapper policy:
+#   - Prefer the committed Gradle Wrapper.
+#   - If the repository does not contain one yet, bootstrap exactly
+#     Gradle 8.11.1 and generate the wrapper for this workflow run.
+#
+# Note:
+#   The generated wrapper in CI is temporary and is NOT committed back
+#   to the repository.
 # ====================================================================
 
 name: Release Debug APK
@@ -13,42 +28,192 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: lias-debug-release
+  cancel-in-progress: false
+
 jobs:
   build:
+
     name: Build and Publish Debug APK
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Inspect Repository Layout
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "Current directory:"
+          pwd
+
+          echo
+          echo "Repository root:"
+          ls -la
+
+          echo
+          echo "Gradle-related files:"
+          find . \
+            -maxdepth 3 \
+            \( \
+              -name "gradlew" \
+              -o -name "gradlew.bat" \
+              -o -name "gradle-wrapper.properties" \
+              -o -name "gradle-wrapper.jar" \
+              -o -name "settings.gradle" \
+              -o -name "settings.gradle.kts" \
+              -o -name "build.gradle" \
+              -o -name "build.gradle.kts" \
+            \) \
+            -print
+
+          if [ ! -f "./settings.gradle.kts" ] && \
+             [ ! -f "./settings.gradle" ]; then
+            echo "::error::No settings.gradle(.kts) found at repository root."
+            echo "::error::The Android project may be inside a subdirectory."
+            exit 1
+          fi
+
+          if [ ! -f "./build.gradle.kts" ] && \
+             [ ! -f "./build.gradle" ]; then
+            echo "::error::No root build.gradle(.kts) found."
+            exit 1
+          fi
+
+          if [ ! -f "./app/build.gradle.kts" ] && \
+             [ ! -f "./app/build.gradle" ]; then
+            echo "::error::No app module build file found."
+            exit 1
+          fi
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.11.1"
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.10.2
+      - name: Ensure Gradle Wrapper Exists
+        shell: bash
+        run: |
+          set -euxo pipefail
 
-      - name: Make gradlew Executable
-        run: chmod +x ./gradlew
+          if [ -f "./gradlew" ]; then
+            echo "Committed Gradle wrapper found."
+          else
+            echo "Gradle wrapper is missing."
+            echo "Generating Gradle 8.11.1 wrapper for this workflow run..."
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+            gradle wrapper \
+              --gradle-version 8.11.1 \
+              --distribution-type bin
+          fi
 
-      - name: Upload to GitHub Release
+          test -f ./gradlew
+          test -f ./gradlew.bat
+          test -f ./gradle/wrapper/gradle-wrapper.properties
+          test -f ./gradle/wrapper/gradle-wrapper.jar
+
+          chmod +x ./gradlew
+
+      - name: Verify Gradle Wrapper Version
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cat gradle/wrapper/gradle-wrapper.properties
+
+          ./gradlew --version
+
+      - name: Compile Debug Kotlin
+        run: |
+          ./gradlew \
+            :app:compileDebugKotlin \
+            --stacktrace \
+            --no-daemon
+
+      - name: Run Debug Unit Tests
+        run: |
+          ./gradlew \
+            :app:testDebugUnitTest \
+            --stacktrace \
+            --no-daemon
+
+      - name: Run Debug Lint
+        run: |
+          ./gradlew \
+            :app:lintDebug \
+            --stacktrace \
+            --no-daemon
+
+      - name: Assemble Debug APK
+        run: |
+          ./gradlew \
+            :app:assembleDebug \
+            --stacktrace \
+            --no-daemon
+
+      - name: Verify Debug APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          echo "Generated APK files:"
+          find app/build/outputs/apk \
+            -type f \
+            -name "*.apk" \
+            -print \
+            -exec ls -lh {} \;
+
+          APK_COUNT="$(
+            find app/build/outputs/apk/debug \
+              -maxdepth 1 \
+              -type f \
+              -name "*.apk" \
+              | wc -l
+          )"
+
+          if [ "$APK_COUNT" -lt 1 ]; then
+            echo "::error::No debug APK was generated."
+            exit 1
+          fi
+
+      - name: Publish GitHub Debug Prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "Latest Debug Build"
+          tag_name: debug-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: LIAS Remote Debug Build #${{ github.run_number }}
+
           body: |
             ## LIAS Remote Debug Build
-            Automated debug build generated from commit `${{ github.sha }}`.
-            
-     #       **Note:** This is an unsigned debug build for testing purposes.
-          prerelease: false
-          make_latest: "true"
-          files: app/build/outputs/apk/debug/*.apk
+
+            Commit: `${{ github.sha }}`
+
+            Verification completed:
+
+            - Kotlin debug compilation
+            - Unit tests
+            - Android lint
+            - Debug APK assembly
+
+            This APK is signed with Android's debug signing key and is
+            intended for direct testing only.
+
+          prerelease: true
+          make_latest: "false"
+          fail_on_unmatched_files: true
+
+          files: |
+            app/build/outputs/apk/debug/*.apk
