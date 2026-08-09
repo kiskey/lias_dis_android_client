@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/SettingsViewModel.kt
-// Version: 27.3.0
+// Version: 27.4.0
 //
 // Purpose:
 //   Settings + safe server replacement + diagnostics state.
@@ -18,6 +18,10 @@
 //   - Adds authoritative policy export/import orchestration.
 //   - Keeps EventRepository as the LIAS mutation authority.
 //   - Health probes remain isolated from the live connection client.
+// Stabilization 27.4:
+//   - Adds dedicated passive server-health error state.
+//   - Keeps connection-edit errors separate from health-check errors.
+//   - Aligns SettingsUiState with the current SettingsScreen contract.
 // ====================================================================
 
 package com.lias.remote.ui
@@ -73,6 +77,15 @@ data class SettingsUiState(
     val isExportingPolicies: Boolean = false,
     val isImportingPolicies: Boolean = false,
     val isRefreshingServerHealth: Boolean = false,
+
+    /*
+     * Passive health-check failure is intentionally separate from
+     * connectionError.
+     *
+     * connectionError belongs to connection setup/edit flows.
+     * healthError belongs only to the read-only Settings health card.
+     */
+    val healthError: String? = null,
 
     /*
      * Health metadata is observational only. The live EventRepository
@@ -656,7 +669,9 @@ class SettingsViewModel(
             _uiState.value =
                 _uiState.value.copy(
                     isRefreshingServerHealth =
-                        true
+                        true,
+                    healthError =
+                        null
                 )
 
             val startedAt =
@@ -698,12 +713,18 @@ class SettingsViewModel(
                                     },
                             healthLatencyMs =
                                 latencyMs,
-                            connectionError =
+                            healthError =
                                 null
                         )
                 }
 
                 else -> {
+
+                    val presentation =
+                        ErrorPresentation
+                            .from(
+                                result
+                            )
 
                     _uiState.value =
                         _uiState.value.copy(
@@ -712,7 +733,9 @@ class SettingsViewModel(
                             serverVersion =
                                 null,
                             healthLatencyMs =
-                                null
+                                null,
+                            healthError =
+                                presentation.message
                         )
 
                     appendDiagnostic(

@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt
-// Version: 12.0.0
+// Version: 27.4.0
 //
 // Purpose:
 //   User-facing Settings with progressive disclosure.
@@ -840,7 +840,7 @@ private fun serverHealthText(
     }
 
     if (
-        state.isRefreshingHealth
+        state.isRefreshingServerHealth
     ) {
         return "Checking server…"
     }
