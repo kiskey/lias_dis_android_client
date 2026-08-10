@@ -18,12 +18,16 @@
 package com.lias.remote.ui.screens.connect
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -36,12 +40,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.SettingsViewModel
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
@@ -66,6 +72,10 @@ fun ConnectScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .imePadding()
+                .verticalScroll(
+                    rememberScrollState()
+                )
                 .background(
                     LiasThemeColors.background
                 )
@@ -185,7 +195,7 @@ fun ConnectScreen(
                 )
         ) {
 
-            HigField(
+            HigConfiguredField(
                 value =
                     state.serverUrl,
                 onValueChange =
@@ -194,11 +204,16 @@ fun ConnectScreen(
                     "LIAS Server",
                 placeholder =
                     "http://192.168.1.1:8081",
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
                 enabled =
                     !state.isConnecting
             )
 
-            HigField(
+            HigConfiguredField(
                 value =
                     state.authToken,
                 onValueChange =
@@ -209,6 +224,11 @@ fun ConnectScreen(
                     "Optional",
                 visualTransformation =
                     PasswordVisualTransformation(),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
                 enabled =
                     !state.isConnecting
             )

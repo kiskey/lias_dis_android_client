@@ -17,6 +17,7 @@ package com.lias.remote.ui.screens.devices
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,12 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.util.TagDependencyImpact
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.TagDeleteSheet
@@ -230,7 +232,7 @@ fun TagEditorSheet(
                 )
             }
 
-            HigField(
+            HigConfiguredField(
                 value =
                     name,
                 onValueChange = {
@@ -243,7 +245,11 @@ fun TagEditorSheet(
                 label =
                     "Tag Name",
                 placeholder =
-                    "e.g. Nursery"
+                    "e.g. Nursery",
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    )
             )
 
             Column(

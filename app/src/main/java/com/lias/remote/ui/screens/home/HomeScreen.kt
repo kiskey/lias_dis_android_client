@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,11 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
 import com.lias.remote.core.models.Policy
+import com.lias.remote.core.models.Tag
 import com.lias.remote.ui.LiasViewModel
 import com.lias.remote.ui.access.AccessPresentation
 import com.lias.remote.ui.access.AccessPresentationResolver
@@ -44,7 +48,6 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.ListSectionHeader
 import com.lias.remote.ui.components.PillTone
-import com.lias.remote.ui.components.StatusDot
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.navigation.LiasScreen
 import com.lias.remote.ui.screens.ExtendAccessSheet
@@ -54,6 +57,12 @@ import com.lias.remote.ui.theme.LiasThemeColors
 import io.github.alexzhirkevich.cupertino.CupertinoIcon
 import io.github.alexzhirkevich.cupertino.CupertinoText
 import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
+import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
+import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
+import io.github.alexzhirkevich.cupertino.icons.outlined.House
+import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
+import io.github.alexzhirkevich.cupertino.icons.outlined.Lock
+import io.github.alexzhirkevich.cupertino.icons.outlined.Pencil
 import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 
 @Composable
@@ -90,10 +99,15 @@ fun HomeScreen(
                 ?.equals("block", ignoreCase = true) == true
         }
     val restrictedDevices = state.homeRestrictedDevices()
-    val activeTagProtections = state.homeActiveTagProtections()
     val hasGlobalProtection = state.homeHasGlobalProtection(globalPolicy)
+    val activeTagProtections =
+        if (hasGlobalProtection) emptyList() else state.homeActiveTagProtections()
+    val activePauseDevices =
+        if (hasGlobalProtection) emptyList() else state.homeActivePauseDevices()
     val activeProtectionCount =
-        activeTagProtections.size + if (hasGlobalProtection) 1 else 0
+        activeTagProtections.size +
+            activePauseDevices.size +
+            if (hasGlobalProtection) 1 else 0
 
     HigLargeTitleScaffold(
         title = "Home",
@@ -227,7 +241,7 @@ fun HomeScreen(
                                 },
                             secondaryText =
                                 if (state.isInitialLoaded) {
-                                    "No global or group protection is currently overriding LIAS defaults."
+                                    "No global, group, or temporary pause protection is currently active."
                                 } else {
                                     "Waiting for authoritative LIAS effective-status data."
                                 }
@@ -258,7 +272,18 @@ fun HomeScreen(
                                             }
                                     )
                                 },
-                                showDivider = activeTagProtections.isNotEmpty(),
+                                leadingContent = {
+                                    HomeIconBubble(
+                                        icon = CupertinoIcons.Outlined.Shield,
+                                        tint =
+                                            if (globalPolicy.action.equals("block", true)) {
+                                                LiasThemeColors.red
+                                            } else {
+                                                LiasThemeColors.green
+                                            }
+                                    )
+                                },
+                                showDivider = false,
                                 onClick = { showGlobalSheet = true }
                             )
                         }
@@ -268,17 +293,72 @@ fun HomeScreen(
 
                             GroupedListRow(
                                 primaryText = protection.tag.name,
-                                secondaryText = protectionSubtitle(status),
+                                secondaryText = "Group policy · Internet blocked",
+                                leadingContent = {
+                                    HomeIconBubble(
+                                        icon = protection.tag.homeIconKind().imageVector(),
+                                        tint = LiasThemeColors.red
+                                    )
+                                },
                                 trailingContent = {
                                     ProtectionPill(status)
                                 },
-                                showDivider = index < activeTagProtections.lastIndex,
+                                showDivider =
+                                    index < activeTagProtections.lastIndex ||
+                                        activePauseDevices.isNotEmpty(),
                                 onClick = {
                                     onNavigateToTab(LiasScreen.Devices)
                                 }
                             )
                         }
+
+                        activePauseDevices.forEachIndexed { index, device ->
+                            val status = state.effectiveStatusForDevice(device.pdid)
+                            val minutesLeft = status?.activeExtension?.minutesLeft ?: 0
+
+                            GroupedListRow(
+                                primaryText = device.displayName,
+                                secondaryText =
+                                    if (minutesLeft > 0) {
+                                        "Temporary pause · $minutesLeft min remaining"
+                                    } else {
+                                        "Temporary pause currently in effect"
+                                    },
+                                leadingContent = {
+                                    HomeIconBubble(
+                                        icon = CupertinoIcons.Outlined.Clock,
+                                        tint = LiasThemeColors.orange
+                                    )
+                                },
+                                trailingContent = {
+                                    StatusPill(
+                                        text = "Paused",
+                                        tone = PillTone.PAUSED
+                                    )
+                                },
+                                showDivider = index < activePauseDevices.lastIndex,
+                                onClick = {
+                                    onNavigateToDeviceDetail(device.pdid)
+                                }
+                            )
+                        }
                     }
+                }
+            }
+
+            if (activeProtectionCount > 0) {
+                item {
+                    CupertinoText(
+                        text = "Only protections currently in effect are shown.",
+                        style = HigTypography.footnote,
+                        color = LiasThemeColors.secondaryLabel,
+                        modifier =
+                            Modifier.padding(
+                                start = 32.dp,
+                                end = 16.dp,
+                                top = 7.dp
+                            )
+                    )
                 }
             }
 
@@ -343,10 +423,12 @@ fun HomeScreen(
                             val status = state.effectiveStatusForDevice(device.pdid)
                             val presentation =
                                 AccessPresentationResolver.resolve(device, status)
+                            val primaryTag = device.homePrimaryTag(state.tags)
 
                             RestrictedDeviceRow(
                                 device = device,
                                 presentation = presentation,
+                                primaryTag = primaryTag,
                                 showDivider = index < restrictedDevices.lastIndex,
                                 onResume = {
                                     viewModel.unpauseDeviceInternet(device.pdid)
@@ -430,6 +512,7 @@ fun HomeScreen(
 private fun RestrictedDeviceRow(
     device: Device,
     presentation: AccessPresentation,
+    primaryTag: Tag?,
     showDivider: Boolean,
     onResume: () -> Unit,
     onExtend: () -> Unit,
@@ -448,9 +531,9 @@ private fun RestrictedDeviceRow(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StatusDot(
-                        isOnline = device.online,
-                        isPaused = presentation.isPaused
+                    HomeIconBubble(
+                        icon = primaryTag.homeIconKind().imageVector(),
+                        tint = homeTagAccent(primaryTag)
                     )
 
                     Spacer(modifier = Modifier.size(8.dp))
@@ -605,21 +688,55 @@ private fun ProtectionPill(
     )
 }
 
-private fun protectionSubtitle(
-    status: EffectiveStatus
-): String =
-    when {
-        status.activeExtension != null ->
-            "Temporary group access is currently in effect"
+@Composable
+private fun HomeIconBubble(
+    icon: ImageVector,
+    tint: Color
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(36.dp)
+                .background(
+                    color = tint.copy(alpha = 0.12f),
+                    shape = CircleShape
+                ),
+        contentAlignment = Alignment.Center
+    ) {
+        CupertinoIcon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
 
-        status.source.equals("schedule", ignoreCase = true) ->
-            "Schedule is currently in effect"
+@Composable
+private fun homeTagAccent(
+    tag: Tag?
+): Color {
+    val fallback = LiasThemeColors.blue
+    val encoded = tag?.color?.trim().orEmpty()
 
-        status.source.equals("tag_policy", ignoreCase = true) ->
-            "Group rule is currently in effect"
+    return if (encoded.isBlank()) {
+        fallback
+    } else {
+        runCatching {
+            Color(android.graphics.Color.parseColor(encoded))
+        }.getOrDefault(fallback)
+    }
+}
 
-        else ->
-            "LIAS protection is currently in effect"
+private fun HomeTagIconKind.imageVector(): ImageVector =
+    when (this) {
+        HomeTagIconKind.SHIELD -> CupertinoIcons.Outlined.Shield
+        HomeTagIconKind.LOCK -> CupertinoIcons.Outlined.Lock
+        HomeTagIconKind.HOUSE -> CupertinoIcons.Outlined.House
+        HomeTagIconKind.IPHONE -> CupertinoIcons.Outlined.Iphone
+        HomeTagIconKind.GEAR -> CupertinoIcons.Outlined.Gear
+        HomeTagIconKind.CLOCK -> CupertinoIcons.Outlined.Clock
+        HomeTagIconKind.PENCIL -> CupertinoIcons.Outlined.Pencil
     }
 
 @Composable

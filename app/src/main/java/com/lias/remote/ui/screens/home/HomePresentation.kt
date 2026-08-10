@@ -56,24 +56,53 @@ internal fun UiState.homeRestrictedDevices(): List<Device> =
  * either non-enforcements or represented once elsewhere on Home.
  */
 internal fun UiState.homeActiveTagProtections(): List<HomeTagProtection> =
-    tags
-        .mapNotNull { tag ->
-            val status = effectiveStatusForTag(tag.id) ?: return@mapNotNull null
-            val source = status.source.trim().lowercase()
-
-            if (
-                source in setOf(
-                    "global",
-                    "fallback",
-                    "infrastructure"
-                )
-            ) {
-                null
-            } else {
-                HomeTagProtection(tag, status)
-            }
+    policies
+        .asSequence()
+        .filter { policy ->
+            policy.enabled &&
+                policy.type.equals("tag", ignoreCase = true) &&
+                policy.action.lowercase() in setOf("block", "schedule") &&
+                !policy.targetID.equals("infrastructure", ignoreCase = true)
         }
-        .sortedBy { it.tag.name.lowercase() }
+        .map { it.targetID }
+        .filter { it.isNotBlank() }
+        .toSet()
+        .let { policyTagIds ->
+            tags
+                .mapNotNull { tag ->
+                    if (tag.id !in policyTagIds) {
+                        return@mapNotNull null
+                    }
+
+                    val status =
+                        effectiveStatusForTag(tag.id)
+                            ?: return@mapNotNull null
+                    val source = status.source.trim().lowercase()
+
+                    if (
+                        source in setOf(
+                            "global",
+                            "fallback",
+                            "infrastructure"
+                        ) ||
+                        !status.action.equals("block", ignoreCase = true)
+                    ) {
+                        null
+                    } else {
+                        HomeTagProtection(tag, status)
+                    }
+                }
+                .sortedBy { it.tag.name.lowercase() }
+        }
+
+internal fun UiState.homeActivePauseDevices(): List<Device> =
+    homeRestrictedDevices()
+        .filter { device ->
+            effectiveStatusForDevice(device.pdid)
+                ?.activeExtension
+                ?.reasonTag
+                .equals("pause", ignoreCase = true)
+        }
 
 internal fun UiState.homeHasGlobalProtection(
     globalPolicy: Policy

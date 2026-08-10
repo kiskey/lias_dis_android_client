@@ -16,6 +16,7 @@
 
 package com.lias.remote.ui.screens.devices
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,11 +30,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.User
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
@@ -172,7 +174,7 @@ fun UserAssignmentSheet(
                         LiasThemeColors.tertiaryLabel
                 )
 
-                HigField(
+                HigConfiguredField(
                     value =
                         newUserName,
                     onValueChange = {
@@ -181,7 +183,11 @@ fun UserAssignmentSheet(
                     label =
                         "Name",
                     placeholder =
-                        "e.g. Alex"
+                        "e.g. Alex",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        )
                 )
 
                 HigTextButton(

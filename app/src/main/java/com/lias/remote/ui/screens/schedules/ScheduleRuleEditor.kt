@@ -17,6 +17,7 @@ package com.lias.remote.ui.screens.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,11 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.ScheduleRule
 import com.lias.remote.core.util.ScheduleFormatting
 import com.lias.remote.core.util.ScheduleProjection
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
@@ -237,7 +240,7 @@ fun ScheduleRuleEditor(
                     10.dp
                 )
         ) {
-            HigField(
+            HigConfiguredField(
                 value =
                     rule.startTime,
                 onValueChange = {
@@ -252,13 +255,18 @@ fun ScheduleRuleEditor(
                     "Start",
                 placeholder =
                     "22:00",
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Next
+                    ),
                 modifier =
                     Modifier.weight(
                         1f
                     )
             )
 
-            HigField(
+            HigConfiguredField(
                 value =
                     rule.endTime,
                 onValueChange = {
@@ -273,6 +281,11 @@ fun ScheduleRuleEditor(
                     "End",
                 placeholder =
                     "06:00",
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done
+                    ),
                 modifier =
                     Modifier.weight(
                         1f
@@ -366,7 +379,7 @@ fun ScheduleRuleEditor(
                         10.dp
                     )
             ) {
-                HigField(
+                HigConfiguredField(
                     value =
                         rule.startDate
                             .orEmpty(),
@@ -375,8 +388,7 @@ fun ScheduleRuleEditor(
                             rule.copy(
                                 startDate =
                                     it
-                                        .trim()
-                                        .ifBlank {
+                                        .ifEmpty {
                                             null
                                         }
                             )
@@ -386,13 +398,18 @@ fun ScheduleRuleEditor(
                         "Start Date",
                     placeholder =
                         "YYYY-MM-DD",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Next
+                        ),
                     modifier =
                         Modifier.weight(
                             1f
                         )
                 )
 
-                HigField(
+                HigConfiguredField(
                     value =
                         rule.endDate
                             .orEmpty(),
@@ -401,8 +418,7 @@ fun ScheduleRuleEditor(
                             rule.copy(
                                 endDate =
                                     it
-                                        .trim()
-                                        .ifBlank {
+                                        .ifEmpty {
                                             null
                                         }
                             )
@@ -412,6 +428,11 @@ fun ScheduleRuleEditor(
                         "End Date",
                     placeholder =
                         "YYYY-MM-DD",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Done
+                        ),
                     modifier =
                         Modifier.weight(
                             1f

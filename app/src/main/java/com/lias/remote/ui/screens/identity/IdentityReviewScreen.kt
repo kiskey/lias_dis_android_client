@@ -1,5 +1,6 @@
 package com.lias.remote.ui.screens.identity
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.network.EngineFeatures
 import com.lias.remote.core.network.IdentityCandidateDetail
@@ -31,7 +35,7 @@ import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigAlertDialog
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
@@ -587,16 +591,24 @@ private fun IdentityDecisionDialog(
         onConfirm = onConfirm,
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HigField(
+                HigConfiguredField(
                     value = note,
                     onValueChange = { onNoteChange(it.take(1024)) },
                     label = "Decision Note",
-                    placeholder = "Optional"
+                    placeholder = "Optional",
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 6
                 )
-                HigField(
+                HigConfiguredField(
                     value = confirmation,
                     onValueChange = onConfirmationChange,
-                    label = confirmationLabel
+                    label = confirmationLabel,
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Characters,
+                            imeAction = ImeAction.Done
+                        )
                 )
             }
         }
@@ -621,11 +633,14 @@ private fun NoteDialog(
         isDestructive = true,
         onConfirm = onConfirm,
         content = {
-            HigField(
+            HigConfiguredField(
                 value = note,
                 onValueChange = { onNoteChange(it.take(1024)) },
                 label = "Decision Note",
-                placeholder = "Optional"
+                placeholder = "Optional",
+                singleLine = false,
+                minLines = 3,
+                maxLines = 6
             )
         }
     )
@@ -654,10 +669,14 @@ private fun BindingDialog(
                     selectedOption = bindingType,
                     onOptionSelected = onTypeChange
                 )
-                HigField(
+                HigConfiguredField(
                     value = value,
                     onValueChange = onValueChange,
-                    label = "Binding Value"
+                    label = "Binding Value",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        )
                 )
             }
         }
@@ -683,15 +702,25 @@ private fun SplitDialog(
         onConfirm = onConfirm,
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HigField(
+                HigConfiguredField(
                     value = mac,
                     onValueChange = onMacChange,
-                    label = "MAC to Split"
+                    label = "MAC to Split",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Next
+                        )
                 )
-                HigField(
+                HigConfiguredField(
                     value = confirmation,
                     onValueChange = onConfirmationChange,
-                    label = "Type SPLIT"
+                    label = "Type SPLIT",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Characters,
+                            imeAction = ImeAction.Done
+                        )
                 )
             }
         }

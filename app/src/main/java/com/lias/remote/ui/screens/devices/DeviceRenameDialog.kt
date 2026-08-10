@@ -13,13 +13,15 @@
 
 package com.lias.remote.ui.screens.devices
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
 import com.lias.remote.ui.components.HigAlertDialog
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 
 @Composable
 fun RenameDeviceDialog(
@@ -58,7 +60,7 @@ fun RenameDeviceDialog(
             )
         },
         content = {
-            HigField(
+            HigConfiguredField(
                 value =
                     text,
                 onValueChange = {
@@ -67,7 +69,11 @@ fun RenameDeviceDialog(
                 label =
                     "Device Name",
                 placeholder =
-                    "Device name"
+                    "Device name",
+                keyboardOptions =
+                    KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    )
             )
         }
     )

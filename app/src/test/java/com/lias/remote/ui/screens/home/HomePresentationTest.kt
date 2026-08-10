@@ -64,6 +64,14 @@ class HomePresentationTest {
         val state =
             UiState(
                 tags = tags,
+                policies =
+                    listOf(
+                        tagPolicy("kids"),
+                        tagPolicy("study"),
+                        tagPolicy("global"),
+                        tagPolicy("fallback"),
+                        tagPolicy("infra")
+                    ),
                 tagEffectiveStatuses =
                     mapOf(
                         "kids" to status("block", "tag_policy"),
@@ -75,8 +83,58 @@ class HomePresentationTest {
             )
 
         assertEquals(
-            listOf("kids", "study"),
+            listOf("kids"),
             state.homeActiveTagProtections().map { it.tag.id }
+        )
+    }
+
+    @Test
+    fun `active tag protections require an eligible blocking policy for the group`() {
+        val state =
+            UiState(
+                tags = listOf(tag("kids", "Kids"), tag("unused", "Unused")),
+                policies =
+                    listOf(
+                        tagPolicy("kids"),
+                        tagPolicy("unused", action = "allow")
+                    ),
+                tagEffectiveStatuses =
+                    mapOf(
+                        "kids" to status("block", "tag_policy"),
+                        "unused" to status("block", "schedule")
+                    )
+            )
+
+        assertEquals(
+            listOf("kids"),
+            state.homeActiveTagProtections().map { it.tag.id }
+        )
+    }
+
+    @Test
+    fun `active pause list contains only server identified temporary pauses`() {
+        val state =
+            UiState(
+                devices =
+                    listOf(
+                        device("paused", "Paused"),
+                        device("blocked", "Blocked")
+                    ),
+                deviceEffectiveStatuses =
+                    mapOf(
+                        "paused" to
+                            status(
+                                "block",
+                                "device_policy",
+                                ExtensionInfo(reasonTag = "pause")
+                            ),
+                        "blocked" to status("block", "device_policy")
+                    )
+            )
+
+        assertEquals(
+            listOf("paused"),
+            state.homeActivePauseDevices().map { it.pdid }
         )
     }
 
@@ -115,6 +173,18 @@ class HomePresentationTest {
             id = "global_default",
             name = "Global Access",
             type = "global",
+            action = action
+        )
+
+    private fun tagPolicy(
+        targetId: String,
+        action: String = "schedule"
+    ) =
+        Policy(
+            id = "policy_$targetId",
+            name = "Policy $targetId",
+            type = "tag",
+            targetID = targetId,
             action = action
         )
 }
