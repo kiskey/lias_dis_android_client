@@ -1,0 +1,21 @@
+{
+  "files": {
+    "SchedulePickerSheets.kt": "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt"
+  },
+  "checks": {
+    "has_plan_marker": true,
+    "imports_cupertino_date_picker": true,
+    "imports_date_picker_style": true,
+    "imports_remember_state": true,
+    "imports_experimental_api": true,
+    "date_sheet_uses_cupertino_date_picker": true,
+    "date_sheet_uses_wheel_style": true,
+    "date_sheet_uses_state": true,
+    "date_sheet_no_sequential_dates_list": true,
+    "date_sheet_confirms_yyyy_mm_dd": true,
+    "time_sheet_not_replaced_with_datetime_picker": true,
+    "no_cupertino_adaptive_dependency_added": true,
+    "no_cupertino_native_dependency_added": true
+  },
+  "sensitive_changed_files": []
+}

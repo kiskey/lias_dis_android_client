@@ -12,6 +12,11 @@
 //   visually competing with the active picker task.
 // - Picker card animates upward from the bottom.
 // - LIAS wire formats remain YYYY-MM-DD and HH:mm.
+//
+// Plan 3.1 Cupertino date wheel:
+// - Date sheet uses Slanoss CupertinoDatePicker Wheel style.
+// - Day, month, and year scroll as separate picker columns.
+// - Confirm still emits YYYY-MM-DD.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -67,9 +72,14 @@ import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
+import java.time.ZoneOffset
+import java.time.Instant
+import com.slapps.cupertino.rememberCupertinoDatePickerState
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.DatePickerStyle
+import com.slapps.cupertino.CupertinoDatePicker
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
@@ -162,6 +172,7 @@ fun ScheduleTimePickerSheet(
     }
 }
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun ScheduleDatePickerSheet(
     title: String,
@@ -169,81 +180,115 @@ fun ScheduleDatePickerSheet(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    val today = remember { LocalDate.now() }
-
-    val initial = remember(initialValue) {
-        runCatching { LocalDate.parse(initialValue) }
-            .getOrDefault(today)
-    }
-
-    val firstYear = min(today.year - 2, initial.year - 1)
-    val lastYear = max(today.year + 10, initial.year + 1)
-
-    val startDate = remember(firstYear) {
-        LocalDate.of(firstYear, 1, 1)
-    }
-
-    val endDate = remember(lastYear) {
-        LocalDate.of(lastYear, 12, 31)
-    }
-
-    val dates = remember(startDate, endDate) {
-        buildList {
-            var cursor = startDate
-            while (!cursor.isAfter(endDate)) {
-                add(cursor)
-                cursor = cursor.plusDays(1)
-            }
+    val today =
+        remember {
+            LocalDate.now()
         }
-    }
 
-    val initialIndex = remember(dates, initial) {
-        dates.indexOf(initial).coerceAtLeast(0)
-    }
+    val initial =
+        remember(
+            initialValue
+        ) {
+            runCatching {
+                LocalDate.parse(
+                    initialValue
+                )
+            }
+                .getOrDefault(
+                    today
+                )
+        }
 
-    var selectedIndex by remember(initialIndex) {
-        mutableIntStateOf(initialIndex)
-    }
-
-    val formatter = remember {
-        DateTimeFormatter.ofPattern(
-            "EEE, MMM d, yyyy",
-            Locale.getDefault()
+    val firstYear =
+        min(
+            today.year - 2,
+            initial.year - 1
         )
-    }
+
+    val lastYear =
+        max(
+            today.year + 10,
+            initial.year + 1
+        )
+
+    val initialMillis =
+        remember(
+            initial
+        ) {
+            initial
+                .atStartOfDay()
+                .toInstant(
+                    ZoneOffset.UTC
+                )
+                .toEpochMilli()
+        }
+
+    val pickerState =
+        rememberCupertinoDatePickerState(
+            initialSelectedDateMillis =
+                initialMillis,
+            yearRange =
+                firstYear..lastYear
+        )
 
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
     ) {
-        TextWheel(
-            values = dates.map { it.format(formatter) },
-            initialIndex = initialIndex,
-            onSelectedIndex = { selectedIndex = it },
-            modifier = Modifier.fillMaxWidth()
+        CupertinoDatePicker(
+            state =
+                pickerState,
+            style =
+                DatePickerStyle.Wheel(),
+            modifier =
+                Modifier.fillMaxWidth()
         )
 
+        val selectedDate =
+            remember(
+                pickerState.selectedDateMillis
+            ) {
+                Instant
+                    .ofEpochMilli(
+                        pickerState.selectedDateMillis
+                    )
+                    .atZone(
+                        ZoneOffset.UTC
+                    )
+                    .toLocalDate()
+            }
+
         CupertinoText(
-            text = dates[
-                selectedIndex.coerceIn(dates.indices)
-            ].toString(),
-            style = HigTypography.headline,
-            color = LiasThemeColors.secondaryLabel,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            text =
+                selectedDate.toString(),
+            style =
+                HigTypography.headline,
+            color =
+                LiasThemeColors.secondaryLabel,
+            textAlign =
+                TextAlign.Center,
+            modifier =
+                Modifier.fillMaxWidth()
         )
 
         HigButton(
             text = "Done",
             onClick = {
                 onConfirm(
-                    dates[
-                        selectedIndex.coerceIn(dates.indices)
-                    ].toString()
+                    Instant
+                        .ofEpochMilli(
+                            pickerState.selectedDateMillis
+                        )
+                        .atZone(
+                            ZoneOffset.UTC
+                        )
+                        .toLocalDate().toString()
                 )
             },
-            style = HigButtonStyle.Primary,
-            modifier = Modifier.fillMaxWidth()
+            style =
+                HigButtonStyle.Primary,
+            modifier =
+                Modifier.fillMaxWidth()
         )
     }
 }
