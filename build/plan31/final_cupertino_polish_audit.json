@@ -1,0 +1,26 @@
+{
+  "chevrons": {
+    "home_uses_chevron_forward": true,
+    "devices_uses_chevron_forward": true,
+    "home_no_text_disclosure": true,
+    "devices_no_text_disclosure": true,
+    "no_material_icons_home": true,
+    "no_material_icons_devices": true
+  },
+  "date_picker": {
+    "hig_date_picker_exists": true,
+    "hig_defaults_wheel": true,
+    "hig_owns_raw_cupertino_date_picker": true,
+    "schedule_uses_hig_date_picker": true,
+    "schedule_uses_wheel_mode": true,
+    "schedule_confirms_yyyy_mm_dd": true,
+    "schedule_no_sequential_date_list": true,
+    "raw_picker_only_in_hig": true
+  },
+  "dependencies": {
+    "no_cupertino_adaptive_added": true,
+    "no_cupertino_native_added": true
+  },
+  "sensitive_changed_files": [],
+  "raw_picker_occurrences_outside_hig": []
+}

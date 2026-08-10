@@ -10,6 +10,9 @@
 //   - Active Protection group card navigates to Devices filtered by tag.
 // ====================================================================
 
+// Plan 3.1 ChevronForward icon adoption:
+//   - Replaces temporary text disclosure with Slanoss Cupertino icon.
+
 package com.lias.remote.ui.screens.home
 
 import androidx.compose.foundation.background
@@ -71,6 +74,7 @@ import com.slapps.cupertino.icons.outlined.Iphone
 import com.slapps.cupertino.icons.outlined.Lock
 import com.slapps.cupertino.icons.outlined.Pencil
 import com.slapps.cupertino.icons.outlined.Shield
+import com.slapps.cupertino.icons.outlined.ChevronForward
 
 @Composable
 fun HomeScreen(
@@ -579,17 +583,30 @@ private fun RestrictedDeviceRow(
                         tone = presentation.tone
                     )
 
-                    CupertinoText(
-                        text = "›",
-                        style = HigTypography.title3,
-                        color = LiasThemeColors.tertiaryLabel,
+                    CupertinoIcon(
+                        imageVector =
+                            CupertinoIcons
+                                .Outlined
+                                .ChevronForward,
+                        contentDescription =
+                            "Details",
+                        tint =
+                            LiasThemeColors
+                                .tertiaryLabel,
                         modifier =
                             Modifier
                                 .clickable(
-                                    role = Role.Button,
-                                    onClick = onDetails
+                                    role =
+                                        Role.Button,
+                                    onClick =
+                                        onDetails
                                 )
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                .padding(
+                                    horizontal =
+                                        6.dp,
+                                    vertical =
+                                        4.dp
+                                )
                     )
                 }
             }

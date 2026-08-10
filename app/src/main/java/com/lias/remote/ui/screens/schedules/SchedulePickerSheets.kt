@@ -17,6 +17,9 @@
 // - Date sheet uses Slanoss CupertinoDatePicker Wheel style.
 // - Day, month, and year scroll as separate picker columns.
 // - Confirm still emits YYYY-MM-DD.
+//
+// Plan 3.1 Schedule date wrapper integration:
+// - ScheduleDatePickerSheet calls HigDatePicker instead of raw CupertinoDatePicker.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
@@ -74,16 +77,14 @@ import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
 import java.time.ZoneOffset
 import java.time.Instant
-import com.slapps.cupertino.rememberCupertinoDatePickerState
-import com.slapps.cupertino.ExperimentalCupertinoApi
-import com.slapps.cupertino.DatePickerStyle
-import com.slapps.cupertino.CupertinoDatePicker
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import com.lias.remote.ui.components.HigDatePicker
+import com.lias.remote.ui.components.HigDatePickerMode
 
 private const val WHEEL_VISIBLE_ROWS = 5
 private val WHEEL_ROW_HEIGHT = 44.dp
@@ -172,7 +173,6 @@ fun ScheduleTimePickerSheet(
     }
 }
 
-@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun ScheduleDatePickerSheet(
     title: String,
@@ -223,34 +223,41 @@ fun ScheduleDatePickerSheet(
                 .toEpochMilli()
         }
 
-    val pickerState =
-        rememberCupertinoDatePickerState(
-            initialSelectedDateMillis =
-                initialMillis,
-            yearRange =
-                firstYear..lastYear
-        )
+    var selectedDateMillis by
+        remember(
+            initialMillis
+        ) {
+            mutableStateOf(
+                initialMillis
+            )
+        }
 
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
     ) {
-        CupertinoDatePicker(
-            state =
-                pickerState,
-            style =
-                DatePickerStyle.Wheel(),
+        HigDatePicker(
+            selectedDateMillis =
+                initialMillis,
+            onDateSelected = {
+                selectedDateMillis =
+                    it
+            },
+            yearRange =
+                firstYear..lastYear,
+            mode =
+                HigDatePickerMode.Wheel,
             modifier =
                 Modifier.fillMaxWidth()
         )
 
         val selectedDate =
             remember(
-                pickerState.selectedDateMillis
+                selectedDateMillis
             ) {
                 Instant
                     .ofEpochMilli(
-                        pickerState.selectedDateMillis
+                        selectedDateMillis
                     )
                     .atZone(
                         ZoneOffset.UTC
@@ -277,7 +284,7 @@ fun ScheduleDatePickerSheet(
                 onConfirm(
                     Instant
                         .ofEpochMilli(
-                            pickerState.selectedDateMillis
+                            selectedDateMillis
                         )
                         .atZone(
                             ZoneOffset.UTC

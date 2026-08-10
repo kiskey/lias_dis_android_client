@@ -23,6 +23,9 @@
 //   - No emoji-as-interface.
 // ====================================================================
 
+// Plan 3.1 ChevronForward icon adoption:
+//   - Replaces temporary text disclosure with Slanoss Cupertino icon.
+
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
@@ -71,6 +74,9 @@ import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.ChevronForward
 
 private data class DeviceSection(
     val id: String,
@@ -792,11 +798,14 @@ private fun DeviceCardItem(
                             presentation.tone
                     )
 
-                    CupertinoText(
-                        text = "›",
-                        style =
-                            HigTypography.title3,
-                        color =
+                    CupertinoIcon(
+                        imageVector =
+                            CupertinoIcons
+                                .Outlined
+                                .ChevronForward,
+                        contentDescription =
+                            "Details",
+                        tint =
                             LiasThemeColors
                                 .tertiaryLabel,
                         modifier =

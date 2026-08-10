@@ -1,0 +1,21 @@
+{
+  "files": {
+    "app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt": {
+      "has_cupertino_icon_import": true,
+      "has_cupertino_icons_import": true,
+      "has_chevron_forward_import": true,
+      "uses_chevron_forward": true,
+      "no_text_disclosure": true,
+      "no_material_icons": true
+    },
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt": {
+      "has_cupertino_icon_import": true,
+      "has_cupertino_icons_import": true,
+      "has_chevron_forward_import": true,
+      "uses_chevron_forward": true,
+      "no_text_disclosure": true,
+      "no_material_icons": true
+    }
+  },
+  "sensitive_changed_files": []
+}
