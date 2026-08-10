@@ -3,15 +3,19 @@
 //
 // Purpose:
 //   Plan 3.1 text-field polish guard for cursor/selection reconciliation.
+//
+// Notes:
+//   Uses JUnit 4 because the app module already declares libs.junit.
+//   Do not use kotlin.test here unless kotlin-test is explicitly added.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
 
 class HigFieldTextStateTest {
 
@@ -39,6 +43,7 @@ class HigFieldTextStateTest {
             "Kitchen iPad Pro",
             updated.text
         )
+
         assertEquals(
             TextRange(
                 7,
@@ -46,6 +51,7 @@ class HigFieldTextStateTest {
             ),
             updated.selection
         )
+
         assertNull(
             updated.composition
         )
@@ -75,6 +81,7 @@ class HigFieldTextStateTest {
             "Short",
             updated.text
         )
+
         assertEquals(
             TextRange(
                 5,
@@ -82,6 +89,7 @@ class HigFieldTextStateTest {
             ),
             updated.selection
         )
+
         assertNull(
             updated.composition
         )
