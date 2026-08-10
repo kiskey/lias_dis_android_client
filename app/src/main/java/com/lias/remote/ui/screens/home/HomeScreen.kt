@@ -80,7 +80,8 @@ import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
 fun HomeScreen(
     viewModel: LiasViewModel,
     onNavigateToDeviceDetail: (String) -> Unit,
-    onNavigateToTab: (LiasScreen) -> Unit
+    onNavigateToTab: (LiasScreen) -> Unit,
+    onNavigateToIdentityReview: () -> Unit = {}
 ) {
 
     val state by
@@ -166,14 +167,22 @@ fun HomeScreen(
             .filter {
                 device ->
 
+                val effectiveStatus =
+                    state.effectiveStatusForDevice(
+                        device.pdid
+                    )
+
+                !effectiveStatus
+                    ?.source
+                    .equals(
+                        "global",
+                        ignoreCase = true
+                    ) &&
                 when (
                     AccessPresentationResolver
                         .resolve(
                             device,
-                            state
-                                .effectiveStatusForDevice(
-                                    device.pdid
-                                )
+                            effectiveStatus
                         )
                         .kind
                 ) {
@@ -212,6 +221,41 @@ fun HomeScreen(
                     it.displayName.lowercase()
                 }
             )
+
+    val activeTagEnforcements =
+        state.tags
+            .mapNotNull { tag ->
+                val status =
+                    state.effectiveStatusForTag(tag.id)
+
+                if (
+                    status != null &&
+                    !status.source.equals(
+                        "global",
+                        ignoreCase = true
+                    ) &&
+                    (
+                        status.action.equals(
+                            "block",
+                            ignoreCase = true
+                        ) ||
+                        status.activeExtension != null
+                    )
+                ) {
+                    tag to status
+                } else {
+                    null
+                }
+            }
+
+    val hasGlobalEnforcement =
+        state.isInitialLoaded &&
+            state.policies.any {
+                it.id == "global_default"
+            } &&
+            globalPolicy.enabled &&
+            globalPolicy.action.lowercase() in
+            setOf("allow", "block")
 HigLargeTitleScaffold(
         title =
             "Home",
@@ -301,6 +345,88 @@ HigLargeTitleScaffold(
                                 true
                         }
                     )
+                }
+            }
+
+            if (state.capabilities != null) {
+                item {
+                    ListSectionHeader("LIAS 2.0")
+                }
+
+                item {
+                    GroupedListCard(
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        val upstream =
+                            state.systemStatus?.upstream
+                                ?: state.capabilities?.upstream
+
+                        GroupedListRow(
+                            primaryText = "LIAS Engine",
+                            secondaryText =
+                                buildString {
+                                    append(
+                                        "API ${state.capabilities?.apiVersion} · schema ${state.capabilities?.schemaVersion}"
+                                    )
+                                    state.snapshotRevision?.let {
+                                        append(" · snapshot $it")
+                                    }
+                                },
+                            trailingContent = {
+                                StatusPill(
+                                    text =
+                                        when {
+                                            upstream?.legacyMode == true -> "Legacy DIS"
+                                            upstream?.reachable == false -> "Degraded"
+                                            else -> "Current"
+                                        },
+                                    tone =
+                                        when {
+                                            upstream?.legacyMode == true -> PillTone.INFO
+                                            upstream?.reachable == false -> PillTone.WARN
+                                            else -> PillTone.ALLOWED
+                                        }
+                                )
+                            },
+                            showDivider = state.supportsIdentityReview
+                        )
+
+                        if (state.supportsIdentityReview) {
+                            GroupedListRow(
+                                primaryText = "Identity Review",
+                                secondaryText =
+                                    if (
+                                        state.identityReview.pendingCount == 0
+                                    ) {
+                                        "No pending possible matches"
+                                    } else {
+                                        "Review evidence before merging device records"
+                                    },
+                                trailingContent = {
+                                    StatusPill(
+                                        text =
+                                            buildString {
+                                                append(state.identityReview.pendingCount)
+                                                if (
+                                                    state.identityReview.pendingHasMore
+                                                ) {
+                                                    append("+")
+                                                }
+                                            },
+                                        tone =
+                                            if (
+                                                state.identityReview.pendingCount == 0
+                                            ) {
+                                                PillTone.INFO
+                                            } else {
+                                                PillTone.WARN
+                                            }
+                                    )
+                                },
+                                onClick = onNavigateToIdentityReview
+                            )
+                        }
+                    }
                 }
             }
 
@@ -519,14 +645,58 @@ HigLargeTitleScaffold(
             }
 
             if (
-                attentionDevices.isNotEmpty()
+                attentionDevices.isNotEmpty() ||
+                activeTagEnforcements.isNotEmpty() ||
+                hasGlobalEnforcement
             ) {
 
                 item {
 
                     ListSectionHeader(
-                        "Access Attention · ${attentionDevices.size}"
+                        "Active Enforcements · ${attentionDevices.size + activeTagEnforcements.size + if (hasGlobalEnforcement) 1 else 0}"
                     )
+                }
+
+                if (hasGlobalEnforcement) {
+                    item(
+                        key = "home_global_enforcement"
+                    ) {
+                        GroupedListCard(
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = 4.dp
+                            )
+                        ) {
+                            GroupedListRow(
+                                primaryText = "Entire Network",
+                                secondaryText =
+                                    if (globalPolicy.action == "block") {
+                                        "Global kill-switch is authoritative"
+                                    } else {
+                                        "Global allow override is authoritative"
+                                    },
+                                trailingContent = {
+                                    StatusPill(
+                                        text =
+                                            if (globalPolicy.action == "block") {
+                                                "Block All"
+                                            } else {
+                                                "Allow All"
+                                            },
+                                        tone =
+                                            if (globalPolicy.action == "block") {
+                                                PillTone.BLOCKED
+                                            } else {
+                                                PillTone.ALLOWED
+                                            }
+                                    )
+                                },
+                                onClick = {
+                                    showGlobalSheet = true
+                                }
+                            )
+                        }
+                    }
                 }
 
                 attentionDevices.forEach {
@@ -741,6 +911,69 @@ HigLargeTitleScaffold(
                                 }
                             }
                         }
+                    }
+                }
+
+                activeTagEnforcements.forEach { (tag, status) ->
+                    item(
+                        key = "home_tag_enforcement_${tag.id}"
+                    ) {
+                        GroupedListCard(
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = 4.dp
+                            )
+                        ) {
+                            GroupedListRow(
+                                primaryText = tag.name,
+                                secondaryText =
+                                    "Group enforcement · ${status.source.replace('_', ' ')}",
+                                trailingContent = {
+                                    StatusPill(
+                                        text =
+                                            if (status.activeExtension != null) {
+                                                "Extended"
+                                            } else {
+                                                "Blocked"
+                                            },
+                                        tone =
+                                            if (status.activeExtension != null) {
+                                                PillTone.ALLOWED
+                                            } else {
+                                                PillTone.BLOCKED
+                                            }
+                                    )
+                                },
+                                onClick = {
+                                    onNavigateToTab(LiasScreen.Devices)
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                item {
+                    ListSectionHeader("Active Enforcements")
+                }
+
+                item {
+                    GroupedListCard(
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        GroupedListRow(
+                            primaryText =
+                                if (state.isInitialLoaded) {
+                                    "No Active Enforcements"
+                                } else {
+                                    "Loading Enforcements"
+                                },
+                            secondaryText =
+                                if (state.isInitialLoaded) {
+                                    "All devices are currently operating under their server-authoritative default access state."
+                                } else {
+                                    "Waiting for authoritative LIAS effective-status data."
+                                }
+                        )
                     }
                 }
             }

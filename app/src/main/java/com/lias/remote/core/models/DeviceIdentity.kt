@@ -49,6 +49,16 @@ enum class IdentityTier(
     UNKNOWN(
         wireValue = "",
         title = "Unknown"
+    ),
+
+    L7(
+        wireValue = "l7",
+        title = "Layer 7"
+    ),
+
+    BIA(
+        wireValue = "bia",
+        title = "Bound Identity"
     );
 
     companion object {
@@ -163,6 +173,12 @@ object DeviceIdentityFormatter {
 
             IdentityTier.TENTATIVE ->
                 "Identity still being confirmed"
+
+            IdentityTier.L7 ->
+                "Identity anchored by application signals"
+
+            IdentityTier.BIA ->
+                "Identity anchored by verified binding"
 
             IdentityTier.UNKNOWN ->
                 "Identity status unavailable"

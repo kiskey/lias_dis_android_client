@@ -12,7 +12,19 @@
 
 package com.lias.remote.core.network
 
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+
 object Endpoints {
+
+    const val CAPABILITIES =
+        "/api/v1/capabilities"
+
+    const val SNAPSHOT =
+        "/api/v1/snapshot"
+
+    const val SYSTEM_STATUS =
+        "/api/v1/system/status"
 
     // ----------------------------------------------------------------
     // Devices
@@ -21,7 +33,7 @@ object Endpoints {
     const val DEVICES = "/api/v1/devices"
 
     fun device(pdid: String): String =
-        "$DEVICES/$pdid"
+        "$DEVICES/${pathSegment(pdid)}"
 
     fun deviceTags(pdid: String): String =
         "${device(pdid)}/tags"
@@ -44,6 +56,21 @@ object Endpoints {
     fun deviceEffectiveStatus(pdid: String): String =
         "${device(pdid)}/effective-status"
 
+    fun deviceIdentity(pdid: String): String =
+        "${device(pdid)}/identity"
+
+    fun deviceIdentityBindings(pdid: String): String =
+        "${deviceIdentity(pdid)}/bindings"
+
+    fun deviceIdentityBinding(
+        pdid: String,
+        aliasId: Long
+    ): String =
+        "${deviceIdentityBindings(pdid)}/$aliasId"
+
+    fun deviceIdentitySplit(pdid: String): String =
+        "${deviceIdentity(pdid)}/split"
+
 
     // ----------------------------------------------------------------
     // Tags
@@ -52,7 +79,7 @@ object Endpoints {
     const val TAGS = "/api/v1/tags"
 
     fun tag(id: String): String =
-        "$TAGS/$id"
+        "$TAGS/${pathSegment(id)}"
 
     fun tagExtend(tagId: String): String =
         "${tag(tagId)}/extend"
@@ -77,7 +104,7 @@ object Endpoints {
         "$POLICIES/import"
 
     fun policy(id: String): String =
-        "$POLICIES/$id"
+        "$POLICIES/${pathSegment(id)}"
 
 
     // ----------------------------------------------------------------
@@ -87,7 +114,7 @@ object Endpoints {
     const val SCHEDULES = "/api/v1/schedules"
 
     fun schedule(id: String): String =
-        "$SCHEDULES/$id"
+        "$SCHEDULES/${pathSegment(id)}"
 
 
     // ----------------------------------------------------------------
@@ -95,6 +122,18 @@ object Endpoints {
     // ----------------------------------------------------------------
 
     const val USERS = "/api/v1/users"
+
+    const val IDENTITY_CANDIDATES =
+        "/api/v1/identity/candidates"
+
+    fun identityCandidate(id: Long): String =
+        "$IDENTITY_CANDIDATES/$id"
+
+    fun identityCandidateDecision(
+        id: Long,
+        action: String
+    ): String =
+        "${identityCandidate(id)}/${pathSegment(action)}"
 
     const val VACATION =
         "/api/v1/vacation"
@@ -120,4 +159,14 @@ object Endpoints {
 
     const val HEALTH =
         "/health"
+
+    private fun pathSegment(value: String): String =
+        URLEncoder.encode(
+            value,
+            StandardCharsets.UTF_8.toString()
+        )
+            .replace(
+                "+",
+                "%20"
+            )
 }

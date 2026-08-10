@@ -15,12 +15,17 @@ import com.lias.remote.core.network.ApiResult
 import com.lias.remote.core.network.ConnectionState
 import com.lias.remote.core.network.DeviceListResponse
 import com.lias.remote.core.network.Endpoints
+import com.lias.remote.core.network.EngineFeatures
 import com.lias.remote.core.network.EventConstants
+import com.lias.remote.core.network.LiasCapabilitiesResponse
 import com.lias.remote.core.network.LiasApiClient
 import com.lias.remote.core.network.LiasSseClient
+import com.lias.remote.core.network.SnapshotFetchResult
+import com.lias.remote.core.network.SystemStatusResponse
 import com.lias.remote.core.store.SettingsRepository
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,6 +110,21 @@ class EventRepository(
     private val recentToastMap =
         ConcurrentHashMap<String, Long>()
 
+    private val identityQueryRevision =
+        AtomicLong(0L)
+
+    @Volatile
+    private var snapshotEtag: String? =
+        null
+
+    internal fun beginIdentityQuery(): Long =
+        identityQueryRevision.incrementAndGet()
+
+    internal fun identityQueryIsCurrent(
+        revision: Long
+    ): Boolean =
+        identityQueryRevision.get() == revision
+
     fun start() {
 
         if (
@@ -146,6 +166,11 @@ class EventRepository(
 
                     sse.authToken =
                         normalized
+
+                    if (api.baseUrl.isNotBlank()) {
+                        negotiateEngineContract()
+                        refreshAll()
+                    }
                 }
         }
     }
@@ -184,8 +209,19 @@ class EventRepository(
                                 isInitialLoaded =
                                     false,
                                 errorMessage =
-                                    null
+                                    null,
+                                capabilities =
+                                    null,
+                                systemStatus =
+                                    null,
+                                snapshotRevision =
+                                    null,
+                                identityReview =
+                                    IdentityReviewState()
                             )
+
+                        snapshotEtag =
+                            null
 
                         return@collect
                     }
@@ -200,12 +236,91 @@ class EventRepository(
                     sse.baseUrl =
                         url
 
+                    snapshotEtag =
+                        null
+
                     sse.connect(
                         scope
                     )
 
+                    negotiateEngineContract()
+
                     refreshAll()
                 }
+        }
+    }
+
+    private suspend fun negotiateEngineContract() {
+
+        when (
+            val result =
+                api.get<LiasCapabilitiesResponse>(
+                    Endpoints.CAPABILITIES
+                )
+        ) {
+            is ApiResult.Success -> {
+                val capabilities =
+                    result.data
+                        .takeIf {
+                            it.apiVersion == "v1" &&
+                                it.schemaVersion >= 1 &&
+                                it.minClientApiVersion == "v1" &&
+                                it.publicDeviceKey == "pdid" &&
+                                it.responseCompatibility == "additive"
+                        }
+
+                _state.value =
+                    _state.value.copy(
+                        capabilities = capabilities,
+                        identityReview =
+                            if (
+                                capabilities?.supports(
+                                    EngineFeatures.IDENTITY_CANDIDATE_QUEUE
+                                ) == true
+                            ) {
+                                _state.value.identityReview
+                            } else {
+                                IdentityReviewState()
+                            }
+                    )
+
+                if (capabilities != null) {
+                    refreshSystemStatus()
+                    refreshIdentityCandidates()
+                }
+            }
+
+            else -> {
+                /* Older LIAS versions remain fully supported. */
+                _state.value =
+                    _state.value.copy(
+                        capabilities = null,
+                        systemStatus = null,
+                        identityReview = IdentityReviewState()
+                    )
+            }
+        }
+    }
+
+    internal suspend fun refreshSystemStatus() {
+
+        if (_state.value.capabilities == null) {
+            return
+        }
+
+        when (
+            val result =
+                api.get<SystemStatusResponse>(
+                    Endpoints.SYSTEM_STATUS
+                )
+        ) {
+            is ApiResult.Success ->
+                _state.value =
+                    _state.value.copy(
+                        systemStatus = result.data
+                    )
+
+            else -> Unit
         }
     }
 
@@ -253,6 +368,18 @@ class EventRepository(
 
         val snapshotRevision =
             mutations.revision()
+
+        if (
+            _state.value.supportsEngineFeature(
+                EngineFeatures.SNAPSHOT
+            ) &&
+            refreshFromSnapshot(
+                snapshotRevision
+            )
+        ) {
+            refreshSupplementalState()
+            return
+        }
 
         coroutineScope {
 
@@ -506,6 +633,106 @@ class EventRepository(
                         tagStatuses
                 )
         }
+
+        if (_state.value.capabilities != null) {
+            refreshSystemStatus()
+            refreshIdentityCandidates(
+                _state.value.identityReview.status
+            )
+        }
+    }
+
+    private suspend fun refreshFromSnapshot(
+        localRevision: Long
+    ): Boolean {
+
+        return when (
+            val result =
+                api.getSnapshot(
+                    snapshotEtag
+                )
+        ) {
+            is ApiResult.Success -> {
+                when (
+                    val fetch = result.data
+                ) {
+                    SnapshotFetchResult.NotModified -> {
+                        if (
+                            mutations.snapshotIsCurrent(
+                                localRevision
+                            )
+                        ) {
+                            _state.value =
+                                _state.value.copy(
+                                    isInitialLoaded = true,
+                                    errorMessage = null
+                                )
+                        }
+
+                        true
+                    }
+
+                    is SnapshotFetchResult.Modified -> {
+                        if (
+                            !mutations.snapshotIsCurrent(
+                                localRevision
+                            )
+                        ) {
+                            return false
+                        }
+
+                        val snapshot =
+                            fetch.snapshot
+
+                        snapshotEtag =
+                            fetch.etag
+
+                        _state.value =
+                            _state.value.copy(
+                                devices = snapshot.devices,
+                                tags = snapshot.tags,
+                                policies = snapshot.policies,
+                                schedules = snapshot.schedules,
+                                users = snapshot.users,
+                                deviceEffectiveStatuses =
+                                    snapshot.deviceEffectiveStatuses,
+                                tagEffectiveStatuses =
+                                    snapshot.tagEffectiveStatuses,
+                                snapshotRevision = snapshot.revision,
+                                isInitialLoaded = true,
+                                errorMessage = null
+                            )
+
+                        true
+                    }
+                }
+            }
+
+            else -> false
+        }
+    }
+
+    private suspend fun refreshSupplementalState() {
+
+        when (
+            val statsResult =
+                api.get<NetworkStats>(
+                    Endpoints.STATS
+                )
+        ) {
+            is ApiResult.Success ->
+                _state.value =
+                    _state.value.copy(
+                        stats = statsResult.data
+                    )
+
+            else -> Unit
+        }
+
+        refreshSystemStatus()
+        refreshIdentityCandidates(
+            _state.value.identityReview.status
+        )
     }
 
     private fun firstFailure(
@@ -761,6 +988,25 @@ class EventRepository(
                                 )
                             }
                         }
+
+                        refreshIdentityCandidates(
+                            _state.value.identityReview.status
+                        )
+                    }
+
+                    EventConstants.IDENTITY_CANDIDATE_CHANGED,
+                    EventConstants.IDENTITY_CANDIDATE_DECIDED,
+                    EventConstants.IDENTITY_BINDING_CHANGED -> {
+                        refreshIdentityCandidates(
+                            _state.value.identityReview.status
+                        )
+
+                        _state.value
+                            .identityReview
+                            .selectedCandidate
+                            ?.let {
+                                loadIdentityCandidate(it.id)
+                            }
                     }
 
                     EventConstants.SECURITY_ALERT -> {

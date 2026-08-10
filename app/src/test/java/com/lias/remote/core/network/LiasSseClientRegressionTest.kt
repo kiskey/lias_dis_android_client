@@ -461,6 +461,45 @@ class LiasSseClientRegressionTest {
             client.disconnect()
         }
 
+    @Test
+    fun `identity candidate event resolves source pdid`() =
+        runBlocking {
+            serverA.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader(
+                        "Content-Type",
+                        "text/event-stream"
+                    )
+                    .setBody(
+                        "id: 501\n" +
+                            "event: identity.candidate.changed\n" +
+                            "data: {\"candidate_id\":42,\"source_pdid\":\"pdid_source\",\"target_pdid\":\"pdid_target\",\"status\":\"pending\"}\n\n"
+                    )
+            )
+
+            val client = sseClientFor(serverA)
+            val eventDeferred =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    client.events.first()
+                }
+
+            client.connect(scope)
+
+            val event =
+                withTimeout(3_000L) {
+                    eventDeferred.await()
+                }
+
+            assertEquals(
+                EventConstants.IDENTITY_CANDIDATE_CHANGED,
+                event.type
+            )
+            assertEquals("pdid_source", event.deviceID)
+
+            client.disconnect()
+        }
+
     private fun sseClientFor(
         server: MockWebServer
     ): LiasSseClient =

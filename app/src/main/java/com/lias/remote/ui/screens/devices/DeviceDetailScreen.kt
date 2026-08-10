@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.FlowLog
+import com.lias.remote.core.models.IdentityTier
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.ui.LiasViewModel
@@ -671,10 +672,50 @@ fun DeviceDetailScreen(
                         primaryText =
                             "Identity Tier",
                         secondaryText =
-                            device.identityTier
-                                .replaceFirstChar {
-                                    it.uppercase()
-                                },
+                            IdentityTier
+                                .fromWireValue(
+                                    device.identityTier
+                                )
+                                .title,
+                        showDivider =
+                            true
+                    )
+
+                    GroupedListRow(
+                        primaryText =
+                            "Identity Assurance",
+                        secondaryText =
+                            buildString {
+                                append(
+                                    device.identityAssurance
+                                        .replaceFirstChar {
+                                            it.uppercase()
+                                        }
+                                )
+
+                                if (
+                                    device.identityProbability > 0.0
+                                ) {
+                                    append(
+                                        " · ${(device.identityProbability.coerceIn(0.0, 1.0) * 100.0).toInt()}% estimate"
+                                    )
+                                }
+
+                                if (device.identityAmbiguous) {
+                                    append(" · Ambiguous")
+                                }
+                            },
+                        showDivider =
+                            true
+                    )
+
+                    GroupedListRow(
+                        primaryText =
+                            "Public Device ID",
+                        secondaryText =
+                            device.pdid.ifBlank {
+                                "Not available"
+                            },
                         showDivider =
                             true
                     )

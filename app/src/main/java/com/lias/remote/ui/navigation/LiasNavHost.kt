@@ -69,6 +69,7 @@ import com.lias.remote.ui.screens.connect.ConnectScreen
 import com.lias.remote.ui.screens.devices.DeviceDetailScreen
 import com.lias.remote.ui.screens.devices.DevicesScreen
 import com.lias.remote.ui.screens.home.HomeScreen
+import com.lias.remote.ui.screens.identity.IdentityReviewScreen
 import com.lias.remote.ui.screens.rules.RulesScreen
 import com.lias.remote.ui.screens.schedules.SchedulesScreen
 import com.lias.remote.ui.screens.settings.ConnectionSettingsScreen
@@ -300,7 +301,10 @@ fun LiasNavHost(
             NavigationRoutes.DEVICE_DETAIL &&
             currentDestination
                 ?.route !=
-            NavigationRoutes.CONNECTION_SETTINGS
+            NavigationRoutes.CONNECTION_SETTINGS &&
+            currentDestination
+                ?.route !=
+            NavigationRoutes.IDENTITY_REVIEW
 
     CupertinoScaffold(
         topBar = {
@@ -512,6 +516,22 @@ fun LiasNavHost(
                                 restoreState =
                                     true
                             }
+                        },
+                        onNavigateToIdentityReview = {
+                            navController.navigate(
+                                NavigationRoutes.IDENTITY_REVIEW
+                            )
+                        }
+                    )
+                }
+
+                composable(
+                    NavigationRoutes.IDENTITY_REVIEW
+                ) {
+                    IdentityReviewScreen(
+                        viewModel = liasViewModel,
+                        onBack = {
+                            navController.popBackStack()
                         }
                     )
                 }

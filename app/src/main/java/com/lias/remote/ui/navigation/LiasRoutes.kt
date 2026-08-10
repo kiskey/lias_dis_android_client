@@ -45,6 +45,9 @@ sealed class LiasRoute(
     data object ConnectionSettings :
         LiasRoute("connection_settings")
 
+    data object IdentityReview :
+        LiasRoute("identity_review")
+
     data object DeviceDetail :
         LiasRoute("device_detail/{pdid}") {
 

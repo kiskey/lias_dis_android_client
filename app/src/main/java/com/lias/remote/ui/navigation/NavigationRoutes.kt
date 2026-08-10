@@ -35,6 +35,9 @@ object NavigationRoutes {
     const val CONNECTION_SETTINGS =
         "connection_settings"
 
+    const val IDENTITY_REVIEW =
+        "identity_review"
+
     const val DEVICE_DETAIL =
         "device_detail/{pdid}"
 

@@ -12,6 +12,7 @@ import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
+import com.lias.remote.core.network.IdentityCandidateDetail
 import com.lias.remote.repositories.EventRepository
 import com.lias.remote.repositories.UiEvent
 import com.lias.remote.repositories.UiState
@@ -29,11 +30,20 @@ import com.lias.remote.repositories.extendDeviceAuthoritatively
 import com.lias.remote.repositories.extendTagAuthoritatively
 import com.lias.remote.repositories.getDeviceLogs
 import com.lias.remote.repositories.importPolicies
+import com.lias.remote.repositories.bindIdentity
+import com.lias.remote.repositories.clearSelectedIdentityCandidate
+import com.lias.remote.repositories.confirmIdentityCandidate
 import com.lias.remote.repositories.pauseDeviceAuthoritatively
+import com.lias.remote.repositories.loadIdentityCandidate
+import com.lias.remote.repositories.refreshIdentityCandidates
+import com.lias.remote.repositories.rejectIdentityCandidate
 import com.lias.remote.repositories.renameDevice
+import com.lias.remote.repositories.reopenIdentityCandidate
+import com.lias.remote.repositories.revokeIdentityBinding
 import com.lias.remote.repositories.resumeDeviceAuthoritatively
 import com.lias.remote.repositories.savePolicy
 import com.lias.remote.repositories.saveSchedule
+import com.lias.remote.repositories.splitIdentity
 import com.lias.remote.repositories.toggleVacationMode
 import com.lias.remote.repositories.updateTag
 import com.lias.remote.repositories.validatePolicy
@@ -694,6 +704,139 @@ class LiasViewModel(
             .getDeviceLogs(
                 pdid
             )
+
+    // ----------------------------------------------------------------
+    // LIAS 2.0 identity review
+    // ----------------------------------------------------------------
+
+    fun refreshIdentityReview(
+        status: String = "pending"
+    ) {
+        viewModelScope.launch {
+            eventRepository.refreshIdentityCandidates(status)
+        }
+    }
+
+    fun loadMoreIdentityCandidates() {
+        viewModelScope.launch {
+            val review = state.value.identityReview
+            if (
+                !review.isLoading &&
+                !review.nextCursor.isNullOrBlank()
+            ) {
+                eventRepository.refreshIdentityCandidates(
+                    status = review.status,
+                    append = true
+                )
+            }
+        }
+    }
+
+    fun selectIdentityCandidate(
+        candidateId: Long
+    ) {
+        viewModelScope.launch {
+            eventRepository.loadIdentityCandidate(candidateId)
+        }
+    }
+
+    fun clearSelectedIdentityCandidate() {
+        eventRepository.clearSelectedIdentityCandidate()
+    }
+
+    fun confirmIdentityCandidate(
+        candidate: IdentityCandidateDetail,
+        note: String
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.confirmIdentityCandidate(
+                    candidate,
+                    note
+                ),
+                "Identity records merged"
+            )
+        }
+    }
+
+    fun rejectIdentityCandidate(
+        candidate: IdentityCandidateDetail,
+        note: String
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.rejectIdentityCandidate(
+                    candidate,
+                    note
+                ),
+                "Possible match rejected; both records remain separate"
+            )
+        }
+    }
+
+    fun reopenIdentityCandidate(
+        candidate: IdentityCandidateDetail,
+        note: String
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.reopenIdentityCandidate(
+                    candidate,
+                    note
+                ),
+                "Identity review reopened"
+            )
+        }
+    }
+
+    fun bindIdentity(
+        pdid: String,
+        type: String,
+        value: String
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.bindIdentity(
+                    pdid,
+                    type,
+                    value
+                ),
+                "Verified identity binding added"
+            )
+        }
+    }
+
+    fun revokeIdentityBinding(
+        pdid: String,
+        aliasId: Long
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.revokeIdentityBinding(
+                    pdid,
+                    aliasId
+                ),
+                "Identity binding revoked"
+            )
+        }
+    }
+
+    fun splitIdentity(
+        pdid: String,
+        mac: String,
+        moveIps: List<String> = emptyList()
+    ) {
+        viewModelScope.launch {
+            presentResult(
+                eventRepository.splitIdentity(
+                    pdid,
+                    mac,
+                    moveIps
+                ),
+                "Device identity split completed"
+            )
+        }
+    }
 
     // ----------------------------------------------------------------
     // Messages

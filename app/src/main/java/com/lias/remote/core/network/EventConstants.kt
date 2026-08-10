@@ -47,6 +47,15 @@ object EventConstants {
     const val EFFECTIVE_STATUS_CHANGED =
         "effective.status_changed"
 
+    const val IDENTITY_CANDIDATE_CHANGED =
+        "identity.candidate.changed"
+
+    const val IDENTITY_CANDIDATE_DECIDED =
+        "identity.candidate.decided"
+
+    const val IDENTITY_BINDING_CHANGED =
+        "identity.binding.changed"
+
     const val PING =
         "ping"
 
@@ -79,4 +88,14 @@ object EventConstants {
      */
     fun affectsEffectiveStatus(type: String): Boolean =
         type == EFFECTIVE_STATUS_CHANGED
+
+    fun affectsIdentity(type: String): Boolean =
+        when (type) {
+            IDENTITY_CANDIDATE_CHANGED,
+            IDENTITY_CANDIDATE_DECIDED,
+            IDENTITY_BINDING_CHANGED,
+            DEVICE_REIDENTIFIED -> true
+
+            else -> false
+        }
 }
