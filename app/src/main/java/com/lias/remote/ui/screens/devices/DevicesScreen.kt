@@ -6,6 +6,11 @@
 // Purpose:
 //   Canonical device inventory.
 //
+// Plan 3.1 Devices card UX:
+//   - Card tap opens current-state Extend/Manage or Pause modal.
+//   - Details button becomes trailing disclosure.
+//   - Home tag deep-link uses tag scope without prefilled text filter.
+//
 // Batch 26:
 //   - Each device renders exactly once.
 //   - Highest-precedence assigned tag becomes presentation group.
@@ -22,6 +27,7 @@ package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
@@ -100,13 +107,9 @@ fun DevicesScreen(
 
     var searchQuery by
         remember(
-            initialTag?.name
+            initialTagId
         ) {
-            mutableStateOf(
-                initialTag
-                    ?.name
-                    .orEmpty()
-            )
+            mutableStateOf("")
         }
 
     var showTagEditor by
@@ -360,13 +363,19 @@ fun DevicesScreen(
                             device,
                         presentation =
                             presentation,
-                        onExtend = {
-                            activeDeviceForExtend =
-                                device
-                        },
-                        onPause = {
-                            activeDeviceForPause =
-                                device
+                        onPrimaryAction = {
+                            when {
+                                presentation.canManageExtension ||
+                                    presentation.canExtend -> {
+                                    activeDeviceForExtend =
+                                        device
+                                }
+
+                                presentation.canPause -> {
+                                    activeDeviceForPause =
+                                        device
+                                }
+                            }
                         },
                         onResume = {
                             viewModel
@@ -632,11 +641,15 @@ fun DevicesScreen(
 private fun DeviceCardItem(
     device: Device,
     presentation: AccessPresentation,
-    onExtend: () -> Unit,
-    onPause: () -> Unit,
+    onPrimaryAction: () -> Unit,
     onResume: () -> Unit,
     onDetail: () -> Unit
 ) {
+
+    val hasModalPrimaryAction =
+        presentation.canManageExtension ||
+            presentation.canExtend ||
+            presentation.canPause
 
     Box(
         modifier =
@@ -666,6 +679,18 @@ private fun DeviceCardItem(
                         RoundedCornerShape(
                             14.dp
                         )
+                )
+                .then(
+                    if (hasModalPrimaryAction) {
+                        Modifier.clickable(
+                            role =
+                                Role.Button,
+                            onClick =
+                                onPrimaryAction
+                        )
+                    } else {
+                        Modifier
+                    }
                 )
                 .padding(
                     14.dp
@@ -752,127 +777,67 @@ private fun DeviceCardItem(
                     )
                 }
 
-                StatusPill(
-                    text =
-                        presentation.label,
-                    tone =
-                        presentation.tone
-                )
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    StatusPill(
+                        text =
+                            presentation.label,
+                        tone =
+                            presentation.tone
+                    )
+
+                    CupertinoText(
+                        text = "›",
+                        style =
+                            HigTypography.title3,
+                        color =
+                            LiasThemeColors
+                                .tertiaryLabel,
+                        modifier =
+                            Modifier
+                                .clickable(
+                                    role =
+                                        Role.Button,
+                                    onClick =
+                                        onDetail
+                                )
+                                .padding(
+                                    horizontal =
+                                        6.dp,
+                                    vertical =
+                                        4.dp
+                                )
+                    )
+                }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
-                    )
-            )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        6.dp
-                    )
+            if (
+                presentation.canResumePause
             ) {
 
-                when {
-
-                    presentation
-                        .canResumePause ->
-
-                        HigButton(
-                            text =
-                                "Resume",
-                            onClick =
-                                onResume,
-                            style =
-                                HigButtonStyle.Primary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
                         )
+                )
 
-                    presentation
-                        .canManageExtension ->
-
-                        HigButton(
-                            text =
-                                "Manage Access",
-                            onClick =
-                                onExtend,
-                            style =
-                                HigButtonStyle.Secondary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    presentation.canExtend ->
-
-                        HigButton(
-                            text =
-                                "Extend Access",
-                            onClick =
-                                onExtend,
-                            style =
-                                HigButtonStyle.Secondary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    presentation.canPause ->
-
-                        HigButton(
-                            text =
-                                "Pause",
-                            onClick =
-                                onPause,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    else ->
-
-                        HigButton(
-                            text =
-                                "Details",
-                            onClick =
-                                onDetail,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                }
-if (
-                    presentation.canExtend ||
-                    presentation.canPause ||
-                    presentation.canResumePause ||
-                    presentation.canManageExtension
-                ) {
-
-                    HigButton(
-                        text =
-                            "Details",
-                        onClick =
-                            onDetail,
-                        style =
-                            HigButtonStyle.Gray,
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-                }
+                HigButton(
+                    text =
+                        "Resume",
+                    onClick =
+                        onResume,
+                    style =
+                        HigButtonStyle.Primary,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
             }
         }
     }
