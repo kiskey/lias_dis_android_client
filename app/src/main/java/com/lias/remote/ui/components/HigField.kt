@@ -5,6 +5,11 @@
 // Purpose:
 //   Unified LIAS form-field surface.
 //
+// Plan 3.1 text-field polish:
+//   - Uses LIAS-owned iOS grouped-form chrome.
+//   - Keeps CursorSafeTextField -> CupertinoTextField(TextFieldValue).
+//   - Preserves cursor, selection, IME composition, and public String API.
+//
 // Batch 29:
 //   - 48dp+ interactive surface.
 //   - Preserves cursor selection and IME composition for long text.
@@ -150,16 +155,25 @@ internal fun HigConfiguredField(
                 .fillMaxWidth()
                 .heightIn(
                     min =
-                        56.dp
+                        if (singleLine) {
+                            52.dp
+                        } else {
+                            84.dp
+                        }
                 )
                 .clip(
                     RoundedCornerShape(
-                        10.dp
+                        14.dp
                     )
                 )
                 .background(
-                    LiasThemeColors
-                        .tertiaryBackground
+                    if (enabled) {
+                        LiasThemeColors
+                            .secondaryBackground
+                    } else {
+                        LiasThemeColors
+                            .tertiaryBackground
+                    }
                 )
                 .then(
                     accessibilityModifier
@@ -168,24 +182,37 @@ internal fun HigConfiguredField(
                     horizontal =
                         14.dp,
                     vertical =
-                        8.dp
+                        if (singleLine) {
+                            9.dp
+                        } else {
+                            11.dp
+                        }
                 )
     ) {
 
         CupertinoText(
             text =
-                label.uppercase(),
+                label,
             style =
-                HigTypography.caption,
+                HigTypography.subheadline,
             color =
-                LiasThemeColors
-                    .tertiaryLabel
+                if (enabled) {
+                    LiasThemeColors
+                        .secondaryLabel
+                } else {
+                    LiasThemeColors
+                        .tertiaryLabel
+                }
         )
 
         Spacer(
             modifier =
                 Modifier.height(
-                    2.dp
+                    if (singleLine) {
+                        3.dp
+                    } else {
+                        6.dp
+                    }
                 )
         )
 
@@ -232,7 +259,11 @@ internal fun HigConfiguredField(
                     .fillMaxWidth()
                     .heightIn(
                         min =
-                            44.dp
+                            if (singleLine) {
+                                34.dp
+                            } else {
+                                48.dp
+                            }
                     )
         )
     }

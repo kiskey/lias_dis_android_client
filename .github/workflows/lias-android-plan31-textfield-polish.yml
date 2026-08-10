@@ -1,0 +1,52 @@
+name: LIAS Android Plan 3.1 TextField Polish
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - luna
+
+jobs:
+  validate-plan31-textfield-polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Static Plan 3.1 text-field polish audit
+        run: |
+          chmod +x scripts/audit_plan31_textfield_polish.py scripts/verify_plan31_textfield_polish.sh
+          scripts/verify_plan31_textfield_polish.sh
+
+      - name: Compile, test, lint, package
+        run: |
+          gradle \
+            :app:compileDebugKotlin \
+            :app:compileReleaseKotlin \
+            :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:assembleRelease \
+            --stacktrace
+
+      - name: Dependency reports
+        run: |
+          mkdir -p build/plan31-textfield-polish-reports
+          gradle :app:dependencies --configuration debugRuntimeClasspath > build/plan31-textfield-polish-reports/debugRuntimeClasspath.txt
+          gradle :app:dependencies --configuration releaseRuntimeClasspath > build/plan31-textfield-polish-reports/releaseRuntimeClasspath.txt
+          if grep -RIn 'io.github.alexzhirkevich' build/plan31-textfield-polish-reports; then
+            echo "Old Compose Cupertino group resolved in runtime dependency graph." >&2
+            exit 1
+          fi

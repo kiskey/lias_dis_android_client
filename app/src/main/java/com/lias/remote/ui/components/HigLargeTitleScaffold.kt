@@ -5,6 +5,11 @@
 // Purpose:
 //   Apple-inspired collapsible large-title application scaffold.
 //
+// Plan 3.1 search-field polish:
+//   - Keeps CursorSafeTextField for cursor/selection stability.
+//   - Uses maintained-fork Cupertino search/clear icons.
+//   - Refines iOS search-field chrome without Canvas glyphs.
+//
 // Batch 21:
 //   - Large titles may wrap under large font scale.
 //   - Landscape layout remains compact.
@@ -342,9 +347,21 @@ fun HigSearchField(
                     min =
                         48.dp
                 )
-                .clip(RoundedCornerShape(10.dp))
-                .background(LiasThemeColors.fill2)
-                .padding(start = 12.dp, end = 2.dp),
+                .clip(
+                    RoundedCornerShape(
+                        13.dp
+                    )
+                )
+                .background(
+                    LiasThemeColors
+                        .tertiaryBackground
+                )
+                .padding(
+                    start =
+                        12.dp,
+                    end =
+                        2.dp
+                ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CupertinoIcon(
@@ -381,7 +398,10 @@ fun HigSearchField(
             modifier =
                 Modifier
                     .weight(1f)
-                    .heightIn(min = 44.dp)
+                    .heightIn(
+                        min =
+                            44.dp
+                    )
         )
 
         if (query.isNotEmpty()) {
