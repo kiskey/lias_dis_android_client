@@ -18,7 +18,6 @@
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -42,9 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -56,8 +52,12 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoScaffold
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoScaffold
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.filled.XmarkCircle
+import com.slapps.cupertino.icons.outlined.MagnifyingGlass
 
 @Composable
 fun HigLargeTitleScaffold(
@@ -333,7 +333,6 @@ fun HigSearchField(
             MutableInteractionSource()
         }
     val searchTint = LiasThemeColors.secondaryLabel
-    val clearMark = LiasThemeColors.secondaryBackground
 
     Row(
         modifier =
@@ -348,28 +347,20 @@ fun HigSearchField(
                 .padding(start = 12.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Canvas(modifier = Modifier.size(17.dp)) {
-            val strokeWidth = 1.7.dp.toPx()
-            val radius = size.minDimension * 0.32f
-            val center = Offset(size.width * 0.42f, size.height * 0.42f)
-
-            drawCircle(
-                color = searchTint,
-                radius = radius,
-                center = center,
-                style = Stroke(width = strokeWidth)
-            )
-            drawLine(
-                color = searchTint,
-                start =
-                    Offset(
-                        center.x + radius * 0.72f,
-                        center.y + radius * 0.72f
-                    ),
-                end = Offset(size.width * 0.90f, size.height * 0.90f),
-                strokeWidth = strokeWidth
-            )
-        }
+        CupertinoIcon(
+            imageVector =
+                CupertinoIcons
+                    .Outlined
+                    .MagnifyingGlass,
+            contentDescription =
+                null,
+            tint =
+                searchTint,
+            modifier =
+                Modifier.size(
+                    17.dp
+                )
+        )
 
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -408,30 +399,20 @@ fun HigSearchField(
                         ),
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(modifier = Modifier.size(18.dp)) {
-                    val markInset = size.minDimension * 0.33f
-                    val markWidth = 1.5.dp.toPx()
-
-                    drawCircle(color = searchTint)
-                    drawLine(
-                        color = clearMark,
-                        start = Offset(markInset, markInset),
-                        end =
-                            Offset(
-                                size.width - markInset,
-                                size.height - markInset
-                            ),
-                        strokeWidth = markWidth,
-                        cap = StrokeCap.Round
-                    )
-                    drawLine(
-                        color = clearMark,
-                        start = Offset(size.width - markInset, markInset),
-                        end = Offset(markInset, size.height - markInset),
-                        strokeWidth = markWidth,
-                        cap = StrokeCap.Round
-                    )
-                }
+                CupertinoIcon(
+                    imageVector =
+                        CupertinoIcons
+                            .Filled
+                            .XmarkCircle,
+                    contentDescription =
+                        null,
+                    tint =
+                        searchTint,
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
+                )
             }
         } else {
             Spacer(modifier = Modifier.width(10.dp))

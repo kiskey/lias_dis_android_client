@@ -55,11 +55,11 @@ import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.components.SwipeAction
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoSwitch
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Pencil
-import io.github.alexzhirkevich.cupertino.icons.outlined.Trash
+import com.slapps.cupertino.CupertinoSwitch
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.Pencil
+import com.slapps.cupertino.icons.outlined.Trash
 import kotlinx.coroutines.launch
 
 @Composable

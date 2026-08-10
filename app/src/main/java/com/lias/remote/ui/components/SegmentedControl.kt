@@ -1,4 +1,4 @@
-@file:OptIn(io.github.alexzhirkevich.cupertino.ExperimentalCupertinoApi::class)
+@file:OptIn(com.slapps.cupertino.ExperimentalCupertinoApi::class)
 
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt
@@ -17,9 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControl
-import io.github.alexzhirkevich.cupertino.CupertinoSegmentedControlTab
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoSegmentedControl
+import com.slapps.cupertino.CupertinoSegmentedControlTab
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun SegmentedControl(

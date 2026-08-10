@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.section.CupertinoSection
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.section.CupertinoSection
 
 @Composable
 fun GroupedList(

@@ -1,8 +1,14 @@
 // ====================================================================
 // File: settings.gradle.kts
-// Version: 1.0.0
-// Purpose: Configures Gradle project settings, plugin management, and 
-//          centralizes dependency versions via Version Catalogs.
+// Version: 30.0.0
+//
+// Purpose:
+//   Configures Gradle project settings, plugin management, and
+//   dependency repository ownership.
+//
+// Compose Cupertino migration Plan 3.0 / Batch 1:
+//   - Keeps repository policy unchanged.
+//   - Keeps root project and module structure unchanged.
 // ====================================================================
 
 pluginManagement {
@@ -20,12 +26,18 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(
+        RepositoriesMode.FAIL_ON_PROJECT_REPOS
+    )
     repositories {
         google()
         mavenCentral()
     }
 }
 
-rootProject.name = "lias-android-remote"
-include(":app")
+rootProject.name =
+    "lias-android-remote"
+
+include(
+    ":app"
+)

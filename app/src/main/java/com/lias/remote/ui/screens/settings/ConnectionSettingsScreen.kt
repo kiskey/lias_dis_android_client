@@ -59,9 +59,9 @@ import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoScaffold
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
+import com.slapps.cupertino.CupertinoScaffold
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoTopAppBar
 
 @Composable
 fun ConnectionSettingsScreen(

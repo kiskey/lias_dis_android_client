@@ -1,0 +1,78 @@
+name: LIAS Android Cupertino Plan 3.0
+
+on:
+  push:
+    branches:
+      - luna
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  plan30-android-validation:
+    name: Plan 3.0 Android validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Static Plan 3.0 guard
+        run: scripts/verify_cupertino_plan30.sh
+
+      - name: Compile debug Kotlin
+        run: gradle --no-daemon :app:compileDebugKotlin
+
+      - name: Compile release Kotlin
+        run: gradle --no-daemon :app:compileReleaseKotlin
+
+      - name: Unit and contract tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
+      - name: Lint debug
+        run: gradle --no-daemon :app:lintDebug
+
+      - name: Release shrinking and packaging
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Dependency reports
+        run: |
+          mkdir -p build/plan30-reports
+          gradle --no-daemon :app:dependencies --configuration debugRuntimeClasspath \
+            > build/plan30-reports/debugRuntimeClasspath.txt
+          gradle --no-daemon :app:dependencies --configuration releaseRuntimeClasspath \
+            > build/plan30-reports/releaseRuntimeClasspath.txt
+
+      - name: Verify maintained Cupertino dependency only
+        run: |
+          if grep -RIn 'io.github.alexzhirkevich' build/plan30-reports; then
+            echo "Old Compose Cupertino group remains in runtime dependency graph." >&2
+            exit 1
+          fi
+
+          grep -RIn 'io.github.schott12521.*cupertino' build/plan30-reports
+
+      - name: Upload Plan 3.0 reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan30-gradle-reports
+          path: |
+            build/plan30-reports
+            app/build/reports

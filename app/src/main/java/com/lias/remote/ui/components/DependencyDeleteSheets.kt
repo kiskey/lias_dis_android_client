@@ -28,7 +28,7 @@ import com.lias.remote.core.util.ScheduleDependencyImpact
 import com.lias.remote.core.util.TagDependencyImpact
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun ScheduleDeleteSheet(

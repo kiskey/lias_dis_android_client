@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigSpec
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoIcon
 import kotlin.math.roundToInt
 
 data class SwipeAction(

@@ -44,8 +44,8 @@ import com.lias.remote.ui.components.formatTemporaryDuration
 import com.lias.remote.ui.components.rememberTemporaryMinutesLeft
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoSlider
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoSlider
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun ExtendAccessSheet(

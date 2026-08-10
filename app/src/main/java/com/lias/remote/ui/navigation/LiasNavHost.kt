@@ -77,15 +77,15 @@ import com.lias.remote.ui.screens.settings.SettingsScreen
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
-import io.github.alexzhirkevich.cupertino.CupertinoScaffold
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
-import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
-import io.github.alexzhirkevich.cupertino.icons.outlined.House
-import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
-import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoScaffold
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.Clock
+import com.slapps.cupertino.icons.outlined.Gear
+import com.slapps.cupertino.icons.outlined.House
+import com.slapps.cupertino.icons.outlined.Iphone
+import com.slapps.cupertino.icons.outlined.Shield
 
 sealed class LiasScreen(
     val route: String,

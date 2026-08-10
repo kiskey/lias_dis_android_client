@@ -64,8 +64,8 @@ import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoSwitch
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoSwitch
+import com.slapps.cupertino.CupertinoText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

@@ -19,7 +19,6 @@
 package com.lias.remote.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
@@ -39,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -51,7 +49,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoTextField
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun HigField(
@@ -101,7 +100,7 @@ internal fun HigConfiguredField(
     onClick: (() -> Unit)? = null
 ) {
 
-    val interactiveModifier =
+    val accessibilityModifier =
         if (
             onClick !=
             null
@@ -136,7 +135,13 @@ internal fun HigConfiguredField(
                 )
 
         } else {
-            Modifier
+            Modifier.semantics(
+                mergeDescendants =
+                    true
+            ) {
+                contentDescription =
+                    label
+            }
         }
 
     Column(
@@ -157,7 +162,7 @@ internal fun HigConfiguredField(
                         .tertiaryBackground
                 )
                 .then(
-                    interactiveModifier
+                    accessibilityModifier
                 )
                 .padding(
                     horizontal =
@@ -234,9 +239,10 @@ internal fun HigConfiguredField(
 }
 
 /**
- * A controlled text editor that retains selection and IME composition while
- * the screen continues to own the String value. BasicTextField keeps the
- * caret visible when a single-line value scrolls horizontally.
+ * A controlled Cupertino editor that retains selection and IME composition
+ * while the screen continues to own the String value. The maintained
+ * Compose Cupertino TextFieldValue overload owns rendering, cursor movement,
+ * selection, horizontal scrolling, and platform input semantics.
  */
 @Composable
 internal fun CursorSafeTextField(
@@ -269,7 +275,7 @@ internal fun CursorSafeTextField(
         }
     }
 
-    BasicTextField(
+    CupertinoTextField(
         value = editorValue,
         onValueChange = { updated ->
             editorValue = updated
@@ -289,29 +295,19 @@ internal fun CursorSafeTextField(
                         LiasThemeColors.tertiaryLabel
                     }
             ),
-        cursorBrush = SolidColor(LiasThemeColors.blue),
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         singleLine = singleLine,
         minLines = minLines,
         maxLines = maxLines,
-        decorationBox = { innerTextField ->
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment =
-                    if (singleLine) {
-                        Alignment.CenterStart
-                    } else {
-                        Alignment.TopStart
-                    }
-            ) {
-                if (editorValue.text.isEmpty() && placeholder != null) {
-                    placeholder()
-                }
-                innerTextField()
+        placeholder = placeholder,
+        contentAlignment =
+            if (singleLine) {
+                Alignment.CenterVertically
+            } else {
+                Alignment.Top
             }
-        }
     )
 }
 
