@@ -65,6 +65,28 @@ fallback behavior and is protected by regression tests. A breaking server wire
 change belongs in a new API namespace such as `/api/v2`; an increase in the v1
 `schema_version` does not make a breaking change acceptable.
 
+
+## Compose Cupertino Plan 3.0 accepted baseline
+
+Status: accepted dependency and namespace migration record  
+Recorded version: 30.0.0
+
+The Android app has completed the Plan 3.0 maintained-fork migration with the following stable UI dependency baseline:
+
+| Area | Accepted baseline |
+| --- | --- |
+| AGP | 8.10.1 |
+| Kotlin / Compose compiler plugin | 2.2.0 |
+| Gradle wrapper | 8.11.1 |
+| Java/JVM | 17 |
+| Android SDKs | minSdk 26, compileSdk 36, targetSdk 35 |
+| Compose BOM | 2025.06.00 |
+| Cupertino artifacts | `io.github.schott12521:cupertino:2.3.1` and `io.github.schott12521:cupertino-icons-extended:2.3.1` |
+| Cupertino Kotlin package | `com.slapps.cupertino` |
+| kotlinx.serialization JSON | 1.7.3 |
+
+This record documents the accepted dependency baseline only. It does not authorize or record any LIAS server API change, Android repository ownership change, REST/SSE behavior change, navigation route change, persisted setting change, PDID keying change, identity workflow change, policy/schedule semantic change, or user-visible behavior change. Plan 3.1 UX adoption remains separate and requires explicit approval.
+
 ## Current stable Android contract
 
 ### Platform and build dependencies
