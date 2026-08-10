@@ -1,0 +1,58 @@
+{
+  "home_candidates": [
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/home/HomePresentation.kt",
+      "score": 3
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt",
+      "score": 5
+    },
+    {
+      "path": "app/src/test/java/com/lias/remote/ui/screens/home/HomePresentationTest.kt",
+      "score": 3
+    }
+  ],
+  "nav_candidates": [
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt",
+      "score": 5
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/navigation/NavigationRoutes.kt",
+      "score": 3
+    },
+    {
+      "path": "app/src/test/java/com/lias/remote/ui/navigation/NavigationRoutesTest.kt",
+      "score": 3
+    }
+  ],
+  "devices_candidates": [
+    {
+      "path": "app/src/main/java/com/lias/remote/core/device/DevicePresentation.kt",
+      "score": 3
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt",
+      "score": 3
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt",
+      "score": 4
+    },
+    {
+      "path": "app/src/test/java/com/lias/remote/core/device/DevicePresentationTest.kt",
+      "score": 3
+    }
+  ],
+  "old_cupertino_refs": [],
+  "material_icon_imports": [],
+  "cupertino_import_gaps": [
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceRenameDialog.kt"
+  ],
+  "recommended_env_overrides": {
+    "PLAN31_HOME_FILE": "app/src/main/java/com/lias/remote/ui/screens/home/HomePresentation.kt",
+    "PLAN31_NAV_FILE": "app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt",
+    "PLAN31_DEVICES_FILE": "app/src/main/java/com/lias/remote/core/device/DevicePresentation.kt"
+  }
+}

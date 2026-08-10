@@ -3,11 +3,17 @@
 //
 // Purpose:
 //   LIAS operational overview using server-authoritative access state.
+//
+// Plan 3.1 exact Home UX patch:
+//   - Restricted device card tap opens extend-access sheet.
+//   - Trailing disclosure opens device details.
+//   - Active Protection group card navigates to Devices filtered by tag.
 // ====================================================================
 
 package com.lias.remote.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +77,7 @@ fun HomeScreen(
     viewModel: LiasViewModel,
     onNavigateToDeviceDetail: (String) -> Unit,
     onNavigateToTab: (LiasScreen) -> Unit,
+    onNavigateToDevicesForTag: (String) -> Unit,
     onNavigateToIdentityReview: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
@@ -307,7 +315,7 @@ fun HomeScreen(
                                     index < activeTagProtections.lastIndex ||
                                         activePauseDevices.isNotEmpty(),
                                 onClick = {
-                                    onNavigateToTab(LiasScreen.Devices)
+                                    onNavigateToDevicesForTag(protection.tag.id)
                                 }
                             )
                         }
@@ -520,7 +528,14 @@ private fun RestrictedDeviceRow(
 ) {
     Column {
         Column(
-            modifier = Modifier.padding(14.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        role = Role.Button,
+                        onClick = onExtend
+                    )
+                    .padding(14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -555,40 +570,38 @@ private fun RestrictedDeviceRow(
                     }
                 }
 
-                StatusPill(
-                    text = presentation.label,
-                    tone = presentation.tone
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatusPill(
+                        text = presentation.label,
+                        tone = presentation.tone
+                    )
+
+                    CupertinoText(
+                        text = "›",
+                        style = HigTypography.title3,
+                        color = LiasThemeColors.tertiaryLabel,
+                        modifier =
+                            Modifier
+                                .clickable(
+                                    role = Role.Button,
+                                    onClick = onDetails
+                                )
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                when {
-                    presentation.canResumePause ->
-                        HigButton(
-                            text = "Resume",
-                            onClick = onResume,
-                            style = HigButtonStyle.Primary,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                    presentation.canExtend ->
-                        HigButton(
-                            text = "Extend Access",
-                            onClick = onExtend,
-                            style = HigButtonStyle.Secondary,
-                            modifier = Modifier.weight(1f)
-                        )
-                }
+            if (presentation.canResumePause) {
+                Spacer(modifier = Modifier.height(10.dp))
 
                 HigButton(
-                    text = "Details",
-                    onClick = onDetails,
-                    style = HigButtonStyle.Gray,
-                    modifier = Modifier.weight(1f)
+                    text = "Resume",
+                    onClick = onResume,
+                    style = HigButtonStyle.Primary,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

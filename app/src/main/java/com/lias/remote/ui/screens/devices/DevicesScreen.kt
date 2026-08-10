@@ -76,6 +76,7 @@ private data class DeviceSection(
 @Composable
 fun DevicesScreen(
     viewModel: LiasViewModel,
+    initialTagId: String? = null,
     onNavigateToDeviceDetail: (String) -> Unit
 ) {
 
@@ -86,10 +87,25 @@ fun DevicesScreen(
     val scrollState =
         rememberLazyListState()
 
+    val initialTag =
+        remember(
+            state.tags,
+            initialTagId
+        ) {
+            state.tags
+                .firstOrNull {
+                    it.id == initialTagId
+                }
+        }
+
     var searchQuery by
-        remember {
+        remember(
+            initialTag?.name
+        ) {
             mutableStateOf(
-                ""
+                initialTag
+                    ?.name
+                    .orEmpty()
             )
         }
 
@@ -132,7 +148,8 @@ fun DevicesScreen(
         remember(
             state.devices,
             state.tags,
-            searchQuery
+            searchQuery,
+            initialTagId
         ) {
 
             buildDeviceSections(
@@ -141,7 +158,9 @@ fun DevicesScreen(
                 tags =
                     state.tags,
                 query =
-                    searchQuery
+                    searchQuery,
+                selectedTagId =
+                    initialTagId
             )
         }
 
@@ -862,19 +881,42 @@ if (
 private fun buildDeviceSections(
     devices: List<Device>,
     tags: List<Tag>,
-    query: String
+    query: String,
+    selectedTagId: String? = null
 ): List<DeviceSection> {
+
+    val tagScopedDevices =
+        selectedTagId
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                tagId ->
+
+                devices.filter {
+                    device ->
+
+                    device.safeTags.any {
+                        it.equals(
+                            tagId,
+                            ignoreCase =
+                                true
+                        )
+                    }
+                }
+            }
+            ?: devices
 
     val filtered =
         if (
             query.isBlank()
         ) {
 
-            devices
+            tagScopedDevices
 
         } else {
 
-            devices.filter {
+            tagScopedDevices.filter {
                 device ->
 
                 device.displayName

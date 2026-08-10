@@ -517,6 +517,30 @@ fun LiasNavHost(
                                     true
                             }
                         },
+                        onNavigateToDevicesForTag = {
+                            tagId ->
+
+                            navController.navigate(
+                                NavigationRoutes
+                                    .devicesByTag(
+                                        tagId
+                                    )
+                            ) {
+
+                                popUpTo(
+                                    navController
+                                        .graph
+                                        .findStartDestination()
+                                        .id
+                                ) {
+                                    saveState =
+                                        true
+                                }
+
+                                launchSingleTop =
+                                    true
+                            }
+                        },
                         onNavigateToIdentityReview = {
                             navController.navigate(
                                 NavigationRoutes.IDENTITY_REVIEW
@@ -543,6 +567,45 @@ fun LiasNavHost(
                     DevicesScreen(
                         viewModel =
                             liasViewModel,
+                        onNavigateToDeviceDetail = {
+                            pdid ->
+
+                            navController.navigate(
+                                NavigationRoutes
+                                    .deviceDetail(
+                                        pdid
+                                    )
+                            )
+                        }
+                    )
+                }
+
+                composable(
+                    route =
+                        NavigationRoutes.DEVICES_BY_TAG,
+                    arguments =
+                        listOf(
+                            navArgument(
+                                "tagId"
+                            ) {
+                                type =
+                                    NavType.StringType
+                            }
+                        )
+                ) {
+                    entry ->
+
+                    val tagId =
+                        entry.arguments
+                            ?.getString(
+                                "tagId"
+                            )
+
+                    DevicesScreen(
+                        viewModel =
+                            liasViewModel,
+                        initialTagId =
+                            tagId,
                         onNavigateToDeviceDetail = {
                             pdid ->
 
