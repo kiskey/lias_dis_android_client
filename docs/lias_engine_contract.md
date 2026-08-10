@@ -34,7 +34,7 @@ editing the reference repository:
 | Device identity additions | Decodes opaque `device_id` without using it as a key; decodes assurance, probability, ambiguity, `l7`/`bia` tiers, and richer event facts |
 | Identity review | Paged pending/confirmed/rejected queues, detail/profile/evidence comparison, guarded confirm/reject/reopen, verified bindings/revocation, and typed-confirmation split |
 | Identity events | Explicit candidate/binding event handling that refetches authoritative identity state |
-| Active Enforcements | Home renders global, device, and tag enforcement from server-authoritative effective-status data while preserving existing Home features/actions |
+| Home protections and restrictions | Home separates global/group protections from paused or blocked devices using server-authoritative effective-status data; global-source device duplicates remain suppressed and existing recovery actions remain available |
 | Transport hardening | Structured server messages, encoded dynamic path segments, and a 1 MiB SSE event ceiling |
 | Verification | New engine contract tests plus existing regression suite; final compile/test/lint/assemble verification is performed by remote Android CI |
 
