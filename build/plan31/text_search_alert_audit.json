@@ -1,0 +1,73 @@
+{
+  "files": {
+    "HigField.kt": "app/src/main/java/com/lias/remote/ui/components/HigField.kt",
+    "HigLargeTitleScaffold.kt": "app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt",
+    "HigAlertDialog.kt": "app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt"
+  },
+  "checks": {
+    "hig_field_uses_cupertino_text_field": true,
+    "hig_field_uses_text_field_value": true,
+    "hig_field_has_reconcile_editor_value": true,
+    "search_uses_cursor_safe_text_field": true,
+    "search_uses_magnifying_glass_icon": true,
+    "search_uses_xmark_circle_icon": true,
+    "search_has_ime_search": true,
+    "search_adapter_has_no_canvas_glyphs": true,
+    "hig_alert_is_lias_owned_adapter": true
+  },
+  "old_cupertino_refs": [],
+  "material_alert_dialog_refs": [],
+  "platform_dialog_refs": [
+    "app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt"
+  ],
+  "platform_dialog_refs_allowed_note": "HigAlertDialog and schedule picker Dialog/Popup usage are audited separately; Plan 3.1 does not require replacing editable/adaptive dialogs blindly.",
+  "all_canvas_refs": [
+    "app/src/main/java/com/lias/remote/ui/components/DetailedWeekGrid.kt"
+  ],
+  "adapter_canvas_refs_that_would_fail": [],
+  "basic_text_field_refs": [],
+  "short_confirmation_candidates": [
+    "app/src/main/java/com/lias/remote/core/diagnostics/Diagnostics.kt",
+    "app/src/main/java/com/lias/remote/core/models/Models.kt",
+    "app/src/main/java/com/lias/remote/core/network/ConnectionValidation.kt",
+    "app/src/main/java/com/lias/remote/core/network/Endpoints.kt",
+    "app/src/main/java/com/lias/remote/core/network/EngineApiTypes.kt",
+    "app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt",
+    "app/src/main/java/com/lias/remote/core/store/SettingsRepository.kt",
+    "app/src/main/java/com/lias/remote/core/util/ConfigurationSafety.kt",
+    "app/src/main/java/com/lias/remote/core/util/EffectiveAccessPresentation.kt",
+    "app/src/main/java/com/lias/remote/core/util/ScheduleValidation.kt",
+    "app/src/main/java/com/lias/remote/repositories/EventRepository.kt",
+    "app/src/main/java/com/lias/remote/repositories/IdentityRepositoryActions.kt",
+    "app/src/main/java/com/lias/remote/repositories/PolicyScheduleMutations.kt",
+    "app/src/main/java/com/lias/remote/repositories/TagMutations.kt",
+    "app/src/main/java/com/lias/remote/ui/components/DependencyDeleteSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/components/DestructiveBiometricAuth.kt",
+    "app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt",
+    "app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt",
+    "app/src/main/java/com/lias/remote/ui/components/HigSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt",
+    "app/src/main/java/com/lias/remote/ui/components/StatusPills.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceRenameDialog.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/UserAssignmentSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/identity/IdentityReviewScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleRuleEditor.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleRuleEditorCard.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt"
+  ]
+}
