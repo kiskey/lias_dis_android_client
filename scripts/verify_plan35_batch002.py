@@ -32,11 +32,11 @@ expected = {
     (
         "app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt",
         "ExtendAccessSheet",
-    ): "Editor",
+    ): 'Compact',
     (
         "app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt",
         "PauseSheet",
-    ): "Editor",
+    ): 'Compact',
     (
         "app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt",
         "OnboardingSheet",

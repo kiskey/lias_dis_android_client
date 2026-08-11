@@ -1,19 +1,21 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt
-// Version: 24.0.0
+// Version: 35.4.0
 //
 // Purpose:
-//   Server-aligned Pause confirmation.
+//   Server-aligned one-hour Pause confirmation.
+//
+// Plan 3.5 refinement:
+//   - Compact Cupertino sheet: Medium first, Large remains available.
+//   - Keeps the single destructive confirmation action.
+//   - Fixed one-hour LIAS server contract is unchanged.
 //
 // Backend contract:
 //   POST /api/v1/devices/{pdid}/pause
-//   -> fixed one-hour pause
-//
-// Batch 24 intentionally removes the fake 15/30/60/120-minute Pause
-// selector.
+//   -> fixed one-hour pause.
 //
 // Compatibility:
-//   onConfirm still returns Int so pre-Batch-24 call sites compile.
+//   onConfirm still returns Int.
 //   The only value this sheet ever returns is 60.
 // ====================================================================
 
@@ -32,9 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
-import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
@@ -45,16 +47,14 @@ fun PauseSheet(
     onDismiss: () -> Unit,
     onConfirm: (minutes: Int) -> Unit
 ) {
-
     HigModalSheet(
         presentation =
-            HigSheetPresentation.Editor,
+            HigSheetPresentation.Compact,
         onDismiss =
             onDismiss,
         accessibilityLabel =
             "Pause Internet"
     ) {
-
         val animatedComplete =
             rememberHigAnimatedCompletion(
                 fallbackDismiss =
@@ -78,7 +78,6 @@ fun PauseSheet(
                     16.dp
                 )
         ) {
-
             HigSheetHeader(
                 title =
                     "Pause Internet",
@@ -136,7 +135,6 @@ fun PauseSheet(
                 text =
                     "Pause for 1 Hour",
                 onClick = {
-
                     animatedComplete {
                         onConfirm(
                             60
