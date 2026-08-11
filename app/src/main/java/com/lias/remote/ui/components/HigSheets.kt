@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 35.1.0
+// Version: 35.5.1
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -89,6 +89,7 @@ import com.slapps.cupertino.CupertinoBottomSheetDefaults
 import com.slapps.cupertino.CupertinoSheetValue
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.PresentationContentInteraction
 import com.slapps.cupertino.PresentationDetent
 import com.slapps.cupertino.PresentationStyle
 import com.slapps.cupertino.rememberCupertinoBottomSheetScaffoldState
@@ -132,6 +133,32 @@ enum class HigSheetPresentation {
     Picker,
     Editor
 }
+
+/*
+ * LIAS-owned nested-scroll policy.
+ *
+ * ResizeSheet preserves the legacy Slanoss behavior where nested scrolling
+ * can change detents. ScrollContent keeps nested scrolling with the child
+ * control/list while direct sheet drag remains controlled by
+ * sheetSwipeEnabled.
+ */
+enum class HigSheetContentInteraction {
+    ResizeSheet,
+    ScrollContent
+}
+
+private fun HigSheetContentInteraction.toCupertinoInteraction():
+    PresentationContentInteraction =
+    when (
+        this
+    ) {
+        HigSheetContentInteraction.ResizeSheet ->
+            PresentationContentInteraction.Resize
+
+        HigSheetContentInteraction.ScrollContent ->
+            PresentationContentInteraction.Scroll
+    }
+
 
 private const val HIG_PICKER_VIEWPORT_FRACTION =
     0.62f
@@ -241,6 +268,9 @@ fun HigModalSheet(
     presentation:
         HigSheetPresentation =
         HigSheetPresentation.Compact,
+    contentInteraction:
+        HigSheetContentInteraction =
+        HigSheetContentInteraction.ResizeSheet,
     content: @Composable ColumnScope.() -> Unit
 ) {
     // Plan 3.3 CupertinoSheetState adapter:
@@ -271,6 +301,9 @@ fun HigModalSheet(
                 PresentationStyle.Modal(
                     detents =
                         presentation.detents(),
+                    contentInteraction =
+                    contentInteraction
+                        .toCupertinoInteraction(),
                     dismissOnClickOutside =
                         true
                 )

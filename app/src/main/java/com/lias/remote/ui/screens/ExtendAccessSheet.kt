@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt
-// Version: 35.4.0
+// Version: 35.5.1
 //
 // Purpose:
 //   Minimal Cupertino temporary-access duration picker.
@@ -38,6 +38,7 @@ import com.lias.remote.core.models.ExtensionInfo
 import com.lias.remote.core.models.TemporaryAccessKind
 import com.lias.remote.core.models.kind
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetContentInteraction
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.HigTextButton
@@ -134,6 +135,8 @@ fun ExtendAccessSheet(
     HigModalSheet(
         presentation =
             HigSheetPresentation.Compact,
+        contentInteraction =
+            HigSheetContentInteraction.ScrollContent,
         onDismiss =
             onDismiss,
         accessibilityLabel =

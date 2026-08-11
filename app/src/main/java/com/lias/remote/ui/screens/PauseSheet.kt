@@ -1,13 +1,13 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt
-// Version: 35.4.0
+// Version: 35.5.1
 //
 // Purpose:
 //   Server-aligned one-hour Pause confirmation.
 //
 // Plan 3.5 refinement:
 //   - Compact Cupertino sheet: Medium first, Large remains available.
-//   - Keeps the single destructive confirmation action.
+//   - Focused copy keeps the destructive action visible at Medium.
 //   - Fixed one-hour LIAS server contract is unchanged.
 //
 // Backend contract:
@@ -69,13 +69,13 @@ fun PauseSheet(
                         horizontal =
                             24.dp,
                         vertical =
-                            16.dp
+                            12.dp
                     ),
             horizontalAlignment =
                 Alignment.CenterHorizontally,
             verticalArrangement =
                 Arrangement.spacedBy(
-                    16.dp
+                    12.dp
                 )
         ) {
             HigSheetHeader(
@@ -102,7 +102,7 @@ fun PauseSheet(
                 text =
                     "1 Hour",
                 style =
-                    HigTypography.largeTitle,
+                    HigTypography.title1,
                 fontWeight =
                     FontWeight.Bold,
                 color =
@@ -111,22 +111,11 @@ fun PauseSheet(
 
             CupertinoText(
                 text =
-                    "LIAS will block Internet access for this device for one hour. You can resume access early at any time.",
+                    "Pauses internet for 1 hour. You can resume access early at any time.",
                 style =
                     HigTypography.body,
                 color =
                     LiasThemeColors.secondaryLabel,
-                textAlign =
-                    TextAlign.Center
-            )
-
-            CupertinoText(
-                text =
-                    "Infrastructure devices cannot be paused.",
-                style =
-                    HigTypography.caption,
-                color =
-                    LiasThemeColors.tertiaryLabel,
                 textAlign =
                     TextAlign.Center
             )
