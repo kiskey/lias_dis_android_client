@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt
-// Version: 18.0.0
+// Version: 18.0.1
 //
 // Purpose:
 //   Full LIAS schedule editor.
@@ -53,7 +53,7 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetPresentation
-import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
@@ -163,8 +163,8 @@ fun ScheduleEditorSheet(
             onDismiss
     ) {
 
-        val animatedComplete =
-            rememberHigAnimatedCompletion(
+        val immediateComplete =
+            rememberHigImmediateCompletion(
                 fallbackDismiss =
                     onDismiss
             )
@@ -216,7 +216,7 @@ fun ScheduleEditorSheet(
                                         initialSchedule
                                     )
 
-                                animatedComplete {
+                                immediateComplete {
                                     onSave(
                                         schedule
                                     )
@@ -691,7 +691,7 @@ fun ScheduleEditorSheet(
                                 initialSchedule
                             )
 
-                        animatedComplete {
+                        immediateComplete {
                             onSave(
                                 schedule
                             )

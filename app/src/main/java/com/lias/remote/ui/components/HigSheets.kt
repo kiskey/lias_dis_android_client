@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 35.5.3
+// Version: 35.5.4
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -125,6 +125,23 @@ fun rememberHigAnimatedDismiss(
 ): () -> Unit =
     LocalHigAnimatedDismiss.current
         ?: fallback
+
+private val LocalHigImmediateCompletion =
+    staticCompositionLocalOf<
+        (((() -> Unit) -> Unit))?
+    > {
+        null
+    }
+
+@Composable
+fun rememberHigImmediateCompletion(
+    fallbackDismiss: () -> Unit
+): ((() -> Unit) -> Unit) =
+    LocalHigImmediateCompletion.current
+        ?: { action ->
+            action()
+            fallbackDismiss()
+        }
 
 private val LocalHigAnimatedCompletion =
     staticCompositionLocalOf<
@@ -291,6 +308,7 @@ fun HigModalSheet(
     contentInteraction:
         HigSheetContentInteraction =
         HigSheetContentInteraction.ResizeSheet,
+    dismissEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     // Plan 3.3 CupertinoSheetState adapter:
@@ -317,6 +335,11 @@ fun HigModalSheet(
         rememberCupertinoSheetState(
             initialValue =
                 CupertinoSheetValue.Hidden,
+            confirmValueChange = {
+                    value ->
+                dismissEnabled ||
+                    value !is CupertinoSheetValue.Hidden
+            },
             presentationStyle =
                 PresentationStyle.Modal(
                     detents =
@@ -353,6 +376,7 @@ fun HigModalSheet(
      */
     fun requestImmediateHeaderCancel() {
         if (
+            !dismissEnabled ||
             parentDismissDelivered ||
             completionInFlight
         ) {
@@ -364,7 +388,10 @@ fun HigModalSheet(
 
 
     fun requestAnimatedDismiss() {
-        if (parentDismissDelivered) {
+        if (
+            !dismissEnabled ||
+            parentDismissDelivered
+        ) {
             return
         }
 
@@ -376,7 +403,34 @@ fun HigModalSheet(
         }
     }
 
-    fun requestAnimatedCompletion(
+    /*
+     * Local completion actions execute their callback before parent removal,
+     * but do not wait for Slanoss's 400ms sheet hide tween.
+     */
+    fun requestImmediateCompletion(
+        action: () -> Unit
+    ) {
+        if (
+            parentDismissDelivered ||
+            completionInFlight
+        ) {
+            return
+        }
+
+        completionInFlight =
+            true
+
+        try {
+            action()
+        } finally {
+            completionInFlight =
+                false
+        }
+
+        deliverParentDismissOnce()
+    }
+
+fun requestAnimatedCompletion(
         action: () -> Unit
     ) {
         if (
@@ -449,6 +503,8 @@ fun HigModalSheet(
 
         LocalHigAnimatedDismiss provides
             ::requestAnimatedDismiss,
+        LocalHigImmediateCompletion provides
+            ::requestImmediateCompletion,
         LocalHigAnimatedCompletion provides
             ::requestAnimatedCompletion
     ) {

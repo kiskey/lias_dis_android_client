@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt
-// Version: 19.0.0
+// Version: 19.0.1
 //
 // Purpose:
 //   Safe multi-tag classification editor.
@@ -44,7 +44,7 @@ import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetPresentation
-import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.theme.HigTypography
@@ -113,8 +113,8 @@ fun MoveTagSheet(
             onDismiss
     ) {
 
-        val animatedComplete =
-            rememberHigAnimatedCompletion(
+        val immediateComplete =
+            rememberHigImmediateCompletion(
                 fallbackDismiss =
                     onDismiss
             )
@@ -227,7 +227,7 @@ fun MoveTagSheet(
                             )
                         }
 
-                        animatedComplete {
+                        immediateComplete {
                             onConfirm(
                                 finalTags
                             )
