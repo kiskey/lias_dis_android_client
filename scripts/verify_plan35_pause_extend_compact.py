@@ -76,7 +76,7 @@ checks = {
     "extend_identity_filter_retained": "TemporaryAccessKind.EXTEND" in extend,
     "extend_active_status_retained": "rememberTemporaryMinutesLeft(" in extend and "remaining" in extend,
     "extend_cancel_retained": '"Cancel Extended Access"' in extend and "isDestructive" in extend,
-    "extend_completion_ordering": "rememberHigAnimatedCompletion" in extend,
+    "extend_completion_ordering": "rememberHigImmediateCompletion" in extend,
     "extend_confirm_selected_minutes": re.search(r"onConfirm\s*\(\s*selectedMinutes\s*\)", extend) is not None,
 }
 

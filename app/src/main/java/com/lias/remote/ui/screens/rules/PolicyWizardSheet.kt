@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt
-// Version: 28.4.0
+// Version: 28.4.1
 //
 // Purpose:
 //   Complete LIAS policy editor.
@@ -27,6 +27,7 @@ package com.lias.remote.ui.screens.rules
 
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -61,13 +64,15 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetPresentation
-import com.lias.remote.ui.components.rememberHigAnimatedDismiss
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoSwitch
+import com.slapps.cupertino.CupertinoActivityIndicator
 import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.ExperimentalCupertinoApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -130,6 +135,15 @@ fun PolicyWizardSheet(
                 false
             )
         }
+
+
+    var isSaving by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
 
     val availableTags =
         remember(
@@ -360,8 +374,15 @@ fun PolicyWizardSheet(
     }
 
     suspend fun save(
-        animatedDismiss: () -> Unit
+        immediateComplete:
+            ((() -> Unit) -> Unit)
     ) {
+
+        if (
+            isSaving
+        ) {
+            return
+        }
 
         val currentValidation =
             PolicySemantics.validateDraft(
@@ -394,30 +415,48 @@ fun PolicyWizardSheet(
             return
         }
 
+        isSaving =
+            true
+
         val saved =
-            onSave(
-                draft.toPolicy(
-                    initialPolicy
+            try {
+                onSave(
+                    draft.toPolicy(
+                        initialPolicy
+                    )
                 )
-            )
+            } catch (
+                throwable: Throwable
+            ) {
+                isSaving =
+                    false
+
+                throw throwable
+            }
 
         if (
             saved
         ) {
-            animatedDismiss()
+            immediateComplete {
+            }
+        } else {
+            isSaving =
+                false
         }
     }
 
     HigModalSheet(
+        dismissEnabled =
+            !isSaving,
         presentation =
             HigSheetPresentation.Editor,
         onDismiss =
             onDismiss
     ) {
 
-        val animatedDismiss =
-            rememberHigAnimatedDismiss(
-                fallback =
+        val immediateComplete =
+            rememberHigImmediateCompletion(
+                fallbackDismiss =
                     onDismiss
             )
 
@@ -626,7 +665,9 @@ fun PolicyWizardSheet(
                                 )
                         )
 
-                        HigButton(
+                        PolicySaveButton(
+                            saving =
+                                isSaving,
                             text =
                                 if (
                                     draft.action ==
@@ -647,7 +688,7 @@ fun PolicyWizardSheet(
                                 } else {
                                     scope.launch {
                                         save(
-                                            animatedDismiss
+                                            immediateComplete
                                         )
                                     }
                                 }
@@ -729,7 +770,9 @@ fun PolicyWizardSheet(
                                 )
                         )
 
-                        HigButton(
+                        PolicySaveButton(
+                            saving =
+                                isSaving,
                             text =
                                 when {
                                     isValidating ->
@@ -747,7 +790,7 @@ fun PolicyWizardSheet(
                             onClick = {
                                 scope.launch {
                                     save(
-                                        animatedDismiss
+                                        immediateComplete
                                     )
                                 }
                             },
@@ -768,6 +811,66 @@ fun PolicyWizardSheet(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalCupertinoApi::class)
+@Composable
+private fun PolicySaveButton(
+    text: String,
+    saving: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    style: HigButtonStyle = HigButtonStyle.Primary
+) {
+    /*
+     * Spinner overlay stays inside the existing button slot.
+     * Saving state does not change row or sheet dimensions.
+     */
+    Box(
+        modifier =
+            modifier
+    ) {
+        HigButton(
+            text =
+                if (
+                    saving
+                ) {
+                    "Saving…"
+                } else {
+                    text
+                },
+            onClick =
+                onClick,
+            enabled =
+                enabled &&
+                    !saving,
+            style =
+                style,
+            modifier =
+                Modifier.fillMaxWidth()
+        )
+
+        if (
+            saving
+        ) {
+            CupertinoActivityIndicator(
+                size =
+                    18.dp,
+                color =
+                    Color.White,
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.CenterStart
+                        )
+                        .padding(
+                            start =
+                                16.dp
+                        )
+            )
         }
     }
 }

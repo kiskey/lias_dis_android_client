@@ -123,7 +123,7 @@ checks = {
     "sheet_swipe_retained":
         re.search(
             r"sheetSwipeEnabled\s*=\s*true",
-            modal,
+            HIG,
         ) is not None,
 
     # Time picker implementation unchanged in architecture.

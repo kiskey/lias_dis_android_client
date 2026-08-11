@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt
-// Version: 27.2.0
+// Version: 27.2.1
 //
 // Purpose:
 //   Create/edit custom LIAS tags.
@@ -46,7 +46,7 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetPresentation
-import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.TagDeleteSheet
 import com.lias.remote.ui.theme.HigTypography
@@ -137,8 +137,8 @@ fun TagEditorSheet(
             onDismiss
     ) {
 
-        val animatedComplete =
-            rememberHigAnimatedCompletion(
+        val immediateComplete =
+            rememberHigImmediateCompletion(
                 fallbackDismiss =
                     onDismiss
             )
@@ -216,7 +216,7 @@ fun TagEditorSheet(
                                                 ?: false
                                     )
 
-                                animatedComplete {
+                                immediateComplete {
                                     onSave(
                                         updatedTag
                                     )

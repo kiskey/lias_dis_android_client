@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt
-// Version: 35.5.1
+// Version: 35.5.2
 //
 // Purpose:
 //   Minimal Cupertino temporary-access duration picker.
@@ -44,6 +44,7 @@ import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.formatTemporaryDuration
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.rememberTemporaryMinutesLeft
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
@@ -142,6 +143,12 @@ fun ExtendAccessSheet(
         accessibilityLabel =
             "Extend Access"
     ) {
+        val immediateComplete =
+            rememberHigImmediateCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
         val animatedComplete =
             rememberHigAnimatedCompletion(
                 fallbackDismiss =
@@ -175,7 +182,7 @@ fun ExtendAccessSheet(
                         text =
                             "Apply",
                         onClick = {
-                            animatedComplete {
+                            immediateComplete {
                                 onConfirm(
                                     selectedMinutes
                                 )

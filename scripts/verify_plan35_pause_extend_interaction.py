@@ -124,7 +124,7 @@ checks = {
     "sheet_swipe_retained":
         re.search(
             r"sheetSwipeEnabled\s*=\s*true",
-            modal,
+            HIG,
         ) is not None,
 
     # Pause.

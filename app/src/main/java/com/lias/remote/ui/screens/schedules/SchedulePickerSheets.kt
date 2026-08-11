@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt
-// Version: 33.3.4
+// Version: 33.3.5
 //
 // Focused Cupertino-style schedule picker presentation.
 //
@@ -63,7 +63,7 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheetPortal
 import com.lias.remote.ui.components.HigSheetContentInteraction
 import com.lias.remote.ui.components.HigSheetPresentation
-import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigImmediateCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
@@ -79,7 +79,7 @@ import kotlin.math.min
 import com.lias.remote.ui.components.HigDatePicker
 import com.lias.remote.ui.components.HigDatePickerMode
 
-private typealias AnimatedCompletion = (() -> Unit) -> Unit
+private typealias ImmediateCompletion = (() -> Unit) -> Unit
 
 private const val WHEEL_VISIBLE_ROWS = 5
 private val WHEEL_ROW_HEIGHT = 44.dp
@@ -108,7 +108,7 @@ fun ScheduleTimePickerSheet(
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) { animatedComplete ->
+    ) { immediateComplete ->
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -161,7 +161,7 @@ fun ScheduleTimePickerSheet(
                         selectedMinute
                     )
 
-                animatedComplete {
+                immediateComplete {
                     onConfirm(
                         value
                     )
@@ -235,7 +235,7 @@ fun ScheduleDatePickerSheet(
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) { animatedComplete ->
+    ) { immediateComplete ->
         HigDatePicker(
             selectedDateMillis =
                 initialMillis,
@@ -292,7 +292,7 @@ fun ScheduleDatePickerSheet(
                         .toLocalDate()
                         .toString()
 
-                animatedComplete {
+                immediateComplete {
                     onConfirm(
                         value
                     )
@@ -310,7 +310,7 @@ fun ScheduleDatePickerSheet(
 private fun FocusedPickerDialog(
     title: String,
     onDismiss: () -> Unit,
-    content: @Composable (AnimatedCompletion) -> Unit
+    content: @Composable (ImmediateCompletion) -> Unit
 ) {
     val configuration =
         LocalConfiguration.current
@@ -340,8 +340,8 @@ private fun FocusedPickerDialog(
         accessibilityLabel =
             title
     ) {
-        val animatedComplete =
-            rememberHigAnimatedCompletion(
+        val immediateComplete =
+            rememberHigImmediateCompletion(
                 fallbackDismiss =
                     onDismiss
             )
@@ -376,7 +376,7 @@ private fun FocusedPickerDialog(
             )
 
             content(
-                animatedComplete
+                immediateComplete
             )
         }
     }

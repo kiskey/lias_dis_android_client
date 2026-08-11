@@ -278,9 +278,11 @@ checks = {
             ACTIONS,
         ) is not None,
 
-    "policy_success_animated_dismiss_retained":
-        "rememberHigAnimatedDismiss(" in POLICY
-        and "animatedDismiss()" in POLICY,
+    "policy_success_immediate_after_server":
+        "rememberHigImmediateCompletion(" in POLICY
+        and "isSaving" in POLICY
+        and "CupertinoActivityIndicator(" in POLICY
+        and "immediateComplete {" in POLICY,
 
     "immediate_primitive_centralized":
         not screen_immediate_imports,

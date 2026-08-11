@@ -52,27 +52,46 @@ LIAS owns sheet interaction semantics in `HigSheets.kt`.
 
 ## Dismissal responsiveness
 
-- Shared `HigSheetHeader` **Cancel** is an immediate, guarded parent-dismiss
-  action. It does not wait for the Slanoss bottom-sheet hide tween.
-- The immediate Cancel path is blocked while an animated completion is already
-  in flight, preventing Cancel from racing Save/Done/Apply/Confirm.
+- Shared `HigSheetHeader` **Cancel** remains an immediate, guarded
+  parent-dismiss action.
+- Local **Done / Save / Apply / Confirm** actions use
+  `rememberHigImmediateCompletion`: the existing callback runs first, then
+  guarded parent removal occurs immediately. They do not wait for the
+  Slanoss bottom-sheet hide tween.
+- The completion guard prevents duplicate local completion taps and prevents
+  header Cancel from racing a local completion callback.
 - Back, outside-tap and swipe-down continue to use the Slanoss sheet lifecycle.
-- Non-header uses of `rememberHigAnimatedDismiss` remain animated.
-- Save/Done/Apply/Confirm keep strict ordering:
-  `hide animation -> action -> parent cleanup`.
+- The legacy animated completion adapter remains available for non-target
+  actions that intentionally keep animated completion (for example Pause,
+  onboarding/security actions, user assignment selection, and Extend's
+  destructive Cancel Extended Access action).
+- **Policy Wizard Save Rule is server-authoritative:** the sheet stays mounted
+  while `onSave(...)` is suspended. A native Slanoss
+  `CupertinoActivityIndicator` is overlaid inside the existing Save Rule
+  button slot with `Saving…`, so the progress state does not change row or
+  sheet geometry.
+- Policy Save Rule dismisses immediately only after `onSave(...)` returns
+  success. A false result clears the progress state and leaves the editor open.
 - Global Access remains a native `CupertinoActionSheet` and retains its
   existing 150 ms exit handling.
-- No artificial Cancel delay, debounce, network work, or hardware-specific
-  workaround is introduced.
+- No artificial completion delay, debounce, guessed short animation, or
+  hardware-specific workaround is introduced.
 
 ## Runtime acceptance
+
+- Policy Save Rule shows the native Cupertino spinner inside the existing
+  button footprint while the authoritative server save is in flight.
+- Policy Save Rule cannot submit twice while `isSaving` is true.
+- Policy server failure removes the spinner and keeps the sheet open.
+- Policy server success closes immediately after success without an additional
+  bottom-sheet hide animation.
 
 - Header Cancel removes a standard LIAS sheet immediately without waiting for
   the full Slanoss bottom-sheet hide animation.
 - Rapid repeated Cancel taps deliver parent dismissal at most once.
 - Cancel does not interrupt an already-started Save/Done/Apply completion.
 - Back and swipe-down still visibly animate the sheet.
-- Save/Done/Apply still complete only after their existing hide animation.
+- Local Save/Done/Apply/Confirm callbacks run before immediate parent removal.
 
 On Pixel 6a portrait:
 
@@ -88,7 +107,7 @@ On Pixel 6a portrait:
   sheet to another detent.
 - Direct sheet/grabber dragging can still expand Picker to Large.
 - Swipe-down dismissal still works.
-- Date/time Done actions remain visible and complete using animated ordering.
+- Date/time Done actions deliver the selected value immediately and close without the 400 ms hide tail.
 - Date/time pickers can be opened repeatedly without the nested-sheet crash.
 - no action overlaps gesture or 3-button navigation.
 
