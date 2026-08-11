@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 35.5.2
+// Version: 35.5.3
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -15,7 +15,8 @@
 //
 // Plan 3.3 Batch 002:
 //   - Uses Slanoss 2.3.1 CupertinoSheetState / CupertinoBottomSheetScaffold.
-//   - Back, outside tap, swipe-down and header Cancel animate before parent removal.
+//   - Back, outside tap and swipe-down keep animated sheet dismissal.
+//   - Header Cancel uses immediate guarded parent removal for responsive UX.
 //
 // Plan 3.3 Batch 003:
 //   - Adds animated completion ordering for Save/Done/Confirm actions.
@@ -96,6 +97,20 @@ import com.slapps.cupertino.rememberCupertinoBottomSheetScaffoldState
 import com.slapps.cupertino.rememberCupertinoSheetState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+
+private val LocalHigImmediateHeaderCancel =
+    staticCompositionLocalOf<
+        (() -> Unit)?
+    > {
+        null
+    }
+
+@Composable
+fun rememberHigImmediateHeaderCancel(
+    fallback: () -> Unit
+): () -> Unit =
+    LocalHigImmediateHeaderCancel.current
+        ?: fallback
 
 private val LocalHigAnimatedDismiss =
     staticCompositionLocalOf<
@@ -327,6 +342,27 @@ fun HigModalSheet(
         }
     }
 
+    /*
+     * Header Cancel means abandon this sheet's local edits immediately.
+     *
+     * Slanoss 2.3.1 sheet hide uses a fixed Cupertino transition and
+     * suspends until that motion finishes. Header Cancel intentionally
+     * does not wait for that animation.
+     *
+     * Save/Done/Apply/Confirm do NOT use this path.
+     */
+    fun requestImmediateHeaderCancel() {
+        if (
+            parentDismissDelivered ||
+            completionInFlight
+        ) {
+            return
+        }
+
+        deliverParentDismissOnce()
+    }
+
+
     fun requestAnimatedDismiss() {
         if (parentDismissDelivered) {
             return
@@ -407,6 +443,10 @@ fun HigModalSheet(
     }
 
     CompositionLocalProvider(
+        LocalHigImmediateHeaderCancel provides
+
+            ::requestImmediateHeaderCancel,
+
         LocalHigAnimatedDismiss provides
             ::requestAnimatedDismiss,
         LocalHigAnimatedCompletion provides
@@ -521,8 +561,8 @@ fun HigSheetHeader(
         null
 ) {
 
-    val animatedCancel =
-        rememberHigAnimatedDismiss(
+    val immediateCancel =
+        rememberHigImmediateHeaderCancel(
             fallback =
                 onCancel
         )
@@ -548,7 +588,7 @@ fun HigSheetHeader(
             text =
                 "Cancel",
             onClick =
-                animatedCancel
+                immediateCancel
         )
 
         CupertinoText(

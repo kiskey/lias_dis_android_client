@@ -50,7 +50,29 @@ LIAS owns sheet interaction semantics in `HigSheets.kt`.
   insets, and `YYYY-MM-DD` / `HH:mm` wire formats remain unchanged.
 - **Identity Candidate Review: Editor/Large** remains unchanged.
 
+## Dismissal responsiveness
+
+- Shared `HigSheetHeader` **Cancel** is an immediate, guarded parent-dismiss
+  action. It does not wait for the Slanoss bottom-sheet hide tween.
+- The immediate Cancel path is blocked while an animated completion is already
+  in flight, preventing Cancel from racing Save/Done/Apply/Confirm.
+- Back, outside-tap and swipe-down continue to use the Slanoss sheet lifecycle.
+- Non-header uses of `rememberHigAnimatedDismiss` remain animated.
+- Save/Done/Apply/Confirm keep strict ordering:
+  `hide animation -> action -> parent cleanup`.
+- Global Access remains a native `CupertinoActionSheet` and retains its
+  existing 150 ms exit handling.
+- No artificial Cancel delay, debounce, network work, or hardware-specific
+  workaround is introduced.
+
 ## Runtime acceptance
+
+- Header Cancel removes a standard LIAS sheet immediately without waiting for
+  the full Slanoss bottom-sheet hide animation.
+- Rapid repeated Cancel taps deliver parent dismissal at most once.
+- Cancel does not interrupt an already-started Save/Done/Apply completion.
+- Back and swipe-down still visibly animate the sheet.
+- Save/Done/Apply still complete only after their existing hide animation.
 
 On Pixel 6a portrait:
 
