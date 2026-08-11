@@ -39,7 +39,9 @@ checks = {
     "ime": "imePadding()" in h,
     "accessibility": "paneTitle" in h,
     "picker_no_standalone_dialog": not direct_dialog(sp),
-    "picker_hig_sheet": "HigModalSheet(" in sp,
+    "picker_hig_sheet":
+        "HigModalSheetPortal(" in sp
+        and "fun HigModalSheetPortal(" in h,
     "date_wire": ".toLocalDate()" in sp and ".toString()" in sp,
     "time_wire": '"%02d:%02d"' in sp,
     "policy_success_only": "onSave: suspend (Policy) -> Boolean" in pw,

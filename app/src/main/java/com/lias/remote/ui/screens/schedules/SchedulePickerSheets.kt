@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt
-// Version: 33.3.2
+// Version: 33.3.3
 //
 // Focused Cupertino-style schedule picker presentation.
 //
@@ -60,7 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigModalSheetPortal
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.theme.HigTypography
@@ -323,7 +323,7 @@ private fun FocusedPickerDialog(
                 420.dp
             )
 
-    HigModalSheet(
+    HigModalSheetPortal(
         onDismiss =
             onDismiss,
         modifier =

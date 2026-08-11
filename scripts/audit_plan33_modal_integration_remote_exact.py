@@ -39,7 +39,13 @@ checks = {
     "hig_show_hide": "sheetState.show()" in texts[hig] and "sheetState.hide()" in texts[hig],
     "completion_guard": "completionInFlight" in texts[hig],
     "picker_no_standalone_dialog": not direct_dialog(texts[picker]),
-    "picker_hig_sheet": "HigModalSheet(" in texts[picker],
+    "picker_hig_sheet":
+        "HigModalSheetPortal(" in texts[picker]
+        and "fun HigModalSheetPortal(" in texts[hig],
+    "picker_full_window_portal":
+        "DialogProperties(" in texts[hig]
+        and "usePlatformDefaultWidth =" in texts[hig]
+        and "decorFitsSystemWindows =" in texts[hig],
     "completion_hooks_complete": not missing,
     "no_material_modal_bottom_sheet": not any(
         "androidx.compose.material3.ModalBottomSheet" in t

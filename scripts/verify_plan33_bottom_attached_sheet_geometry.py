@@ -26,7 +26,15 @@ checks = {
         < text.find("PresentationDetent.Large"),
 
     "full_height_sheet_surface":
-        ".fillMaxHeight()" in text,
+        "Modifier.fillMaxSize()" in text,
+
+    "detent_safe_visible_viewport":
+        "sheetViewportFraction" in text
+        and ".fillMaxHeight(" in text,
+
+    "nested_sheet_full_window_portal":
+        "fun HigModalSheetPortal(" in text
+        and "DialogProperties(" in text,
 
     "explicit_cupertino_grabber":
         "CupertinoBottomSheetDefaults" in text

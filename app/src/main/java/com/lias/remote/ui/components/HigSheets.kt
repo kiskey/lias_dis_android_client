@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 33.5.0
+// Version: 33.6.0
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -31,12 +31,19 @@
 //   - Measures the shared surface at full height so Medium stays
 //     physically attached to the bottom edge instead of floating.
 //   - Explicitly retains the Cupertino drag handle with multiple detents.
+//
+// Plan 3.3 Regression Stabilization:
+//   - Keeps the anchor surface full-height but makes the visible content
+//     viewport match Medium/Large so bottom actions remain above nav bars.
+//   - Adds a full-window Dialog constraint portal for nested picker sheets.
+//   - HigModalSheet remains the sole owner of Cupertino sheet lifecycle.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -66,6 +73,8 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
@@ -112,6 +121,56 @@ fun rememberHigAnimatedCompletion(
             action()
             fallbackDismiss()
         }
+
+/*
+ * Full-window presentation boundary for a sheet launched from inside
+ * another scrollable sheet. Dialog owns only the window/constraints;
+ * HigModalSheet still owns Cupertino motion, scrim, Back, swipe,
+ * outside-tap and completion ordering.
+ */
+@Composable
+fun HigModalSheetPortal(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    accessibilityLabel: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(
+        onDismissRequest = {
+            /*
+             * Platform dismissal is disabled below. HigModalSheet owns
+             * animated dismissal so parent cleanup cannot race motion.
+             */
+        },
+        properties =
+            DialogProperties(
+                dismissOnBackPress =
+                    false,
+                dismissOnClickOutside =
+                    false,
+                usePlatformDefaultWidth =
+                    false,
+                decorFitsSystemWindows =
+                    false
+            )
+    ) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize()
+        ) {
+            HigModalSheet(
+                onDismiss =
+                    onDismiss,
+                modifier =
+                    modifier,
+                accessibilityLabel =
+                    accessibilityLabel,
+                content =
+                    content
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
@@ -291,30 +350,58 @@ fun HigModalSheet(
             applyContentScaling =
                 false,
             sheetContent = {
-                Column(
+                /*
+                 * Slanoss needs a full-height measured surface for correct
+                 * Medium/Large anchors. The user-visible content viewport,
+                 * however, must match the active detent so navigation/IME
+                 * insets land at the visible bottom rather than below it.
+                 */
+                Box(
                     modifier =
-                        modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .navigationBarsPadding()
-                            .imePadding()
-                            .then(
-                                if (
-                                    accessibilityLabel.isNullOrBlank()
-                                ) {
-                                    Modifier
-                                } else {
-                                    Modifier.semantics {
-                                        paneTitle =
-                                            accessibilityLabel
-                                    }
-                                }
-                            )
-                            .padding(
-                                bottom = 24.dp
-                            )
+                        Modifier.fillMaxSize()
                 ) {
-                    content()
+                    val sheetViewportFraction =
+                        if (
+                            sheetState.currentValue is
+                                CupertinoSheetValue.Expanded ||
+                            sheetState.targetValue is
+                                CupertinoSheetValue.Expanded
+                        ) {
+                            1.0f
+                        } else {
+                            0.5f
+                        }
+
+                    Column(
+                        modifier =
+                            modifier
+                                .align(
+                                    Alignment.TopCenter
+                                )
+                                .fillMaxWidth()
+                                .fillMaxHeight(
+                                    sheetViewportFraction
+                                )
+                                .navigationBarsPadding()
+                                .imePadding()
+                                .then(
+                                    if (
+                                        accessibilityLabel.isNullOrBlank()
+                                    ) {
+                                        Modifier
+                                    } else {
+                                        Modifier.semantics {
+                                            paneTitle =
+                                                accessibilityLabel
+                                        }
+                                    }
+                                )
+                                .padding(
+                                    bottom = 24.dp
+                                )
+                    ) {
+                        content()
+                    }
                 }
             }
         ) {

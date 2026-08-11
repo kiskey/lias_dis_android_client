@@ -45,7 +45,10 @@ checks["policy_animated_dismiss"] = "animatedDismiss()" in p
 checks["rules_api_success"] = "ApiResult.Success" in r
 
 picker = txt("app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt")
-checks["picker_hig_modal"] = "HigModalSheet(" in picker
+checks["picker_hig_modal"] = (
+    "HigModalSheetPortal(" in picker
+    and "fun HigModalSheetPortal(" in h
+)
 checks["picker_completion"] = "rememberHigAnimatedCompletion(" in picker
 checks["picker_no_dialog_import"] = "import androidx.compose.ui.window.Dialog" not in picker
 checks["picker_no_standalone_dialog"] = re.search(r'(?<![A-Za-z0-9_])Dialog\s*\(', picker) is None

@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt
-// Version: 34.4.0
+// Version: 34.4.1
 //
 // Purpose:
 //   Shared non-device-specific modal actions.
@@ -354,13 +354,19 @@ fun GlobalSwitchSheet(
         title = {
             CupertinoText(
                 text =
-                    "Global Access"
+                    "Global Access",
+                style =
+                    HigTypography.headline,
+                fontWeight =
+                    FontWeight.SemiBold
             )
         },
         message = {
             CupertinoText(
                 text =
-                    "Controls every non-infrastructure device on this LIAS server."
+                    "Controls every non-infrastructure device on this LIAS server.",
+                style =
+                    HigTypography.subheadline
             )
         },
         content = {
