@@ -422,14 +422,14 @@ private fun ConfiguredLiasApp(
                                      * Slanoss CupertinoNavigationBarItem
                                      * owns a 20.dp icon slot. Keep its
                                      * layout/semantics untouched and scale
-                                     * only the glyph drawing to ~24.dp.
+                                     * only the glyph drawing to ~26.dp.
                                      */
                                     modifier =
                                         Modifier.graphicsLayer {
                                             scaleX =
-                                                1.20f
+                                                1.30f
                                             scaleY =
-                                                1.20f
+                                                1.30f
                                         }
                                 )
                             },
