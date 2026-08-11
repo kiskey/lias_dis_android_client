@@ -55,6 +55,11 @@ for p in [ROOT / "gradle/libs.versions.toml", ROOT / "app/build.gradle.kts"]:
 checks["no_cupertino_adaptive"] = "cupertino-adaptive" not in deps
 checks["no_cupertino_native"] = "cupertino-native" not in deps
 
+OUT.parent.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
 OUT.write_text(json.dumps({"checks": checks, "completion_missing": missing}, indent=2), encoding="utf-8")
 print(OUT.read_text())
 
