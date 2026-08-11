@@ -32,7 +32,7 @@ import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.WeeklyTimeline
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun PolicyScheduleSelector(

@@ -1,17 +1,17 @@
 // ====================================================================
 // File: app/build.gradle.kts
-// Version: 27.0.0
+// Version: 30.0.0
 //
 // Purpose:
 //   Final application build configuration.
 //
-// Batch 27:
-//   - compileSdk 36 now paired with AGP 8.9.3.
-//   - JDK/JVM 17.
-//   - Batch-23 MockWebServer tests restored.
-//   - Coroutine tests restored.
-//   - Robolectric navigation/deep-link tests restored.
-//   - Android resources enabled for local Robolectric tests.
+// Compose Cupertino migration Plan 3.0 / Batch 1:
+//   - Consumes the upgraded version catalog.
+//   - Keeps namespace, app id, minSdk, compileSdk, targetSdk,
+//     Java/JVM 17, build features, release shrinking, resource
+//     packaging, and unit-test Android resources unchanged.
+//   - Does not introduce new UI behavior, new endpoints, new
+//     repositories, new navigation routes, or new persisted settings.
 // ====================================================================
 
 plugins {
@@ -234,7 +234,7 @@ dependencies {
 
 
     // ----------------------------------------------------------------
-    // Cupertino
+    // Cupertino maintained fork
     // ----------------------------------------------------------------
 
     implementation(

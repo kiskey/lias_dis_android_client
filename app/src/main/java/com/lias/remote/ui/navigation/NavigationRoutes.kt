@@ -23,6 +23,9 @@ object NavigationRoutes {
     const val DEVICES =
         "devices"
 
+    const val DEVICES_BY_TAG =
+        "devices/tag/{tagId}"
+
     const val SCHEDULES =
         "schedules"
 
@@ -35,6 +38,9 @@ object NavigationRoutes {
     const val CONNECTION_SETTINGS =
         "connection_settings"
 
+    const val IDENTITY_REVIEW =
+        "identity_review"
+
     const val DEVICE_DETAIL =
         "device_detail/{pdid}"
 
@@ -44,6 +50,16 @@ object NavigationRoutes {
         "device_detail/${
             Uri.encode(
                 pdid
+            )
+        }"
+
+
+    fun devicesByTag(
+        tagId: String
+    ): String =
+        "devices/tag/${
+            Uri.encode(
+                tagId
             )
         }"
 }

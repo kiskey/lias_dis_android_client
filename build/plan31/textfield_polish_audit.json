@@ -1,0 +1,21 @@
+{
+  "files": {
+    "HigField.kt": "app/src/main/java/com/lias/remote/ui/components/HigField.kt",
+    "HigLargeTitleScaffold.kt": "app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt"
+  },
+  "checks": {
+    "hig_field_uses_cupertino_textfield": true,
+    "hig_field_uses_textfieldvalue": true,
+    "hig_field_keeps_reconcile": true,
+    "hig_field_has_cupertino_group_chrome_marker": true,
+    "hig_field_no_basic_textfield": true,
+    "search_uses_cursor_safe_textfield": true,
+    "search_uses_cupertino_icons": true,
+    "search_no_canvas": true
+  },
+  "old_cupertino_refs": [],
+  "material_textfield_refs": [],
+  "material_icon_refs": [],
+  "basic_textfield_refs": [],
+  "sensitive_changed_files": []
+}

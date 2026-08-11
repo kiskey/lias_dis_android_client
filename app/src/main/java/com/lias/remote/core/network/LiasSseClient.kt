@@ -27,6 +27,7 @@
 package com.lias.remote.core.network
 
 import com.lias.remote.core.models.LiasEvent
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -440,6 +441,9 @@ class LiasSseClient(
                     val dataBuilder =
                         StringBuilder()
 
+                    var eventDataBytes =
+                        0
+
                     while (
                         !source.exhausted()
                     ) {
@@ -470,6 +474,9 @@ class LiasSseClient(
 
                                     dataBuilder
                                         .clear()
+
+                                    eventDataBytes =
+                                        0
                                 }
                             }
 
@@ -495,6 +502,27 @@ class LiasSseClient(
                                             "data:"
                                         )
                                         .trimStart()
+
+                                eventDataBytes +=
+                                    data
+                                        .encodeToByteArray()
+                                        .size +
+                                        if (
+                                            dataBuilder.isNotEmpty()
+                                        ) {
+                                            1
+                                        } else {
+                                            0
+                                        }
+
+                                if (
+                                    eventDataBytes >
+                                    MAX_EVENT_DATA_BYTES
+                                ) {
+                                    throw IOException(
+                                        "LIAS SSE event exceeded the 1 MiB contract limit."
+                                    )
+                                }
 
                                 if (
                                     dataBuilder
@@ -682,6 +710,22 @@ class LiasSseClient(
                             it.isNotBlank()
                         }
                     ?: element[
+                        "source_pdid"
+                    ]
+                        ?.jsonPrimitive
+                        ?.contentOrNull
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                    ?: element[
+                        "target_pdid"
+                    ]
+                        ?.jsonPrimitive
+                        ?.contentOrNull
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                    ?: element[
                         "new_pdid"
                     ]
                         ?.jsonPrimitive
@@ -725,5 +769,8 @@ class LiasSseClient(
 
         private const val MAX_RECONNECT_BACKOFF_MS =
             10_000L
+
+        private const val MAX_EVENT_DATA_BYTES =
+            1 shl 20
     }
 }

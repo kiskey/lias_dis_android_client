@@ -33,7 +33,7 @@ import com.lias.remote.ui.theme.SystemIndigoDark
 import com.lias.remote.ui.theme.SystemOrangeDark
 import com.lias.remote.ui.theme.SystemPinkDark
 import com.lias.remote.ui.theme.SystemTealDark
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun DetailedWeekGrid(

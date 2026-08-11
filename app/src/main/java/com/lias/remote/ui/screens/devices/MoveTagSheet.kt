@@ -43,14 +43,17 @@ import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Checkmark
-import io.github.alexzhirkevich.cupertino.icons.outlined.Lock
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.Checkmark
+import com.slapps.cupertino.icons.outlined.Lock
 
 @Composable
 fun MoveTagSheet(
@@ -104,9 +107,23 @@ fun MoveTagSheet(
         }
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Compact,
         onDismiss =
             onDismiss
     ) {
+
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
+        val animatedDismiss =
+            rememberHigAnimatedDismiss(
+                fallback =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -138,7 +155,7 @@ fun MoveTagSheet(
                     text =
                         "Cancel",
                     onClick =
-                        onDismiss
+                        animatedDismiss
                 )
 
                 Column(
@@ -210,9 +227,11 @@ fun MoveTagSheet(
                             )
                         }
 
-                        onConfirm(
-                            finalTags
-                        )
+                        animatedComplete {
+                            onConfirm(
+                                finalTags
+                            )
+                        }
                     }
                 )
             }

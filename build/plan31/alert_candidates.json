@@ -1,0 +1,1870 @@
+{
+  "material_alerts": [],
+  "platform_dialogs": [
+    "app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt"
+  ],
+  "forms_or_sheets": [
+    "app/src/main/java/com/lias/remote/ui/components/DependencyDeleteSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/components/HigSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/devices/UserAssignmentSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/identity/IdentityReviewScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleRuleEditorCard.kt",
+    "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt",
+    "app/src/main/java/com/lias/remote/ui/theme/HigSpec.kt"
+  ],
+  "candidate_records": [
+    {
+      "path": "app/src/main/java/com/lias/remote/MainActivity.kt",
+      "hits": [
+        {
+          "line": 18,
+          "text": "//     - removes obsolete SettingsViewModel(LiasApiClient) constructor"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/device/DevicePresentation.kt",
+      "hits": [
+        {
+          "line": 63,
+          "text": "tags.remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/diagnostics/Diagnostics.kt",
+      "hits": [
+        {
+          "line": 80,
+          "text": "\"LIAS rejected the configured authentication token.\""
+        },
+        {
+          "line": 123,
+          "text": "\"LIAS Rejected the Change\","
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/models/DeviceIdentity.kt",
+      "hits": [
+        {
+          "line": 175,
+          "text": "\"Identity still being confirmed\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/models/Models.kt",
+      "hits": [
+        {
+          "line": 430,
+          "text": "@SerialName(\"confirmed_by\")"
+        },
+        {
+          "line": 431,
+          "text": "val confirmedBy: List<String>? = emptyList(),"
+        },
+        {
+          "line": 451,
+          "text": "val safeConfirmedBy: List<String>"
+        },
+        {
+          "line": 453,
+          "text": "confirmedBy ?: emptyList()"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/ApiResult.kt",
+      "hits": [
+        {
+          "line": 28,
+          "text": "* Authentication/authorization was rejected by LIAS."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/ConnectionValidation.kt",
+      "hits": [
+        {
+          "line": 11,
+          "text": "//   - Rejects malformed URLs before a network request."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/Endpoints.kt",
+      "hits": [
+        {
+          "line": 71,
+          "text": "fun deviceIdentitySplit(pdid: String): String ="
+        },
+        {
+          "line": 72,
+          "text": "\"${deviceIdentity(pdid)}/split\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/EngineApiTypes.kt",
+      "hits": [
+        {
+          "line": 190,
+          "text": "@SerialName(\"revoked_at\")"
+        },
+        {
+          "line": 191,
+          "text": "val revokedAt: String? = null"
+        },
+        {
+          "line": 255,
+          "text": "data class IdentitySplitRequest("
+        },
+        {
+          "line": 265,
+          "text": "const val IDENTITY_CANDIDATE_REOPEN = \"identity_candidate_reopen\""
+        },
+        {
+          "line": 267,
+          "text": "const val IDENTITY_SPLIT = \"identity_split\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/EventConstants.kt",
+      "hits": [
+        {
+          "line": 20,
+          "text": "const val DEVICE_REMOVED ="
+        },
+        {
+          "line": 21,
+          "text": "\"device.removed\""
+        },
+        {
+          "line": 73,
+          "text": "DEVICE_REMOVED,"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/LiasApiClient.kt",
+      "hits": [
+        {
+          "line": 194,
+          "text": "\"LIAS rejected the authentication token.\""
+        },
+        {
+          "line": 497,
+          "text": "> delete("
+        },
+        {
+          "line": 503,
+          "text": "method = \"DELETE\""
+        },
+        {
+          "line": 568,
+          "text": "suspend fun cancelDeviceExtension("
+        },
+        {
+          "line": 571,
+          "text": "delete("
+        },
+        {
+          "line": 595,
+          "text": "suspend fun cancelTagExtension("
+        },
+        {
+          "line": 598,
+          "text": "delete("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/LiasSseClient.kt",
+      "hits": [
+        {
+          "line": 18,
+          "text": "//     Cancel the active request so the reconnect uses the new token."
+        },
+        {
+          "line": 31,
+          "text": "import kotlinx.coroutines.CancellationException"
+        },
+        {
+          "line": 104,
+          "text": "* reconnect loop to reopen against the new endpoint."
+        },
+        {
+          "line": 107,
+          "text": "?.cancel()"
+        },
+        {
+          "line": 146,
+          "text": "?.cancel()"
+        },
+        {
+          "line": 225,
+          "text": "error: CancellationException"
+        },
+        {
+          "line": 272,
+          "text": "?.cancel()"
+        },
+        {
+          "line": 278,
+          "text": "?.cancel()"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/network/LiasTemporaryAccessApi.kt",
+      "hits": [
+        {
+          "line": 64,
+          "text": "return delete("
+        },
+        {
+          "line": 112,
+          "text": "suspend fun LiasApiClient.cancelDeviceExtend("
+        },
+        {
+          "line": 126,
+          "text": "return delete("
+        },
+        {
+          "line": 174,
+          "text": "suspend fun LiasApiClient.cancelTagExtend("
+        },
+        {
+          "line": 188,
+          "text": "return delete("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/policy/PolicySemantics.kt",
+      "hits": [
+        {
+          "line": 15,
+          "text": "//   - deleted targets"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/store/SecureTokenStore.kt",
+      "hits": [
+        {
+          "line": 143,
+          "text": ".remove("
+        },
+        {
+          "line": 146,
+          "text": ".remove("
+        },
+        {
+          "line": 225,
+          "text": ".remove("
+        },
+        {
+          "line": 228,
+          "text": ".remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/store/SettingsRepository.kt",
+      "hits": [
+        {
+          "line": 11,
+          "text": "//     storage and then removed."
+        },
+        {
+          "line": 253,
+          "text": "* Remove plaintext storage regardless of whether a token"
+        },
+        {
+          "line": 260,
+          "text": ".remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/util/ConfigurationSafety.kt",
+      "hits": [
+        {
+          "line": 6,
+          "text": "//   Cross-resource dependency analysis for destructive LIAS actions."
+        },
+        {
+          "line": 10,
+          "text": "//   mappings decoupled. Some backend delete operations therefore do not"
+        },
+        {
+          "line": 13,
+          "text": "// Android must not treat those deletes as harmless."
+        },
+        {
+          "line": 16,
+          "text": "//   - Referenced schedules cannot be casually deleted."
+        },
+        {
+          "line": 17,
+          "text": "//   - Tags still assigned to devices cannot be deleted."
+        },
+        {
+          "line": 18,
+          "text": "//   - Tags still targeted by policies cannot be deleted."
+        },
+        {
+          "line": 20,
+          "text": "//   - Built-in tags cannot be deleted."
+        },
+        {
+          "line": 40,
+          "text": "val canDeleteSafely: Boolean"
+        },
+        {
+          "line": 88,
+          "text": "val canDeleteSafely: Boolean"
+        },
+        {
+          "line": 108,
+          "text": "\"Built-in system tags cannot be deleted.\""
+        },
+        {
+          "line": 267,
+          "text": "* Normal tag-management UI must never add or remove the"
+        },
+        {
+          "line": 271,
+          "text": "* enforcement; removing it removes that immunity."
+        },
+        {
+          "line": 312,
+          "text": "\"Infrastructure protection cannot be removed from normal tag management.\""
+        },
+        {
+          "line": 347,
+          "text": "requested.remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/util/EffectiveAccessPresentation.kt",
+      "hits": [
+        {
+          "line": 41,
+          "text": "val canCancelExtension: Boolean,"
+        },
+        {
+          "line": 69,
+          "text": "canCancelExtension ="
+        },
+        {
+          "line": 125,
+          "text": "canCancelExtension ="
+        },
+        {
+          "line": 152,
+          "text": "canCancelExtension ="
+        },
+        {
+          "line": 208,
+          "text": "canCancelExtension ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/util/ScheduleProjection.kt",
+      "hits": [
+        {
+          "line": 25,
+          "text": "//   - Identical start/end: no projected segment; validation rejects it."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/core/util/ScheduleValidation.kt",
+      "hits": [
+        {
+          "line": 151,
+          "text": "* Internal contradictions are rejected by the backend using"
+        },
+        {
+          "line": 152,
+          "text": "* MergeSchedules([]Schedule{s})."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/EventRepository.kt",
+      "hits": [
+        {
+          "line": 49,
+          "text": "* Mutation ownership is split into focused files, all coordinated by"
+        },
+        {
+          "line": 831,
+          "text": "val confirmedBy ="
+        },
+        {
+          "line": 843,
+          "text": ".safeConfirmedBy"
+        },
+        {
+          "line": 856,
+          "text": "confirmedBy.isEmpty()"
+        },
+        {
+          "line": 863,
+          "text": "\"Device is online \u00b7 verified by ${confirmedBy.size} source${if (confirmedBy.size == 1) \"\" else \"s\"}\""
+        },
+        {
+          "line": 910,
+          "text": "EventConstants.DEVICE_REMOVED -> {"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/EventRepositoryActions.kt",
+      "hits": [
+        {
+          "line": 14,
+          "text": "//   - deletePolicy"
+        },
+        {
+          "line": 16,
+          "text": "//   - deleteSchedule"
+        },
+        {
+          "line": 21,
+          "text": "//   - deleteTag"
+        },
+        {
+          "line": 85,
+          "text": "remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/IdentityRepositoryActions.kt",
+      "hits": [
+        {
+          "line": 13,
+          "text": "import com.lias.remote.core.network.IdentitySplitRequest"
+        },
+        {
+          "line": 48,
+          "text": "it in setOf(\"pending\", \"confirmed\", \"rejected\")"
+        },
+        {
+          "line": 259,
+          "text": "suspend fun EventRepository.confirmIdentityCandidate("
+        },
+        {
+          "line": 278,
+          "text": "\"confirm\""
+        },
+        {
+          "line": 296,
+          "text": "suspend fun EventRepository.rejectIdentityCandidate("
+        },
+        {
+          "line": 315,
+          "text": "\"reject\""
+        },
+        {
+          "line": 332,
+          "text": "suspend fun EventRepository.reopenIdentityCandidate("
+        },
+        {
+          "line": 339,
+          "text": "EngineFeatures.IDENTITY_CANDIDATE_REOPEN"
+        },
+        {
+          "line": 352,
+          "text": "\"reopen\""
+        },
+        {
+          "line": 360,
+          "text": "refreshIdentityCandidates(\"rejected\")"
+        },
+        {
+          "line": 363,
+          "text": "refreshIdentityCandidates(\"rejected\")"
+        },
+        {
+          "line": 402,
+          "text": "suspend fun EventRepository.revokeIdentityBinding("
+        },
+        {
+          "line": 417,
+          "text": "api.delete<Unit>("
+        },
+        {
+          "line": 432,
+          "text": "suspend fun EventRepository.splitIdentity("
+        },
+        {
+          "line": 440,
+          "text": "EngineFeatures.IDENTITY_SPLIT"
+        },
+        {
+          "line": 448,
+          "text": "api.post<Device, IdentitySplitRequest>("
+        },
+        {
+          "line": 449,
+          "text": "Endpoints.deviceIdentitySplit(pdid),"
+        },
+        {
+          "line": 450,
+          "text": "IdentitySplitRequest("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/MutationCoordinator.kt",
+      "hits": [
+        {
+          "line": 83,
+          "text": "resourceMutexes.remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/PolicyScheduleMutations.kt",
+      "hits": [
+        {
+          "line": 6,
+          "text": "//   Canonical policy/schedule persistence with dependency-safe delete."
+        },
+        {
+          "line": 9,
+          "text": "//   - Referenced schedules cannot be deleted from Android."
+        },
+        {
+          "line": 249,
+          "text": "suspend fun EventRepository.deletePolicy("
+        },
+        {
+          "line": 265,
+          "text": "\"Global Access cannot be deleted.\""
+        },
+        {
+          "line": 291,
+          "text": "api.delete<Unit>("
+        },
+        {
+          "line": 379,
+          "text": "suspend fun EventRepository.deleteSchedule("
+        },
+        {
+          "line": 452,
+          "text": "\"Remove it from those rules before deleting the schedule. Deleting it directly would make those LIAS schedule bundles fail closed to Block.\""
+        },
+        {
+          "line": 459,
+          "text": "api.delete<Unit>("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/TagMutations.kt",
+      "hits": [
+        {
+          "line": 9,
+          "text": "//   Backend DeleteTag removes only the tag itself."
+        },
+        {
+          "line": 15,
+          "text": "// Therefore Android refuses destructive deletion while dependencies"
+        },
+        {
+          "line": 130,
+          "text": "suspend fun EventRepository.deleteTag("
+        },
+        {
+          "line": 170,
+          "text": "\"Infrastructure is immutable and cannot be deleted.\""
+        },
+        {
+          "line": 181,
+          "text": "\"Built-in system tags cannot be deleted.\""
+        },
+        {
+          "line": 244,
+          "text": "\"Delete or retarget \""
+        },
+        {
+          "line": 282,
+          "text": "api.delete<Unit>("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/repositories/TemporaryAccessRepository.kt",
+      "hits": [
+        {
+          "line": 22,
+          "text": "import com.lias.remote.core.network.cancelDeviceExtend"
+        },
+        {
+          "line": 23,
+          "text": "import com.lias.remote.core.network.cancelTagExtend"
+        },
+        {
+          "line": 79,
+          "text": "* LIAS may create/remove temporary internal policy and"
+        },
+        {
+          "line": 164,
+          "text": "suspend fun EventRepository.cancelDeviceExtensionAuthoritatively("
+        },
+        {
+          "line": 173,
+          "text": "api.cancelDeviceExtend("
+        },
+        {
+          "line": 237,
+          "text": "suspend fun EventRepository.cancelTagExtensionAuthoritatively("
+        },
+        {
+          "line": 246,
+          "text": "api.cancelTagExtend("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/LiasViewModel.kt",
+      "hits": [
+        {
+          "line": 21,
+          "text": "import com.lias.remote.repositories.cancelDeviceExtensionAuthoritatively"
+        },
+        {
+          "line": 22,
+          "text": "import com.lias.remote.repositories.cancelTagExtensionAuthoritatively"
+        },
+        {
+          "line": 25,
+          "text": "import com.lias.remote.repositories.deletePolicy"
+        },
+        {
+          "line": 26,
+          "text": "import com.lias.remote.repositories.deleteSchedule"
+        },
+        {
+          "line": 27,
+          "text": "import com.lias.remote.repositories.deleteTag"
+        },
+        {
+          "line": 35,
+          "text": "import com.lias.remote.repositories.confirmIdentityCandidate"
+        },
+        {
+          "line": 39,
+          "text": "import com.lias.remote.repositories.rejectIdentityCandidate"
+        },
+        {
+          "line": 41,
+          "text": "import com.lias.remote.repositories.reopenIdentityCandidate"
+        },
+        {
+          "line": 42,
+          "text": "import com.lias.remote.repositories.revokeIdentityBinding"
+        },
+        {
+          "line": 46,
+          "text": "import com.lias.remote.repositories.splitIdentity"
+        },
+        {
+          "line": 228,
+          "text": "fun cancelDeviceExtension("
+        },
+        {
+          "line": 236,
+          "text": ".cancelDeviceExtensionAuthoritatively("
+        },
+        {
+          "line": 239,
+          "text": "\"Access extension cancelled\""
+        },
+        {
+          "line": 263,
+          "text": "fun cancelTagExtension("
+        },
+        {
+          "line": 271,
+          "text": ".cancelTagExtensionAuthoritatively("
+        },
+        {
+          "line": 274,
+          "text": "\"Group extension cancelled\""
+        },
+        {
+          "line": 512,
+          "text": "fun deletePolicy("
+        },
+        {
+          "line": 522,
+          "text": ".deletePolicy("
+        },
+        {
+          "line": 538,
+          "text": "\"Rule '$policyName' deleted\""
+        },
+        {
+          "line": 599,
+          "text": "fun deleteSchedule("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/DependencyDeleteSheets.kt",
+      "hits": [
+        {
+          "line": 2,
+          "text": "// File: app/src/main/java/com/lias/remote/ui/components/DependencyDeleteSheets.kt"
+        },
+        {
+          "line": 6,
+          "text": "//   Dependency-aware destructive-action presentation."
+        },
+        {
+          "line": 9,
+          "text": "//   - Do not present an enabled destructive button for an operation"
+        },
+        {
+          "line": 10,
+          "text": "//     the repository will reject."
+        },
+        {
+          "line": 34,
+          "text": "fun ScheduleDeleteSheet("
+        },
+        {
+          "line": 38,
+          "text": "onDelete: () -> Unit"
+        },
+        {
+          "line": 61,
+          "text": "title = \"Delete Schedule\","
+        },
+        {
+          "line": 62,
+          "text": "onCancel = onDismiss"
+        },
+        {
+          "line": 156,
+          "text": "\"Edit the rules above and remove this schedule first. Delete becomes available after no policy references remain.\","
+        },
+        {
+          "line": 162,
+          "text": "text = \"Cannot Delete While In Use\","
+        },
+        {
+          "line": 173,
+          "text": "\"This schedule is not referenced by any rule. Deleting it will permanently remove its time windows from LIAS.\","
+        },
+        {
+          "line": 194,
+          "text": "text = \"Delete Schedule\","
+        },
+        {
+          "line": 195,
+          "text": "onClick = onDelete,"
+        },
+        {
+          "line": 205,
+          "text": "fun TagDeleteSheet("
+        },
+        {
+          "line": 208,
+          "text": "onDelete: () -> Unit"
+        },
+        {
+          "line": 231,
+          "text": "title = \"Delete Tag\","
+        },
+        {
+          "line": 232,
+          "text": "onCancel = onDismiss"
+        },
+        {
+          "line": 252,
+          "text": "\"Infrastructure is a super-immutable system classification and cannot be deleted.\""
+        },
+        {
+          "line": 261,
+          "text": "\"Built-in LIAS system tags cannot be deleted.\""
+        },
+        {
+          "line": 270,
+          "text": "\"LIAS does not cascade tag deletion across devices and rules. Remove all dependencies before deleting this tag.\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/DestructiveBiometricAuth.kt",
+      "hits": [
+        {
+          "line": 9,
+          "text": "object DestructiveBiometricAuth {"
+        },
+        {
+          "line": 68,
+          "text": "errorCode == BiometricPrompt.ERROR_USER_CANCELED ||"
+        },
+        {
+          "line": 69,
+          "text": "errorCode == BiometricPrompt.ERROR_CANCELED"
+        },
+        {
+          "line": 86,
+          "text": ".setSubtitle(\"Authenticate to permanently delete $objectLabel.\")"
+        },
+        {
+          "line": 88,
+          "text": ".setNegativeButtonText(\"Cancel\")"
+        },
+        {
+          "line": 89,
+          "text": ".setConfirmationRequired(true)"
+        },
+        {
+          "line": 110,
+          "text": "fun requiresProtectedDelete("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/DetailedWeekGrid.kt",
+      "hits": [
+        {
+          "line": 23,
+          "text": "// Top-level import removed to fix 'Unresolved reference drawRect'."
+        },
+        {
+          "line": 115,
+          "text": "val startParts = c.overlapStart.split(\":\")"
+        },
+        {
+          "line": 116,
+          "text": "val endParts = c.overlapEnd.split(\":\")"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/GroupedList.kt",
+      "hits": [
+        {
+          "line": 95,
+          "text": "isDestructive: Boolean = false,"
+        },
+        {
+          "line": 98,
+          "text": "val headlineColor = if (isDestructive) LiasThemeColors.red else LiasThemeColors.label"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt",
+      "hits": [
+        {
+          "line": 11,
+          "text": "//   - Adds confirmEnabled."
+        },
+        {
+          "line": 13,
+          "text": "//   - Keeps destructive-action semantics explicit."
+        },
+        {
+          "line": 53,
+          "text": "confirmText: String,"
+        },
+        {
+          "line": 54,
+          "text": "onConfirm: () -> Unit,"
+        },
+        {
+          "line": 55,
+          "text": "isDestructive: Boolean = false,"
+        },
+        {
+          "line": 56,
+          "text": "cancelText: String = \"Cancel\","
+        },
+        {
+          "line": 57,
+          "text": "confirmEnabled: Boolean = true,"
+        },
+        {
+          "line": 58,
+          "text": "onCancel: () -> Unit = {},"
+        },
+        {
+          "line": 188,
+          "text": "onCancel()"
+        },
+        {
+          "line": 205,
+          "text": "text = cancelText,"
+        },
+        {
+          "line": 223,
+          "text": "if (confirmEnabled) {"
+        },
+        {
+          "line": 224,
+          "text": "onConfirm()"
+        },
+        {
+          "line": 229,
+          "text": "confirmEnabled,"
+        },
+        {
+          "line": 234,
+          "text": "if (isDestructive) {"
+        },
+        {
+          "line": 248,
+          "text": "text = confirmText,"
+        },
+        {
+          "line": 254,
+          "text": "if (!confirmEnabled) {"
+        },
+        {
+          "line": 256,
+          "text": "} else if (isDestructive) {"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/HigButton.kt",
+      "hits": [
+        {
+          "line": 13,
+          "text": "//   - Destructive state is communicated through semantics as well as"
+        },
+        {
+          "line": 117,
+          "text": "mergeDescendants ="
+        },
+        {
+          "line": 129,
+          "text": "\"Destructive action\""
+        },
+        {
+          "line": 156,
+          "text": "isDestructive: Boolean = false,"
+        },
+        {
+          "line": 162,
+          "text": "isDestructive"
+        },
+        {
+          "line": 189,
+          "text": "mergeDescendants ="
+        },
+        {
+          "line": 197,
+          "text": "isDestructive"
+        },
+        {
+          "line": 200,
+          "text": "\"Destructive action\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/HigField.kt",
+      "hits": [
+        {
+          "line": 111,
+          "text": "mergeDescendants ="
+        },
+        {
+          "line": 139,
+          "text": "mergeDescendants ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/HigLargeTitleScaffold.kt",
+      "hits": [
+        {
+          "line": 14,
+          "text": "//   - Removes assumptions that large text always fits one line."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/HigSheets.kt",
+      "hits": [
+        {
+          "line": 204,
+          "text": "onCancel: () -> Unit,"
+        },
+        {
+          "line": 228,
+          "text": "\"Cancel\","
+        },
+        {
+          "line": 230,
+          "text": "onCancel"
+        },
+        {
+          "line": 254,
+          "text": "* Keeps title visually centered against the Cancel button."
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/MinutePickerSheet.kt",
+      "hits": [
+        {
+          "line": 25,
+          "text": "onConfirm: (minutes: Int) -> Unit,"
+        },
+        {
+          "line": 39,
+          "text": "HigSheetHeader(title = \"Extend Access\", onCancel = onDismiss)"
+        },
+        {
+          "line": 80,
+          "text": "onClick = { onConfirm(selectedMinutes.toInt()) },"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/SegmentedControl.kt",
+      "hits": [
+        {
+          "line": 30,
+          "text": "isDestructive: Boolean = false"
+        },
+        {
+          "line": 48,
+          "text": "val destructive ="
+        },
+        {
+          "line": 49,
+          "text": "isDestructive &&"
+        },
+        {
+          "line": 61,
+          "text": "destructive ->"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/StatusPills.kt",
+      "hits": [
+        {
+          "line": 13,
+          "text": "//   - Removes forced uppercase from visible status text to improve"
+        },
+        {
+          "line": 148,
+          "text": "mergeDescendants ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/components/UndoToast.kt",
+      "hits": [
+        {
+          "line": 13,
+          "text": "//     - recreate a deleted server Policy from stale cached data"
+        },
+        {
+          "line": 14,
+          "text": "//     - recreate deleted schedules/tags"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt",
+      "hits": [
+        {
+          "line": 855,
+          "text": "mergeDescendants ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt",
+      "hits": [
+        {
+          "line": 267,
+          "text": "onCancel = onDismiss"
+        },
+        {
+          "line": 298,
+          "text": "isDestructive = true,"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/ExtendAccessSheet.kt",
+      "hits": [
+        {
+          "line": 56,
+          "text": "onConfirm: (minutes: Int) -> Unit,"
+        },
+        {
+          "line": 57,
+          "text": "onCancelExtension: (() -> Unit)? = null"
+        },
+        {
+          "line": 120,
+          "text": "onCancel ="
+        },
+        {
+          "line": 306,
+          "text": "onConfirm("
+        },
+        {
+          "line": 324,
+          "text": "onCancelExtension !="
+        },
+        {
+          "line": 330,
+          "text": "\"Cancel Extended Access\","
+        },
+        {
+          "line": 332,
+          "text": "onCancelExtension,"
+        },
+        {
+          "line": 333,
+          "text": "isDestructive ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt",
+      "hits": [
+        {
+          "line": 6,
+          "text": "//   Server-aligned Pause confirmation."
+        },
+        {
+          "line": 12,
+          "text": "// Batch 24 intentionally removes the fake 15/30/60/120-minute Pause"
+        },
+        {
+          "line": 16,
+          "text": "//   onConfirm still returns Int so pre-Batch-24 call sites compile."
+        },
+        {
+          "line": 44,
+          "text": "onConfirm: (minutes: Int) -> Unit"
+        },
+        {
+          "line": 75,
+          "text": "onCancel ="
+        },
+        {
+          "line": 130,
+          "text": "onConfirm("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceDetailScreen.kt",
+      "hits": [
+        {
+          "line": 14,
+          "text": "//   - Extend supports active extension management/cancellation."
+        },
+        {
+          "line": 16,
+          "text": "//   - Removes emoji device/action icons."
+        },
+        {
+          "line": 959,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 971,
+          "text": "onCancelExtension ="
+        },
+        {
+          "line": 978,
+          "text": ".cancelDeviceExtension("
+        },
+        {
+          "line": 1004,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 1031,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 1057,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 1162,
+          "text": "\"This device may have been removed, reidentified, or is no longer returned by LIAS.\""
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/DeviceRenameDialog.kt",
+      "hits": [
+        {
+          "line": 30,
+          "text": "onConfirm: (String) -> Unit"
+        },
+        {
+          "line": 53,
+          "text": "confirmText ="
+        },
+        {
+          "line": 55,
+          "text": "confirmEnabled ="
+        },
+        {
+          "line": 57,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 58,
+          "text": "onConfirm("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt",
+      "hits": [
+        {
+          "line": 460,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 472,
+          "text": "onCancelExtension ="
+        },
+        {
+          "line": 480,
+          "text": ".cancelDeviceExtension("
+        },
+        {
+          "line": 527,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 587,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 603,
+          "text": "onCancelExtension ="
+        },
+        {
+          "line": 610,
+          "text": ".cancelTagExtension("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/MoveTagSheet.kt",
+      "hits": [
+        {
+          "line": 11,
+          "text": "//   - infrastructure cannot be granted or removed here."
+        },
+        {
+          "line": 60,
+          "text": "onConfirm: (tagIds: List<String>) -> Unit"
+        },
+        {
+          "line": 139,
+          "text": "\"Cancel\","
+        },
+        {
+          "line": 198,
+          "text": "finalTags.remove("
+        },
+        {
+          "line": 213,
+          "text": "onConfirm("
+        },
+        {
+          "line": 405,
+          "text": "selected.remove("
+        },
+        {
+          "line": 414,
+          "text": "selected.remove("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/TagEditorSheet.kt",
+      "hits": [
+        {
+          "line": 49,
+          "text": "import com.lias.remote.ui.components.TagDeleteSheet"
+        },
+        {
+          "line": 60,
+          "text": "onDelete: (() -> Unit)? = null"
+        },
+        {
+          "line": 95,
+          "text": "var showDeleteSheet by"
+        },
+        {
+          "line": 165,
+          "text": "onCancel ="
+        },
+        {
+          "line": 348,
+          "text": "onDelete != null"
+        },
+        {
+          "line": 358,
+          "text": "dependencyImpact.canDeleteSafely"
+        },
+        {
+          "line": 369,
+          "text": "dependencyImpact.canDeleteSafely"
+        },
+        {
+          "line": 371,
+          "text": "\"Delete Tag\""
+        },
+        {
+          "line": 373,
+          "text": "\"Review Delete Dependencies\""
+        },
+        {
+          "line": 376,
+          "text": "showDeleteSheet ="
+        },
+        {
+          "line": 381,
+          "text": "dependencyImpact.canDeleteSafely"
+        },
+        {
+          "line": 395,
+          "text": "showDeleteSheet &&"
+        },
+        {
+          "line": 399,
+          "text": "TagDeleteSheet("
+        },
+        {
+          "line": 403,
+          "text": "showDeleteSheet ="
+        },
+        {
+          "line": 406,
+          "text": "onDelete = {"
+        },
+        {
+          "line": 408,
+          "text": "showDeleteSheet ="
+        },
+        {
+          "line": 411,
+          "text": "onDelete?.invoke()"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/devices/UserAssignmentSheet.kt",
+      "hits": [
+        {
+          "line": 87,
+          "text": "onCancel ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/home/HomeScreen.kt",
+      "hits": [
+        {
+          "line": 499,
+          "text": "onConfirm = { minutes ->"
+        },
+        {
+          "line": 503,
+          "text": "onCancelExtension ="
+        },
+        {
+          "line": 506,
+          "text": "viewModel.cancelDeviceExtension(device.pdid)"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/identity/IdentityReviewScreen.kt",
+      "hits": [
+        {
+          "line": 52,
+          "text": "MERGE,"
+        },
+        {
+          "line": 53,
+          "text": "REJECT,"
+        },
+        {
+          "line": 54,
+          "text": "REOPEN,"
+        },
+        {
+          "line": 56,
+          "text": "SPLIT,"
+        },
+        {
+          "line": 57,
+          "text": "REVOKE"
+        },
+        {
+          "line": 71,
+          "text": "var confirmation by remember { mutableStateOf(\"\") }"
+        },
+        {
+          "line": 74,
+          "text": "var splitMac by remember { mutableStateOf(\"\") }"
+        },
+        {
+          "line": 75,
+          "text": "var revokeTarget by remember { mutableStateOf<Pair<String, Long>?>(null) }"
+        },
+        {
+          "line": 132,
+          "text": "options = listOf(\"Pending\", \"Confirmed\", \"Rejected\"),"
+        },
+        {
+          "line": 221,
+          "text": "onMerge = {"
+        },
+        {
+          "line": 223,
+          "text": "confirmation = \"\""
+        },
+        {
+          "line": 224,
+          "text": "dialog = IdentityDialog.MERGE"
+        },
+        {
+          "line": 226,
+          "text": "onReject = {"
+        },
+        {
+          "line": 228,
+          "text": "dialog = IdentityDialog.REJECT"
+        },
+        {
+          "line": 230,
+          "text": "onReopen = {"
+        },
+        {
+          "line": 232,
+          "text": "dialog = IdentityDialog.REOPEN"
+        },
+        {
+          "line": 239,
+          "text": "onSplit = {"
+        },
+        {
+          "line": 240,
+          "text": "splitMac = candidate.sourceDevice?.currentMac.orEmpty()"
+        },
+        {
+          "line": 241,
+          "text": "confirmation = \"\""
+        },
+        {
+          "line": 242,
+          "text": "dialog = IdentityDialog.SPLIT"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/rules/PolicyScheduleSelector.kt",
+      "hits": [
+        {
+          "line": 6,
+          "text": "//   Multi-schedule selection + merged timeline preview."
+        },
+        {
+          "line": 155,
+          "text": "\"MERGED TIMELINE\","
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt",
+      "hits": [
+        {
+          "line": 236,
+          "text": "* ALLOW according to LIAS. No server merge is necessary."
+        },
+        {
+          "line": 427,
+          "text": "onCancel ="
+        },
+        {
+          "line": 663,
+          "text": "updated.remove("
+        },
+        {
+          "line": 1018,
+          "text": "isDestructive ="
+        },
+        {
+          "line": 1230,
+          "text": "\"LIAS Rejected This Bundle\","
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/rules/RulesScreen.kt",
+      "hits": [
+        {
+          "line": 40,
+          "text": "import com.lias.remote.ui.components.DestructiveBiometricAuth"
+        },
+        {
+          "line": 42,
+          "text": "import com.lias.remote.ui.components.requiresProtectedDelete"
+        },
+        {
+          "line": 98,
+          "text": "var policyToDelete by"
+        },
+        {
+          "line": 105,
+          "text": "var policyDeleteAuthError by"
+        },
+        {
+          "line": 391,
+          "text": "onDelete = {"
+        },
+        {
+          "line": 393,
+          "text": "policyDeleteAuthError ="
+        },
+        {
+          "line": 396,
+          "text": "policyToDelete ="
+        },
+        {
+          "line": 463,
+          "text": "onDelete = {"
+        },
+        {
+          "line": 465,
+          "text": "policyDeleteAuthError ="
+        },
+        {
+          "line": 468,
+          "text": "policyToDelete ="
+        },
+        {
+          "line": 606,
+          "text": "policyToDelete"
+        },
+        {
+          "line": 611,
+          "text": "policyDeleteAuthError ="
+        },
+        {
+          "line": 614,
+          "text": "policyToDelete ="
+        },
+        {
+          "line": 618,
+          "text": "\"Delete Rule?\","
+        },
+        {
+          "line": 623,
+          "text": "\"Delete \u201c\""
+        },
+        {
+          "line": 650,
+          "text": "\"This rule will be permanently removed.\""
+        },
+        {
+          "line": 654,
+          "text": "policyDeleteAuthError"
+        },
+        {
+          "line": 665,
+          "text": "confirmText ="
+        },
+        {
+          "line": 666,
+          "text": "\"Delete Rule\","
+        },
+        {
+          "line": 667,
+          "text": "onConfirm = {"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleEditorSheet.kt",
+      "hits": [
+        {
+          "line": 188,
+          "text": "onCancel ="
+        },
+        {
+          "line": 509,
+          "text": "canDelete ="
+        },
+        {
+          "line": 520,
+          "text": "onDelete = {"
+        },
+        {
+          "line": 533,
+          "text": "updated.removeAt("
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt",
+      "hits": [
+        {
+          "line": 87,
+          "text": "onConfirm: (String) -> Unit"
+        },
+        {
+          "line": 150,
+          "text": "onConfirm("
+        },
+        {
+          "line": 170,
+          "text": "onConfirm: (String) -> Unit"
+        },
+        {
+          "line": 239,
+          "text": "onConfirm("
+        },
+        {
+          "line": 339,
+          "text": "onCancel = onDismiss"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleRuleEditor.kt",
+      "hits": [
+        {
+          "line": 51,
+          "text": "onDelete: (() -> Unit)? = null,"
+        },
+        {
+          "line": 103,
+          "text": "onDelete != null"
+        },
+        {
+          "line": 107,
+          "text": "\"Delete\","
+        },
+        {
+          "line": 109,
+          "text": "onDelete"
+        },
+        {
+          "line": 351,
+          "text": "isDestructive ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/schedules/ScheduleRuleEditorCard.kt",
+      "hits": [
+        {
+          "line": 49,
+          "text": "canDelete: Boolean,"
+        },
+        {
+          "line": 51,
+          "text": "onDelete: () -> Unit"
+        },
+        {
+          "line": 95,
+          "text": "if (canDelete) {"
+        },
+        {
+          "line": 96,
+          "text": "HigTextButton(text = \"Remove\", onClick = onDelete, isDestructive = true)"
+        },
+        {
+          "line": 133,
+          "text": "if (!updated.add(day)) updated.remove(day)"
+        },
+        {
+          "line": 241,
+          "text": "onConfirm = { value ->"
+        },
+        {
+          "line": 266,
+          "text": "onConfirm = { value ->"
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulesScreen.kt",
+      "hits": [
+        {
+          "line": 11,
+          "text": "//   - Delete is disabled until all references are removed."
+        },
+        {
+          "line": 12,
+          "text": "//   - Removes false \"defaults to open\" wording."
+        },
+        {
+          "line": 45,
+          "text": "import com.lias.remote.ui.components.DestructiveBiometricAuth"
+        },
+        {
+          "line": 47,
+          "text": "import com.lias.remote.ui.components.requiresProtectedDelete"
+        },
+        {
+          "line": 55,
+          "text": "import com.lias.remote.ui.components.ScheduleDeleteSheet"
+        },
+        {
+          "line": 94,
+          "text": "var scheduleToDelete by"
+        },
+        {
+          "line": 99,
+          "text": "var scheduleDeleteAuthError by"
+        },
+        {
+          "line": 273,
+          "text": "impact.canDeleteSafely"
+        },
+        {
+          "line": 280,
+          "text": "scheduleDeleteAuthError ="
+        },
+        {
+          "line": 283,
+          "text": "scheduleToDelete ="
+        },
+        {
+          "line": 528,
+          "text": "impact.canDeleteSafely"
+        },
+        {
+          "line": 530,
+          "text": "\"Delete\""
+        },
+        {
+          "line": 535,
+          "text": "scheduleDeleteAuthError ="
+        },
+        {
+          "line": 538,
+          "text": "scheduleToDelete ="
+        },
+        {
+          "line": 541,
+          "text": "isDestructive ="
+        },
+        {
+          "line": 542,
+          "text": "impact.canDeleteSafely"
+        },
+        {
+          "line": 582,
+          "text": "scheduleToDelete"
+        },
+        {
+          "line": 594,
+          "text": "ScheduleDeleteSheet("
+        },
+        {
+          "line": 598,
+          "text": "scheduleDeleteAuthError,"
+        },
+        {
+          "line": 600,
+          "text": "scheduleDeleteAuthError ="
+        }
+      ]
+    },
+    {
+      "path": "app/src/main/java/com/lias/remote/ui/screens/settings/SettingsScreen.kt",
+      "hits": [
+        {
+          "line": 19,
+          "text": "// Removed:"
+        },
+        {
+          "line": 643,
+          "text": "isDestructive ="
+        },
+        {
+          "line": 751,
+          "text": "// Policy restore confirmation"
+        },
+        {
+          "line": 771,
+          "text": "confirmText ="
+        },
+        {
+          "line": 773,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 791,
+          "text": "isDestructive ="
+        },
+        {
+          "line": 797,
+          "text": "// Firewall confirmation"
+        },
+        {
+          "line": 813,
+          "text": "\"This temporarily removes LIAS access-control enforcement. Use it only for troubleshooting. LIAS will rebuild its rules on a subsequent synchronization.\","
+        },
+        {
+          "line": 814,
+          "text": "confirmText ="
+        },
+        {
+          "line": 816,
+          "text": "onConfirm = {"
+        },
+        {
+          "line": 824,
+          "text": "isDestructive ="
+        }
+      ]
+    }
+  ]
+}

@@ -24,11 +24,13 @@
 package com.lias.remote.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.diagnostics.ErrorPresentation
 import com.lias.remote.core.network.ConnectionState
@@ -49,16 +53,19 @@ import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.PillTone
 import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoScaffold
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.CupertinoTopAppBar
+import com.slapps.cupertino.CupertinoScaffold
+import com.slapps.cupertino.CupertinoNavigateBackButton
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoTopAppBar
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
@@ -89,9 +96,7 @@ fun ConnectionSettingsScreen(
                 },
                 navigationIcon = {
 
-                    HigTextButton(
-                        text =
-                            "‹ Settings",
+                    CupertinoNavigateBackButton(
                         onClick = {
 
                             if (
@@ -102,6 +107,12 @@ fun ConnectionSettingsScreen(
                             }
 
                             onBack()
+                        },
+                        title = {
+                            CupertinoText(
+                                text =
+                                    "Settings"
+                            )
                         }
                     )
                 },
@@ -145,6 +156,7 @@ fun ConnectionSettingsScreen(
                     .padding(
                         innerPadding
                     )
+                    .imePadding()
                     .verticalScroll(
                         rememberScrollState()
                     )
@@ -162,7 +174,7 @@ fun ConnectionSettingsScreen(
 
             GroupedListCard {
 
-                HigField(
+                HigConfiguredField(
                     value =
                         state.serverUrl,
                     onValueChange =
@@ -170,10 +182,15 @@ fun ConnectionSettingsScreen(
                     label =
                         "LIAS Server",
                     placeholder =
-                        "http://192.168.1.1:8081"
+                        "http://192.168.1.1:8081",
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Next
+                        )
                 )
 
-                HigField(
+                HigConfiguredField(
                     value =
                         state.authToken,
                     onValueChange =
@@ -183,7 +200,12 @@ fun ConnectionSettingsScreen(
                     placeholder =
                         "Optional",
                     visualTransformation =
-                        PasswordVisualTransformation()
+                        PasswordVisualTransformation(),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        )
                 )
             }
 

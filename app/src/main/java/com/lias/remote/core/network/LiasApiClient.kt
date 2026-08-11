@@ -354,6 +354,64 @@ class LiasApiClient(
             }
         }
 
+    internal suspend fun getSnapshot(
+        ifNoneMatch: String?
+    ): ApiResult<SnapshotFetchResult> =
+        withContext(
+            Dispatchers.IO
+        ) {
+            try {
+                val request =
+                    buildRequest(
+                        path = Endpoints.SNAPSHOT,
+                        method = "GET"
+                    )
+                        .newBuilder()
+                        .apply {
+                            ifNoneMatch
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let {
+                                    header("If-None-Match", it)
+                                }
+                        }
+                        .build()
+
+                client.newCall(request)
+                    .execute()
+                    .use { response ->
+                        if (response.code == 304) {
+                            ApiResult.Success(
+                                SnapshotFetchResult.NotModified
+                            )
+                        } else {
+                            when (
+                                val parsed =
+                                    parseResponse(
+                                        response,
+                                        LiasSnapshotResponse.serializer()
+                                    )
+                            ) {
+                                is ApiResult.Success ->
+                                    ApiResult.Success(
+                                        SnapshotFetchResult.Modified(
+                                            snapshot = parsed.data,
+                                            etag = response.header("ETag")
+                                        )
+                                    )
+
+                                is ApiResult.AuthenticationError -> parsed
+                                is ApiResult.ConflictError -> parsed
+                                is ApiResult.HttpError -> parsed
+                                is ApiResult.NetworkError -> parsed
+                                is ApiResult.SerializationError -> parsed
+                            }
+                        }
+                    }
+            } catch (error: Exception) {
+                transportFailure(error)
+            }
+        }
+
     suspend inline fun <
         reified T,
         reified B
@@ -765,6 +823,22 @@ class LiasApiClient(
     private fun decodeServerMessage(
         body: String
     ): String? {
+
+        val structured =
+            try {
+                json.decodeFromString(
+                    ServerErrorResponse.serializer(),
+                    body
+                )
+            } catch (_: Exception) {
+                null
+            }
+
+        structured
+            ?.bestMessage()
+            ?.let {
+                return it
+            }
 
         val decoded =
             decodeConflictResponse(

@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt
-// Version: 28.6.1
+// Version: 33.3.4
 //
 // Focused Cupertino-style schedule picker presentation.
 //
@@ -12,15 +12,18 @@
 //   visually competing with the active picker task.
 // - Picker card animates upward from the bottom.
 // - LIAS wire formats remain YYYY-MM-DD and HH:mm.
+//
+// Plan 3.1 Cupertino date wheel:
+// - Date sheet uses Slanoss CupertinoDatePicker Wheel style.
+// - Day, month, and year scroll as separate picker columns.
+// - Confirm still emits YYYY-MM-DD.
+//
+// Plan 3.1 Schedule date wrapper integration:
+// - ScheduleDatePickerSheet calls HigDatePicker instead of raw CupertinoDatePicker.
 // ====================================================================
 
 package com.lias.remote.ui.screens.schedules
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -29,14 +32,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,22 +58,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigModalSheetPortal
+import com.lias.remote.ui.components.HigSheetContentInteraction
+import com.lias.remote.ui.components.HigSheetPresentation
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
-import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
+import java.time.ZoneOffset
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import com.lias.remote.ui.components.HigDatePicker
+import com.lias.remote.ui.components.HigDatePickerMode
+
+private typealias AnimatedCompletion = (() -> Unit) -> Unit
 
 private const val WHEEL_VISIBLE_ROWS = 5
 private val WHEEL_ROW_HEIGHT = 44.dp
@@ -102,7 +108,7 @@ fun ScheduleTimePickerSheet(
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) {
+    ) { animatedComplete ->
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -147,14 +153,19 @@ fun ScheduleTimePickerSheet(
         HigButton(
             text = "Done",
             onClick = {
-                onConfirm(
+                val value =
                     String.format(
                         Locale.US,
                         "%02d:%02d",
                         selectedHour,
                         selectedMinute
                     )
-                )
+
+                animatedComplete {
+                    onConfirm(
+                        value
+                    )
+                }
             },
             style = HigButtonStyle.Primary,
             modifier = Modifier.fillMaxWidth()
@@ -169,81 +180,128 @@ fun ScheduleDatePickerSheet(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    val today = remember { LocalDate.now() }
-
-    val initial = remember(initialValue) {
-        runCatching { LocalDate.parse(initialValue) }
-            .getOrDefault(today)
-    }
-
-    val firstYear = min(today.year - 2, initial.year - 1)
-    val lastYear = max(today.year + 10, initial.year + 1)
-
-    val startDate = remember(firstYear) {
-        LocalDate.of(firstYear, 1, 1)
-    }
-
-    val endDate = remember(lastYear) {
-        LocalDate.of(lastYear, 12, 31)
-    }
-
-    val dates = remember(startDate, endDate) {
-        buildList {
-            var cursor = startDate
-            while (!cursor.isAfter(endDate)) {
-                add(cursor)
-                cursor = cursor.plusDays(1)
-            }
+    val today =
+        remember {
+            LocalDate.now()
         }
-    }
 
-    val initialIndex = remember(dates, initial) {
-        dates.indexOf(initial).coerceAtLeast(0)
-    }
+    val initial =
+        remember(
+            initialValue
+        ) {
+            runCatching {
+                LocalDate.parse(
+                    initialValue
+                )
+            }
+                .getOrDefault(
+                    today
+                )
+        }
 
-    var selectedIndex by remember(initialIndex) {
-        mutableIntStateOf(initialIndex)
-    }
-
-    val formatter = remember {
-        DateTimeFormatter.ofPattern(
-            "EEE, MMM d, yyyy",
-            Locale.getDefault()
+    val firstYear =
+        min(
+            today.year - 2,
+            initial.year - 1
         )
-    }
+
+    val lastYear =
+        max(
+            today.year + 10,
+            initial.year + 1
+        )
+
+    val initialMillis =
+        remember(
+            initial
+        ) {
+            initial
+                .atStartOfDay()
+                .toInstant(
+                    ZoneOffset.UTC
+                )
+                .toEpochMilli()
+        }
+
+    var selectedDateMillis by
+        remember(
+            initialMillis
+        ) {
+            mutableStateOf(
+                initialMillis
+            )
+        }
 
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) {
-        TextWheel(
-            values = dates.map { it.format(formatter) },
-            initialIndex = initialIndex,
-            onSelectedIndex = { selectedIndex = it },
-            modifier = Modifier.fillMaxWidth()
+    ) { animatedComplete ->
+        HigDatePicker(
+            selectedDateMillis =
+                initialMillis,
+            onDateSelected = {
+                selectedDateMillis =
+                    it
+            },
+            yearRange =
+                firstYear..lastYear,
+            mode =
+                HigDatePickerMode.Wheel,
+            modifier =
+                Modifier.fillMaxWidth()
         )
 
+        val selectedDate =
+            remember(
+                selectedDateMillis
+            ) {
+                Instant
+                    .ofEpochMilli(
+                        selectedDateMillis
+                    )
+                    .atZone(
+                        ZoneOffset.UTC
+                    )
+                    .toLocalDate()
+            }
+
         CupertinoText(
-            text = dates[
-                selectedIndex.coerceIn(dates.indices)
-            ].toString(),
-            style = HigTypography.headline,
-            color = LiasThemeColors.secondaryLabel,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            text =
+                selectedDate.toString(),
+            style =
+                HigTypography.headline,
+            color =
+                LiasThemeColors.secondaryLabel,
+            textAlign =
+                TextAlign.Center,
+            modifier =
+                Modifier.fillMaxWidth()
         )
 
         HigButton(
             text = "Done",
             onClick = {
-                onConfirm(
-                    dates[
-                        selectedIndex.coerceIn(dates.indices)
-                    ].toString()
-                )
+                val value =
+                    Instant
+                        .ofEpochMilli(
+                            selectedDateMillis
+                        )
+                        .atZone(
+                            ZoneOffset.UTC
+                        )
+                        .toLocalDate()
+                        .toString()
+
+                animatedComplete {
+                    onConfirm(
+                        value
+                    )
+                }
             },
-            style = HigButtonStyle.Primary,
-            modifier = Modifier.fillMaxWidth()
+            style =
+                HigButtonStyle.Primary,
+            modifier =
+                Modifier.fillMaxWidth()
         )
     }
 }
@@ -252,20 +310,11 @@ fun ScheduleDatePickerSheet(
 private fun FocusedPickerDialog(
     title: String,
     onDismiss: () -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable (AnimatedCompletion) -> Unit
 ) {
-    var visible by remember {
-        mutableStateOf(false)
-    }
-
     val configuration =
         LocalConfiguration.current
 
-    /*
-     * Keep the entire picker task inside the safe visible window.
-     * The card uses at most 72% of the screen height, leaving clear
-     * context above it while keeping the Done button above system bars.
-     */
     val maxPickerHeight =
         (
             configuration.screenHeightDp *
@@ -276,72 +325,59 @@ private fun FocusedPickerDialog(
                 420.dp
             )
 
-    LaunchedEffect(Unit) {
-        visible = true
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    HigModalSheetPortal(
+        presentation =
+            HigSheetPresentation.Picker,
+        contentInteraction =
+            HigSheetContentInteraction.ScrollContent,
+        onDismiss =
+            onDismiss,
+        modifier =
+            Modifier.widthIn(
+                max =
+                    600.dp
+            ),
+        accessibilityLabel =
+            title
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(LiasThemeColors.background)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 20.dp
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn() +
-                    slideInVertically { fullHeight -> fullHeight },
-                exit = fadeOut() +
-                    slideOutVertically { fullHeight -> fullHeight }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(
-                            max = 600.dp
-                        )
-                        .heightIn(
-                            max = maxPickerHeight
-                        )
-                        .clip(
-                            RoundedCornerShape(
-                                HigSpec.SheetCorner
-                            )
-                        )
-                        .background(
-                            LiasThemeColors.secondaryBackground
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        )
-                        .padding(
-                            horizontal = 20.dp,
-                            vertical = 16.dp
-                        ),
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            14.dp
-                        )
-                ) {
-                    HigSheetHeader(
-                        title = title,
-                        onCancel = onDismiss
-                    )
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
 
-                    content()
-                }
-            }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(
+                        max =
+                            maxPickerHeight
+                    )
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
+                    .padding(
+                        horizontal =
+                            20.dp,
+                        vertical =
+                            16.dp
+                    ),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    14.dp
+                )
+        ) {
+            HigSheetHeader(
+                title =
+                    title,
+                onCancel =
+                    onDismiss
+            )
+
+            content(
+                animatedComplete
+            )
         }
     }
 }

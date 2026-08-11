@@ -6,8 +6,8 @@
 #   Reproducible Android verification.
 #
 # Batch 27:
-#   - Uses repository Gradle wrapper.
-#   - Does NOT regenerate wrapper during CI.
+#   - Uses the repository Gradle wrapper when present.
+#   - Bootstraps the pinned wrapper when the repository copy is absent.
 #   - Verifies unit tests before APK assembly.
 #   - Runs lint.
 #   - Runs debug compilation explicitly.
@@ -53,9 +53,22 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: Ensure pinned Gradle wrapper exists
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ ! -f ./gradlew ] || \
+             [ ! -f ./gradle/wrapper/gradle-wrapper.jar ]; then
+            gradle wrapper \
+              --gradle-version 8.11.1 \
+              --distribution-type bin
+          fi
+
+          chmod +x ./gradlew
 
       - name: Show toolchain
         run: |

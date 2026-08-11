@@ -1,0 +1,14 @@
+{
+  "checks": {
+    "wrapper_exists": true,
+    "imports_cupertino_date_picker": true,
+    "supports_wheel": true,
+    "supports_pager": true,
+    "wheel_default": true,
+    "uses_remember_state": true,
+    "has_on_date_selected": true,
+    "no_adaptive_dependency_added": true,
+    "no_native_dependency_added": true
+  },
+  "sensitive_changed_files": []
+}

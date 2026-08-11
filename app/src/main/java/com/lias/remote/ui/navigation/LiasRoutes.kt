@@ -16,12 +16,12 @@ package com.lias.remote.ui.navigation
 
 import android.net.Uri
 import androidx.compose.ui.graphics.vector.ImageVector
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Clock
-import io.github.alexzhirkevich.cupertino.icons.outlined.Gear
-import io.github.alexzhirkevich.cupertino.icons.outlined.House
-import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
-import io.github.alexzhirkevich.cupertino.icons.outlined.Shield
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.Clock
+import com.slapps.cupertino.icons.outlined.Gear
+import com.slapps.cupertino.icons.outlined.House
+import com.slapps.cupertino.icons.outlined.Iphone
+import com.slapps.cupertino.icons.outlined.Shield
 
 sealed class LiasRoute(
     val route: String
@@ -44,6 +44,9 @@ sealed class LiasRoute(
 
     data object ConnectionSettings :
         LiasRoute("connection_settings")
+
+    data object IdentityReview :
+        LiasRoute("identity_review")
 
     data object DeviceDetail :
         LiasRoute("device_detail/{pdid}") {

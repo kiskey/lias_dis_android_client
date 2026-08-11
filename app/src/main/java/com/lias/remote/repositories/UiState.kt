@@ -21,6 +21,23 @@ import com.lias.remote.core.models.Schedule
 import com.lias.remote.core.models.Tag
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ConnectionState
+import com.lias.remote.core.network.EngineFeatures
+import com.lias.remote.core.network.IdentityCandidateDetail
+import com.lias.remote.core.network.IdentityProfile
+import com.lias.remote.core.network.LiasCapabilitiesResponse
+import com.lias.remote.core.network.SystemStatusResponse
+
+data class IdentityReviewState(
+    val status: String = "pending",
+    val pendingCount: Int = 0,
+    val pendingHasMore: Boolean = false,
+    val candidates: List<IdentityCandidateDetail> = emptyList(),
+    val nextCursor: String? = null,
+    val selectedCandidate: IdentityCandidateDetail? = null,
+    val profiles: Map<String, IdentityProfile> = emptyMap(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
 
 data class UiState(
     val devices:
@@ -65,7 +82,23 @@ data class UiState(
 
     val errorMessage:
         String? =
-        null
+        null,
+
+    val capabilities:
+        LiasCapabilitiesResponse? =
+        null,
+
+    val systemStatus:
+        SystemStatusResponse? =
+        null,
+
+    val snapshotRevision:
+        Long? =
+        null,
+
+    val identityReview:
+        IdentityReviewState =
+        IdentityReviewState()
 ) {
 
     val isLoadingInitialData:
@@ -143,6 +176,19 @@ data class UiState(
         tagEffectiveStatuses[
             tagId
         ]
+
+    fun supportsEngineFeature(
+        feature: String
+    ): Boolean =
+        capabilities
+            ?.supports(feature) ==
+            true
+
+    val supportsIdentityReview: Boolean
+        get() =
+            supportsEngineFeature(
+                EngineFeatures.IDENTITY_CANDIDATE_QUEUE
+            )
 }
 
 sealed class UiEvent {

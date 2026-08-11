@@ -110,7 +110,19 @@ data class Device(
     val nmapAttemptCount: Int = 0,
 
     @SerialName("is_fully_identified")
-    val isFullyIdentified: Boolean = false
+    val isFullyIdentified: Boolean = false,
+
+    @SerialName("identity_assurance")
+    val identityAssurance: String = "unverified",
+
+    @SerialName("identity_probability")
+    val identityProbability: Double = 0.0,
+
+    @SerialName("identity_ambiguous")
+    val identityAmbiguous: Boolean = false,
+
+    @SerialName("device_id")
+    val deviceID: String = ""
 ) {
 
     val safeMacs: List<String>
@@ -416,7 +428,24 @@ data class DeviceEventPayload(
     val hostname: String = "",
 
     @SerialName("confirmed_by")
-    val confirmedBy: List<String>? = emptyList()
+    val confirmedBy: List<String>? = emptyList(),
+
+    @SerialName("canonical_hostname")
+    val canonicalHostname: String = "",
+
+    @SerialName("old_mac")
+    val oldMac: String = "",
+
+    @SerialName("old_ip")
+    val oldIp: String = "",
+
+    @SerialName("old_host")
+    val oldHost: String = "",
+
+    @SerialName("old_canonical_hostname")
+    val oldCanonicalHostname: String = "",
+
+    val timestamp: String = ""
 ) {
 
     val safeConfirmedBy: List<String>

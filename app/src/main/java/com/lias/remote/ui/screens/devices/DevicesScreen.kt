@@ -6,6 +6,11 @@
 // Purpose:
 //   Canonical device inventory.
 //
+// Plan 3.1 Devices card UX:
+//   - Card tap opens current-state Extend/Manage or Pause modal.
+//   - Details button becomes trailing disclosure.
+//   - Home tag deep-link uses tag scope without prefilled text filter.
+//
 // Batch 26:
 //   - Each device renders exactly once.
 //   - Highest-precedence assigned tag becomes presentation group.
@@ -18,10 +23,14 @@
 //   - No emoji-as-interface.
 // ====================================================================
 
+// Plan 3.1 ChevronForward icon adoption:
+//   - Replaces temporary text disclosure with Slanoss Cupertino icon.
+
 package com.lias.remote.ui.screens.devices
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Device
 import com.lias.remote.core.models.EffectiveStatus
@@ -63,7 +73,10 @@ import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.ChevronForward
 
 private data class DeviceSection(
     val id: String,
@@ -76,6 +89,7 @@ private data class DeviceSection(
 @Composable
 fun DevicesScreen(
     viewModel: LiasViewModel,
+    initialTagId: String? = null,
     onNavigateToDeviceDetail: (String) -> Unit
 ) {
 
@@ -86,11 +100,22 @@ fun DevicesScreen(
     val scrollState =
         rememberLazyListState()
 
+    val initialTag =
+        remember(
+            state.tags,
+            initialTagId
+        ) {
+            state.tags
+                .firstOrNull {
+                    it.id == initialTagId
+                }
+        }
+
     var searchQuery by
-        remember {
-            mutableStateOf(
-                ""
-            )
+        remember(
+            initialTagId
+        ) {
+            mutableStateOf("")
         }
 
     var showTagEditor by
@@ -132,7 +157,8 @@ fun DevicesScreen(
         remember(
             state.devices,
             state.tags,
-            searchQuery
+            searchQuery,
+            initialTagId
         ) {
 
             buildDeviceSections(
@@ -141,7 +167,9 @@ fun DevicesScreen(
                 tags =
                     state.tags,
                 query =
-                    searchQuery
+                    searchQuery,
+                selectedTagId =
+                    initialTagId
             )
         }
 
@@ -173,8 +201,7 @@ fun DevicesScreen(
                 }
             )
         }
-    ) {
-        padding ->
+    ) { padding, navigationHeader ->
 
         LazyColumn(
             state =
@@ -184,6 +211,14 @@ fun DevicesScreen(
             contentPadding =
                 padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
 
             if (
                 state.isLoadingInitialData
@@ -341,13 +376,19 @@ fun DevicesScreen(
                             device,
                         presentation =
                             presentation,
-                        onExtend = {
-                            activeDeviceForExtend =
-                                device
-                        },
-                        onPause = {
-                            activeDeviceForPause =
-                                device
+                        onPrimaryAction = {
+                            when {
+                                presentation.canManageExtension ||
+                                    presentation.canExtend -> {
+                                    activeDeviceForExtend =
+                                        device
+                                }
+
+                                presentation.canPause -> {
+                                    activeDeviceForPause =
+                                        device
+                                }
+                            }
                         },
                         onResume = {
                             viewModel
@@ -613,11 +654,15 @@ fun DevicesScreen(
 private fun DeviceCardItem(
     device: Device,
     presentation: AccessPresentation,
-    onExtend: () -> Unit,
-    onPause: () -> Unit,
+    onPrimaryAction: () -> Unit,
     onResume: () -> Unit,
     onDetail: () -> Unit
 ) {
+
+    val hasModalPrimaryAction =
+        presentation.canManageExtension ||
+            presentation.canExtend ||
+            presentation.canPause
 
     Box(
         modifier =
@@ -647,6 +692,18 @@ private fun DeviceCardItem(
                         RoundedCornerShape(
                             14.dp
                         )
+                )
+                .then(
+                    if (hasModalPrimaryAction) {
+                        Modifier.clickable(
+                            role =
+                                Role.Button,
+                            onClick =
+                                onPrimaryAction
+                        )
+                    } else {
+                        Modifier
+                    }
                 )
                 .padding(
                     14.dp
@@ -733,127 +790,70 @@ private fun DeviceCardItem(
                     )
                 }
 
-                StatusPill(
-                    text =
-                        presentation.label,
-                    tone =
-                        presentation.tone
-                )
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    StatusPill(
+                        text =
+                            presentation.label,
+                        tone =
+                            presentation.tone
+                    )
+
+                    CupertinoIcon(
+                        imageVector =
+                            CupertinoIcons
+                                .Outlined
+                                .ChevronForward,
+                        contentDescription =
+                            "Details",
+                        tint =
+                            LiasThemeColors
+                                .tertiaryLabel,
+                        modifier =
+                            Modifier
+                                .clickable(
+                                    role =
+                                        Role.Button,
+                                    onClick =
+                                        onDetail
+                                )
+                                .padding(
+                                    horizontal =
+                                        6.dp,
+                                    vertical =
+                                        4.dp
+                                )
+                    )
+                }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
-                    )
-            )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        6.dp
-                    )
+            if (
+                presentation.canResumePause
             ) {
 
-                when {
-
-                    presentation
-                        .canResumePause ->
-
-                        HigButton(
-                            text =
-                                "Resume",
-                            onClick =
-                                onResume,
-                            style =
-                                HigButtonStyle.Primary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
                         )
+                )
 
-                    presentation
-                        .canManageExtension ->
-
-                        HigButton(
-                            text =
-                                "Manage Access",
-                            onClick =
-                                onExtend,
-                            style =
-                                HigButtonStyle.Secondary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    presentation.canExtend ->
-
-                        HigButton(
-                            text =
-                                "Extend Access",
-                            onClick =
-                                onExtend,
-                            style =
-                                HigButtonStyle.Secondary,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    presentation.canPause ->
-
-                        HigButton(
-                            text =
-                                "Pause",
-                            onClick =
-                                onPause,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-
-                    else ->
-
-                        HigButton(
-                            text =
-                                "Details",
-                            onClick =
-                                onDetail,
-                            style =
-                                HigButtonStyle.Gray,
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                )
-                        )
-                }
-if (
-                    presentation.canExtend ||
-                    presentation.canPause ||
-                    presentation.canResumePause ||
-                    presentation.canManageExtension
-                ) {
-
-                    HigButton(
-                        text =
-                            "Details",
-                        onClick =
-                            onDetail,
-                        style =
-                            HigButtonStyle.Gray,
-                        modifier =
-                            Modifier.weight(
-                                1f
-                            )
-                    )
-                }
+                HigButton(
+                    text =
+                        "Resume",
+                    onClick =
+                        onResume,
+                    style =
+                        HigButtonStyle.Primary,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -862,19 +862,42 @@ if (
 private fun buildDeviceSections(
     devices: List<Device>,
     tags: List<Tag>,
-    query: String
+    query: String,
+    selectedTagId: String? = null
 ): List<DeviceSection> {
+
+    val tagScopedDevices =
+        selectedTagId
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                tagId ->
+
+                devices.filter {
+                    device ->
+
+                    device.safeTags.any {
+                        it.equals(
+                            tagId,
+                            ignoreCase =
+                                true
+                        )
+                    }
+                }
+            }
+            ?: devices
 
     val filtered =
         if (
             query.isBlank()
         ) {
 
-            devices
+            tagScopedDevices
 
         } else {
 
-            devices.filter {
+            tagScopedDevices.filter {
                 device ->
 
                 device.displayName

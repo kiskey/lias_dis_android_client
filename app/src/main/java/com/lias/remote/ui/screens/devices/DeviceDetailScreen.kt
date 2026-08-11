@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.FlowLog
+import com.lias.remote.core.models.IdentityTier
 import com.lias.remote.core.models.User
 import com.lias.remote.core.network.ApiResult
 import com.lias.remote.ui.LiasViewModel
@@ -66,11 +67,14 @@ import com.lias.remote.ui.screens.ExtendAccessSheet
 import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoIcon
-import io.github.alexzhirkevich.cupertino.CupertinoText
-import io.github.alexzhirkevich.cupertino.icons.CupertinoIcons
-import io.github.alexzhirkevich.cupertino.icons.outlined.Iphone
+import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoNavigateBackButton
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.icons.CupertinoIcons
+import com.slapps.cupertino.icons.outlined.Iphone
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun DeviceDetailScreen(
     pdid: String,
@@ -238,15 +242,18 @@ fun DeviceDetailScreen(
             scrollState,
         navLeading = {
 
-            HigTextButton(
-                text =
-                    "‹ Devices",
+            CupertinoNavigateBackButton(
                 onClick =
-                    onBack
+                    onBack,
+                title = {
+                    CupertinoText(
+                        text =
+                            "Devices"
+                    )
+                }
             )
         }
-    ) {
-        padding ->
+    ) { padding, _ ->
 
         LazyColumn(
             state =
@@ -671,10 +678,50 @@ fun DeviceDetailScreen(
                         primaryText =
                             "Identity Tier",
                         secondaryText =
-                            device.identityTier
-                                .replaceFirstChar {
-                                    it.uppercase()
-                                },
+                            IdentityTier
+                                .fromWireValue(
+                                    device.identityTier
+                                )
+                                .title,
+                        showDivider =
+                            true
+                    )
+
+                    GroupedListRow(
+                        primaryText =
+                            "Identity Assurance",
+                        secondaryText =
+                            buildString {
+                                append(
+                                    device.identityAssurance
+                                        .replaceFirstChar {
+                                            it.uppercase()
+                                        }
+                                )
+
+                                if (
+                                    device.identityProbability > 0.0
+                                ) {
+                                    append(
+                                        " · ${(device.identityProbability.coerceIn(0.0, 1.0) * 100.0).toInt()}% estimate"
+                                    )
+                                }
+
+                                if (device.identityAmbiguous) {
+                                    append(" · Ambiguous")
+                                }
+                            },
+                        showDivider =
+                            true
+                    )
+
+                    GroupedListRow(
+                        primaryText =
+                            "Public Device ID",
+                        secondaryText =
+                            device.pdid.ifBlank {
+                                "Not available"
+                            },
                         showDivider =
                             true
                     )

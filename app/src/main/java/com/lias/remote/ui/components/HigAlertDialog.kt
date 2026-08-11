@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt
-// Version: 7.0.0
+// Version: 34.3.0
 //
 // Purpose:
 //   Reusable Apple-style alert dialog.
@@ -11,19 +11,25 @@
 //   - Adds confirmEnabled.
 //   - Avoids forcing Material AlertDialog into the Cupertino UI.
 //   - Keeps destructive-action semantics explicit.
+//   - Editable alerts expand adaptively and avoid the keyboard/system bars.
 // ====================================================================
 
 package com.lias.remote.ui.components
 
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,10 +42,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoButton
-import io.github.alexzhirkevich.cupertino.CupertinoButtonDefaults
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoButton
+import com.slapps.cupertino.CupertinoAlertDialog
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.cancel
+import com.slapps.cupertino.default
+import com.slapps.cupertino.destructive
+import com.slapps.cupertino.CupertinoButtonDefaults
+import com.slapps.cupertino.CupertinoText
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun HigAlertDialog(
     onDismissRequest: () -> Unit,
@@ -53,17 +65,128 @@ fun HigAlertDialog(
     onCancel: () -> Unit = {},
     content: (@Composable () -> Unit)? = null
 ) {
+    /*
+     * Slanoss owns compact alert presentation and action styling.
+     * Editable confirmation forms retain the wider compatibility portal.
+     */
+    if (
+        content ==
+        null
+    ) {
+        CupertinoAlertDialog(
+            onDismissRequest =
+                onDismissRequest,
+            title = {
+                CupertinoText(
+                    text =
+                        title
+                )
+            },
+            message =
+                if (
+                    message.isBlank()
+                ) {
+                    null
+                } else {
+                    {
+                        CupertinoText(
+                            text =
+                                message
+                        )
+                    }
+                },
+            buttonsOrientation =
+                Orientation.Horizontal,
+            buttons = {
+                cancel(
+                    onClick = {
+                        onCancel()
+                        onDismissRequest()
+                    }
+                ) {
+                    CupertinoText(
+                        text =
+                            cancelText
+                    )
+                }
+
+                if (
+                    isDestructive
+                ) {
+                    destructive(
+                        onClick = {
+                            if (
+                                confirmEnabled
+                            ) {
+                                onConfirm()
+                                onDismissRequest()
+                            }
+                        },
+                        enabled =
+                            confirmEnabled
+                    ) {
+                        CupertinoText(
+                            text =
+                                confirmText
+                        )
+                    }
+                } else {
+                    default(
+                        onClick = {
+                            if (
+                                confirmEnabled
+                            ) {
+                                onConfirm()
+                                onDismissRequest()
+                            }
+                        },
+                        enabled =
+                            confirmEnabled
+                    ) {
+                        CupertinoText(
+                            text =
+                                confirmText
+                        )
+                    }
+                }
+            }
+        )
+
+        return
+    }
+
     Dialog(
         onDismissRequest = onDismissRequest,
         properties =
             DialogProperties(
-                usePlatformDefaultWidth = false
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
             )
     ) {
         Box(
             modifier =
                 Modifier
-                    .width(290.dp)
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .imePadding()
+                    .padding(
+                        horizontal = 20.dp,
+                        vertical = 16.dp
+                    ),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .widthIn(
+                            max =
+                                if (content == null) {
+                                    290.dp
+                                } else {
+                                    360.dp
+                                }
+                        )
+                        .fillMaxWidth()
                     .clip(
                         RoundedCornerShape(
                             14.dp
@@ -72,13 +195,13 @@ fun HigAlertDialog(
                     .background(
                         LiasThemeColors.secondaryBackground
                     )
-        ) {
-            Column(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
             ) {
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
 
                 CupertinoText(
                     text = title,
@@ -152,10 +275,10 @@ fun HigAlertDialog(
                             )
                 )
 
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                ) {
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
 
                     CupertinoButton(
                         onClick = {
@@ -233,6 +356,7 @@ fun HigAlertDialog(
                                     LiasThemeColors.blue
                                 }
                         )
+                    }
                     }
                 }
             }

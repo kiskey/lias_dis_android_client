@@ -1,43 +1,43 @@
 # ====================================================================
 # File: gradle/libs.versions.toml
-# Version: 27.5.0
+# Version: 30.0.0
 #
 # Purpose:
 #   Central version catalog for LIAS Remote.
 #
-# Stabilization 27.5:
-#   - Fixes nonexistent Robolectric 4.13.2 artifact.
-#   - Uses Robolectric 4.16.1 for compileSdk/API 36 test support.
+# Compose Cupertino migration Plan 3.0 / Batch 1:
+#   - Moves the build baseline from Kotlin 2.0.20 to Kotlin 2.2.0.
+#   - Moves AGP from 8.9.3 to 8.10.1.
+#   - Keeps Gradle 8.11.1, Java/JVM 17, minSdk 26, compileSdk 36,
+#     and targetSdk 35 unchanged.
+#   - Aligns Compose BOM to a Compose 1.8.x compatible set.
+#   - Aligns kotlinx.serialization JSON to 1.7.3.
+#   - Replaces original Compose Cupertino coordinates with the
+#     maintained fork pinned to io.github.schott12521:*:2.3.1.
 #
-# Fix:
-#   Gradle version catalogs require TOML inline dependency/plugin tables
-#   to be syntactically complete. All inline tables are kept on one line.
-#
-# Build contract:
-#   AGP        8.9.3
-#   Kotlin     2.0.20
-#   Gradle     8.11.1
-#   Java       17
-#   compileSdk 36
-#   targetSdk  35
+# Contract:
+#   This file changes build/dependency inputs only. It does not change
+#   LIAS REST routes, JSON contracts, SSE behavior, repository
+#   ownership, navigation routes, persisted settings, or public Kotlin
+#   application contracts.
 # ====================================================================
 
 [versions]
 
-agp = "8.9.3"
-kotlin = "2.0.20"
+agp = "8.10.1"
+kotlin = "2.2.0"
 
 coreKtx = "1.13.1"
 lifecycle = "2.8.3"
 activityCompose = "1.9.0"
 biometric = "1.1.0"
 
-composeBom = "2024.09.00"
-navigationCompose = "2.7.7"
+composeBom = "2025.06.00"
+navigationCompose = "2.8.9"
 
 okhttp = "4.12.0"
 
-kotlinxSerialization = "1.6.3"
+kotlinxSerialization = "1.7.3"
 kotlinxCoroutines = "1.8.1"
 
 datastore = "1.1.1"
@@ -48,7 +48,7 @@ mockWebServer = "4.12.0"
 robolectric = "4.16.1"
 archCoreTesting = "2.2.0"
 
-cupertino = "0.1.0-alpha04"
+cupertino = "2.3.1"
 
 
 [libraries]
@@ -120,11 +120,11 @@ androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testin
 
 
 # --------------------------------------------------------------------
-# Compose Cupertino
+# Compose Cupertino maintained fork
 # --------------------------------------------------------------------
 
-cupertino = { group = "io.github.alexzhirkevich", name = "cupertino", version.ref = "cupertino" }
-cupertino-icons-extended = { group = "io.github.alexzhirkevich", name = "cupertino-icons-extended", version.ref = "cupertino" }
+cupertino = { group = "io.github.schott12521", name = "cupertino", version.ref = "cupertino" }
+cupertino-icons-extended = { group = "io.github.schott12521", name = "cupertino-icons-extended", version.ref = "cupertino" }
 
 
 [plugins]

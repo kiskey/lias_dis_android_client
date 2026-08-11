@@ -1,13 +1,14 @@
 // ====================================================================
 // File: build.gradle.kts
-// Version: 27.0.0
+// Version: 30.0.0
 //
 // Purpose:
 //   Root Android build configuration.
 //
-// Batch 27:
-//   - Declares every version-catalog plugin used by :app.
-//   - Adds Compose compiler plugin to root plugin resolution.
+// Compose Cupertino migration Plan 3.0 / Batch 1:
+//   - Keeps root plugin resolution centralized through the version
+//     catalog.
+//   - No repository, task, module, or behavior changes.
 // ====================================================================
 
 plugins {

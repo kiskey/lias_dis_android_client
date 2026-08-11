@@ -1,0 +1,18 @@
+{
+  "files": {
+    "DevicesScreen.kt": "app/src/main/java/com/lias/remote/ui/screens/devices/DevicesScreen.kt"
+  },
+  "checks": {
+    "has_plan_marker": true,
+    "imports_clickable": true,
+    "imports_role": true,
+    "search_query_starts_blank": true,
+    "tag_scope_still_uses_selected_tag_id": true,
+    "device_card_has_card_click": true,
+    "device_card_has_disclosure": true,
+    "device_card_keeps_resume_only": true,
+    "device_card_no_visible_extend_manage_pause_details_buttons": true,
+    "no_material_icons": true
+  },
+  "sensitive_changed_files": []
+}

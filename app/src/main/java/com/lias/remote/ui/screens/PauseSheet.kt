@@ -1,19 +1,21 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/PauseSheet.kt
-// Version: 24.0.0
+// Version: 35.5.1
 //
 // Purpose:
-//   Server-aligned Pause confirmation.
+//   Server-aligned one-hour Pause confirmation.
+//
+// Plan 3.5 refinement:
+//   - Compact Cupertino sheet: Medium first, Large remains available.
+//   - Focused copy keeps the destructive action visible at Medium.
+//   - Fixed one-hour LIAS server contract is unchanged.
 //
 // Backend contract:
 //   POST /api/v1/devices/{pdid}/pause
-//   -> fixed one-hour pause
-//
-// Batch 24 intentionally removes the fake 15/30/60/120-minute Pause
-// selector.
+//   -> fixed one-hour pause.
 //
 // Compatibility:
-//   onConfirm still returns Int so pre-Batch-24 call sites compile.
+//   onConfirm still returns Int.
 //   The only value this sheet ever returns is 60.
 // ====================================================================
 
@@ -33,9 +35,11 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
 import com.lias.remote.ui.components.HigSheetHeader
+import com.lias.remote.ui.components.HigSheetPresentation
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun PauseSheet(
@@ -43,13 +47,19 @@ fun PauseSheet(
     onDismiss: () -> Unit,
     onConfirm: (minutes: Int) -> Unit
 ) {
-
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Compact,
         onDismiss =
             onDismiss,
         accessibilityLabel =
             "Pause Internet"
     ) {
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -59,16 +69,15 @@ fun PauseSheet(
                         horizontal =
                             24.dp,
                         vertical =
-                            16.dp
+                            12.dp
                     ),
             horizontalAlignment =
                 Alignment.CenterHorizontally,
             verticalArrangement =
                 Arrangement.spacedBy(
-                    16.dp
+                    12.dp
                 )
         ) {
-
             HigSheetHeader(
                 title =
                     "Pause Internet",
@@ -93,7 +102,7 @@ fun PauseSheet(
                 text =
                     "1 Hour",
                 style =
-                    HigTypography.largeTitle,
+                    HigTypography.title1,
                 fontWeight =
                     FontWeight.Bold,
                 color =
@@ -102,7 +111,7 @@ fun PauseSheet(
 
             CupertinoText(
                 text =
-                    "LIAS will block Internet access for this device for one hour. You can resume access early at any time.",
+                    "Pauses internet for 1 hour. You can resume access early at any time.",
                 style =
                     HigTypography.body,
                 color =
@@ -111,25 +120,15 @@ fun PauseSheet(
                     TextAlign.Center
             )
 
-            CupertinoText(
-                text =
-                    "Infrastructure devices cannot be paused.",
-                style =
-                    HigTypography.caption,
-                color =
-                    LiasThemeColors.tertiaryLabel,
-                textAlign =
-                    TextAlign.Center
-            )
-
             HigButton(
                 text =
                     "Pause for 1 Hour",
                 onClick = {
-
-                    onConfirm(
-                        60
-                    )
+                    animatedComplete {
+                        onConfirm(
+                            60
+                        )
+                    }
                 },
                 style =
                     HigButtonStyle.Danger,

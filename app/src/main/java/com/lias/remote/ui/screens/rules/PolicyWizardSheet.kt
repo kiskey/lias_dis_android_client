@@ -25,6 +25,7 @@
 
 package com.lias.remote.ui.screens.rules
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lias.remote.core.models.Conflict
 import com.lias.remote.core.models.Device
@@ -55,14 +58,16 @@ import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
-import com.lias.remote.ui.components.HigField
+import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
+import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoSwitch
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoSwitch
+import com.slapps.cupertino.CupertinoText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -77,7 +82,7 @@ fun PolicyWizardSheet(
         suspend (List<String>) ->
             ApiResult<List<Conflict>>,
     onDismiss: () -> Unit,
-    onSave: (Policy) -> Unit
+    onSave: suspend (Policy) -> Boolean
 ) {
 
     val scope =
@@ -269,13 +274,19 @@ fun PolicyWizardSheet(
             is ApiResult.AuthenticationError -> {
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.HttpError -> {
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.ConflictError -> {
@@ -284,7 +295,10 @@ fun PolicyWizardSheet(
                     result.conflicts
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.NetworkError -> {
@@ -345,7 +359,9 @@ fun PolicyWizardSheet(
             )
     }
 
-    fun save() {
+    suspend fun save(
+        animatedDismiss: () -> Unit
+    ) {
 
         val currentValidation =
             PolicySemantics.validateDraft(
@@ -370,6 +386,7 @@ fun PolicyWizardSheet(
                 "schedule" &&
             (
                 isValidating ||
+                    validationError != null ||
                     localConflicts.isNotEmpty() ||
                     serverConflicts.isNotEmpty()
                 )
@@ -377,17 +394,32 @@ fun PolicyWizardSheet(
             return
         }
 
-        onSave(
-            draft.toPolicy(
-                initialPolicy
+        val saved =
+            onSave(
+                draft.toPolicy(
+                    initialPolicy
+                )
             )
-        )
+
+        if (
+            saved
+        ) {
+            animatedDismiss()
+        }
     }
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss =
             onDismiss
     ) {
+
+        val animatedDismiss =
+            rememberHigAnimatedDismiss(
+                fallback =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -613,7 +645,11 @@ fun PolicyWizardSheet(
                                     step =
                                         3
                                 } else {
-                                    save()
+                                    scope.launch {
+                                        save(
+                                            animatedDismiss
+                                        )
+                                    }
                                 }
                             },
                             style =
@@ -710,11 +746,14 @@ fun PolicyWizardSheet(
                                 },
                             onClick = {
                                 scope.launch {
-                                    save()
+                                    save(
+                                        animatedDismiss
+                                    )
                                 }
                             },
                             enabled =
                                 !isValidating &&
+                                    validationError == null &&
                                     localConflicts
                                         .isEmpty() &&
                                     serverConflicts
@@ -745,7 +784,7 @@ private fun StepTarget(
     onTargetChange: (String) -> Unit
 ) {
 
-    HigField(
+    HigConfiguredField(
         value =
             draft.name,
         onValueChange =
@@ -753,7 +792,11 @@ private fun StepTarget(
         label =
             "Rule Name",
         placeholder =
-            "e.g. Kids Bedtime"
+            "e.g. Kids Bedtime",
+        keyboardOptions =
+            KeyboardOptions(
+                imeAction = ImeAction.Next
+            )
     )
 
     if (
@@ -1061,7 +1104,7 @@ private fun StepEnforcement(
         "device"
     ) {
 
-        HigField(
+        HigConfiguredField(
             value =
                 draft.priorityText,
             onValueChange =
@@ -1069,7 +1112,12 @@ private fun StepEnforcement(
             label =
                 "Priority",
             placeholder =
-                "50"
+                "50",
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                )
         )
     }
 
@@ -1101,7 +1149,7 @@ private fun StepSchedules(
 
     CupertinoText(
         text =
-            "Choose one or more reusable schedules. LIAS combines them into one effective weekly bundle.",
+            "Choose one or more reusable schedules. LIAS combines them into one effective schedule bundle and validates weekly and calendar-date conflicts.",
         style =
             HigTypography.subheadline,
         color =
@@ -1189,9 +1237,9 @@ private fun StepSchedules(
 
         WarningText(
             title =
-                "Mixed Timezones",
+                "LIAS Cannot Merge Mixed Timezones",
             text =
-                "Selected schedules use ${timezones.joinToString()}. This is difficult to reason about; aligning their timezones is recommended."
+                "LIAS 2.0 rejects schedule bundles whose schedules use different timezones. Selected: ${timezones.joinToString()}. Change them to one timezone before saving."
         )
     }
 
@@ -1218,6 +1266,15 @@ private fun StepSchedules(
                 "LIAS Rejected This Bundle",
             conflicts =
                 serverConflicts
+        )
+
+        CupertinoText(
+            text =
+                "LIAS does not silently choose between contradictory Allow and Block windows. A conflicted bundle fails closed to Block until the overlap is resolved.",
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors.red
         )
     }
 

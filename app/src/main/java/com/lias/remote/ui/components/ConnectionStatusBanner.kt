@@ -31,7 +31,7 @@ import com.lias.remote.repositories.SyncState
 import com.lias.remote.repositories.hasUsableData
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
-import io.github.alexzhirkevich.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoText
 
 @Composable
 fun ConnectionStatusBanner(
