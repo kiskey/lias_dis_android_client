@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 33.4.0
+// Version: 33.5.0
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -24,6 +24,13 @@
 // Plan 3.3 Batch 004:
 //   - Adds navigation-bar inset handling alongside IME padding.
 //   - Verifies swipe, outside-tap, Back and pane semantics remain active.
+//
+// Plan 3.3 Sheet Geometry Fix:
+//   - Opens modal sheets at the Cupertino Medium detent (~half screen).
+//   - Preserves Large as an upward-drag expansion detent.
+//   - Measures the shared surface at full height so Medium stays
+//     physically attached to the bottom edge instead of floating.
+//   - Explicitly retains the Cupertino drag handle with multiple detents.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -35,6 +42,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -63,6 +71,7 @@ import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoBottomSheetScaffold
 import com.slapps.cupertino.CupertinoBottomSheetScaffoldDefaults
+import com.slapps.cupertino.CupertinoBottomSheetDefaults
 import com.slapps.cupertino.CupertinoSheetValue
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.ExperimentalCupertinoApi
@@ -140,6 +149,7 @@ fun HigModalSheet(
                 PresentationStyle.Modal(
                     detents =
                         setOf(
+                            PresentationDetent.Medium,
                             PresentationDetent.Large
                         ),
                     dismissOnClickOutside =
@@ -272,6 +282,10 @@ fun HigModalSheet(
                     topEnd =
                         HigSpec.SheetCorner
                 ),
+            sheetDragHandle = {
+                CupertinoBottomSheetDefaults
+                    .DragHandle()
+            },
             sheetSwipeEnabled =
                 true,
             applyContentScaling =
@@ -281,6 +295,7 @@ fun HigModalSheet(
                     modifier =
                         modifier
                             .fillMaxWidth()
+                            .fillMaxHeight()
                             .navigationBarsPadding()
                             .imePadding()
                             .then(
