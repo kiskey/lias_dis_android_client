@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 34.1.0
+// Version: 34.1.1
 //
 // Purpose:
 //   Canonical application navigation graph.
@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -416,7 +417,20 @@ private fun ConfiguredLiasApp(
                                     imageVector =
                                         screen.icon,
                                     contentDescription =
-                                        null
+                                        null,
+                                    /*
+                                     * Slanoss CupertinoNavigationBarItem
+                                     * owns a 20.dp icon slot. Keep its
+                                     * layout/semantics untouched and scale
+                                     * only the glyph drawing to ~24.dp.
+                                     */
+                                    modifier =
+                                        Modifier.graphicsLayer {
+                                            scaleX =
+                                                1.20f
+                                            scaleY =
+                                                1.20f
+                                        }
                                 )
                             },
                             label = {
