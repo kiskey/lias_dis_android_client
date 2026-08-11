@@ -37,6 +37,7 @@ import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.theme.HigTypography
@@ -64,6 +65,12 @@ fun UserAssignmentSheet(
     HigModalSheet(
         onDismiss = onDismiss
     ) {
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
         Column(
             modifier =
                 Modifier
@@ -153,9 +160,11 @@ fun UserAssignmentSheet(
                                     users.lastIndex,
                             onClick = {
                                 if (!selected) {
-                                    onSelectUser(
-                                        user.id
-                                    )
+                                    animatedComplete {
+                                        onSelectUser(
+                                            user.id
+                                        )
+                                    }
                                 }
                             }
                         )

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
@@ -50,6 +51,12 @@ fun PauseSheet(
         accessibilityLabel =
             "Pause Internet"
     ) {
+
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -127,9 +134,11 @@ fun PauseSheet(
                     "Pause for 1 Hour",
                 onClick = {
 
-                    onConfirm(
-                        60
-                    )
+                    animatedComplete {
+                        onConfirm(
+                            60
+                        )
+                    }
                 },
                 style =
                     HigButtonStyle.Danger,

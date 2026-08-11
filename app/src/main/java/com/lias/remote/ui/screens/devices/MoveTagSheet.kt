@@ -43,6 +43,8 @@ import com.lias.remote.core.util.ConfigurationSafety
 import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
@@ -108,6 +110,18 @@ fun MoveTagSheet(
             onDismiss
     ) {
 
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
+        val animatedDismiss =
+            rememberHigAnimatedDismiss(
+                fallback =
+                    onDismiss
+            )
+
         Column(
             modifier =
                 Modifier
@@ -138,7 +152,7 @@ fun MoveTagSheet(
                     text =
                         "Cancel",
                     onClick =
-                        onDismiss
+                        animatedDismiss
                 )
 
                 Column(
@@ -210,9 +224,11 @@ fun MoveTagSheet(
                             )
                         }
 
-                        onConfirm(
-                            finalTags
-                        )
+                        animatedComplete {
+                            onConfirm(
+                                finalTags
+                            )
+                        }
                     }
                 )
             }

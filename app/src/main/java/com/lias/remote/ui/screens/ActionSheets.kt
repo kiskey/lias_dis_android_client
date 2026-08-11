@@ -40,6 +40,8 @@ import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
+import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
@@ -61,6 +63,12 @@ fun OnboardingSheet(
         onDismiss = onComplete,
         accessibilityLabel = "Welcome to LIAS"
     ) {
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onComplete
+            )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,7 +127,11 @@ fun OnboardingSheet(
 
             HigButton(
                 text = "Continue",
-                onClick = onComplete,
+                onClick = {
+                    animatedComplete {
+                        onComplete()
+                    }
+                },
                 style = HigButtonStyle.Primary,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -173,6 +185,18 @@ fun SecurityAlertSheet(
         onDismiss = onDismiss,
         accessibilityLabel = "Security Alert"
     ) {
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
+        val animatedDismiss =
+            rememberHigAnimatedDismiss(
+                fallback =
+                    onDismiss
+            )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,19 +244,27 @@ fun SecurityAlertSheet(
 
             HigButton(
                 text = "Block Device",
-                onClick = onBlock,
+                onClick = {
+                    animatedComplete {
+                        onBlock()
+                    }
+                },
                 style = HigButtonStyle.Danger,
                 modifier = Modifier.fillMaxWidth()
             )
             HigButton(
                 text = "Mark as Trusted",
-                onClick = onTrust,
+                onClick = {
+                    animatedComplete {
+                        onTrust()
+                    }
+                },
                 style = HigButtonStyle.Secondary,
                 modifier = Modifier.fillMaxWidth()
             )
             HigTextButton(
                 text = "Investigate Later",
-                onClick = onDismiss
+                onClick = animatedDismiss
             )
         }
     }
@@ -255,6 +287,12 @@ fun GlobalSwitchSheet(
         onDismiss = onDismiss,
         accessibilityLabel = "Global Access Switch"
     ) {
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -325,12 +363,17 @@ fun GlobalSwitchSheet(
                     "Save"
                 },
                 onClick = {
-                    onSave(
+                    val updatedPolicy =
                         currentPolicy.copy(
                             action = selectedAction,
                             enabled = true
                         )
-                    )
+
+                    animatedComplete {
+                        onSave(
+                            updatedPolicy
+                        )
+                    }
                 },
                 style = if (selectedAction == "block") {
                     HigButtonStyle.Danger

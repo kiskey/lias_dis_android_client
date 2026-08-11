@@ -60,6 +60,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
 import com.lias.remote.ui.theme.HigTypography
@@ -80,7 +81,7 @@ fun PolicyWizardSheet(
         suspend (List<String>) ->
             ApiResult<List<Conflict>>,
     onDismiss: () -> Unit,
-    onSave: (Policy) -> Unit
+    onSave: suspend (Policy) -> Boolean
 ) {
 
     val scope =
@@ -357,7 +358,9 @@ fun PolicyWizardSheet(
             )
     }
 
-    fun save() {
+    suspend fun save(
+        animatedDismiss: () -> Unit
+    ) {
 
         val currentValidation =
             PolicySemantics.validateDraft(
@@ -390,17 +393,30 @@ fun PolicyWizardSheet(
             return
         }
 
-        onSave(
-            draft.toPolicy(
-                initialPolicy
+        val saved =
+            onSave(
+                draft.toPolicy(
+                    initialPolicy
+                )
             )
-        )
+
+        if (
+            saved
+        ) {
+            animatedDismiss()
+        }
     }
 
     HigModalSheet(
         onDismiss =
             onDismiss
     ) {
+
+        val animatedDismiss =
+            rememberHigAnimatedDismiss(
+                fallback =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -626,7 +642,11 @@ fun PolicyWizardSheet(
                                     step =
                                         3
                                 } else {
-                                    save()
+                                    scope.launch {
+                                        save(
+                                            animatedDismiss
+                                        )
+                                    }
                                 }
                             },
                             style =
@@ -723,7 +743,9 @@ fun PolicyWizardSheet(
                                 },
                             onClick = {
                                 scope.launch {
-                                    save()
+                                    save(
+                                        animatedDismiss
+                                    )
                                 }
                             },
                             enabled =

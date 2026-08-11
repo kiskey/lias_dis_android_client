@@ -52,6 +52,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.SegmentedControl
@@ -159,6 +160,12 @@ fun ScheduleEditorSheet(
             onDismiss
     ) {
 
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
         Column(
             modifier =
                 Modifier
@@ -201,11 +208,16 @@ fun ScheduleEditorSheet(
                                 canSave
                             ) {
 
-                                onSave(
+                                val schedule =
                                     draft.toSchedule(
                                         initialSchedule
                                     )
-                                )
+
+                                animatedComplete {
+                                    onSave(
+                                        schedule
+                                    )
+                                }
                             }
                         }
                     )
@@ -671,11 +683,16 @@ fun ScheduleEditorSheet(
                         canSave
                     ) {
 
-                        onSave(
+                        val schedule =
                             draft.toSchedule(
                                 initialSchedule
                             )
-                        )
+
+                        animatedComplete {
+                            onSave(
+                                schedule
+                            )
+                        }
                     }
                 },
                 enabled =

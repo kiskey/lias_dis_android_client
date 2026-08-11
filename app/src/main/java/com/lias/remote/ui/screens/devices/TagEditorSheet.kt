@@ -45,6 +45,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.TagDeleteSheet
 import com.lias.remote.ui.theme.HigTypography
@@ -133,6 +134,12 @@ fun TagEditorSheet(
             onDismiss
     ) {
 
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
+
         Column(
             modifier =
                 Modifier
@@ -179,7 +186,7 @@ fun TagEditorSheet(
                                     return@HigButton
                                 }
 
-                                onSave(
+                                val updatedTag =
                                     Tag(
                                         /*
                                          * For create, the submitted ID
@@ -205,7 +212,12 @@ fun TagEditorSheet(
                                                 ?.builtin
                                                 ?: false
                                     )
-                                )
+
+                                animatedComplete {
+                                    onSave(
+                                        updatedTag
+                                    )
+                                }
                             },
                             enabled =
                                 changed &&

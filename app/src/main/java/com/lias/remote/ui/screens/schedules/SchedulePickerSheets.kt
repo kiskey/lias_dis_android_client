@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/screens/schedules/SchedulePickerSheets.kt
-// Version: 28.6.1
+// Version: 33.3.2
 //
 // Focused Cupertino-style schedule picker presentation.
 //
@@ -24,11 +24,6 @@
 
 package com.lias.remote.ui.screens.schedules
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -37,14 +32,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,7 +44,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -66,12 +57,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
+import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
-import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
@@ -85,6 +75,8 @@ import kotlin.math.max
 import kotlin.math.min
 import com.lias.remote.ui.components.HigDatePicker
 import com.lias.remote.ui.components.HigDatePickerMode
+
+private typealias AnimatedCompletion = (() -> Unit) -> Unit
 
 private const val WHEEL_VISIBLE_ROWS = 5
 private val WHEEL_ROW_HEIGHT = 44.dp
@@ -113,7 +105,7 @@ fun ScheduleTimePickerSheet(
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) {
+    ) { animatedComplete ->
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -158,14 +150,19 @@ fun ScheduleTimePickerSheet(
         HigButton(
             text = "Done",
             onClick = {
-                onConfirm(
+                val value =
                     String.format(
                         Locale.US,
                         "%02d:%02d",
                         selectedHour,
                         selectedMinute
                     )
-                )
+
+                animatedComplete {
+                    onConfirm(
+                        value
+                    )
+                }
             },
             style = HigButtonStyle.Primary,
             modifier = Modifier.fillMaxWidth()
@@ -235,7 +232,7 @@ fun ScheduleDatePickerSheet(
     FocusedPickerDialog(
         title = title,
         onDismiss = onDismiss
-    ) {
+    ) { animatedComplete ->
         HigDatePicker(
             selectedDateMillis =
                 initialMillis,
@@ -281,7 +278,7 @@ fun ScheduleDatePickerSheet(
         HigButton(
             text = "Done",
             onClick = {
-                onConfirm(
+                val value =
                     Instant
                         .ofEpochMilli(
                             selectedDateMillis
@@ -289,8 +286,14 @@ fun ScheduleDatePickerSheet(
                         .atZone(
                             ZoneOffset.UTC
                         )
-                        .toLocalDate().toString()
-                )
+                        .toLocalDate()
+                        .toString()
+
+                animatedComplete {
+                    onConfirm(
+                        value
+                    )
+                }
             },
             style =
                 HigButtonStyle.Primary,
@@ -304,20 +307,11 @@ fun ScheduleDatePickerSheet(
 private fun FocusedPickerDialog(
     title: String,
     onDismiss: () -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable (AnimatedCompletion) -> Unit
 ) {
-    var visible by remember {
-        mutableStateOf(false)
-    }
-
     val configuration =
         LocalConfiguration.current
 
-    /*
-     * Keep the entire picker task inside the safe visible window.
-     * The card uses at most 72% of the screen height, leaving clear
-     * context above it while keeping the Done button above system bars.
-     */
     val maxPickerHeight =
         (
             configuration.screenHeightDp *
@@ -328,72 +322,55 @@ private fun FocusedPickerDialog(
                 420.dp
             )
 
-    LaunchedEffect(Unit) {
-        visible = true
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    HigModalSheet(
+        onDismiss =
+            onDismiss,
+        modifier =
+            Modifier.widthIn(
+                max =
+                    600.dp
+            ),
+        accessibilityLabel =
+            title
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(LiasThemeColors.background)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 20.dp
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn() +
-                    slideInVertically { fullHeight -> fullHeight },
-                exit = fadeOut() +
-                    slideOutVertically { fullHeight -> fullHeight }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(
-                            max = 600.dp
-                        )
-                        .heightIn(
-                            max = maxPickerHeight
-                        )
-                        .clip(
-                            RoundedCornerShape(
-                                HigSpec.SheetCorner
-                            )
-                        )
-                        .background(
-                            LiasThemeColors.secondaryBackground
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        )
-                        .padding(
-                            horizontal = 20.dp,
-                            vertical = 16.dp
-                        ),
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            14.dp
-                        )
-                ) {
-                    HigSheetHeader(
-                        title = title,
-                        onCancel = onDismiss
-                    )
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
 
-                    content()
-                }
-            }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(
+                        max =
+                            maxPickerHeight
+                    )
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
+                    .padding(
+                        horizontal =
+                            20.dp,
+                        vertical =
+                            16.dp
+                    ),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    14.dp
+                )
+        ) {
+            HigSheetHeader(
+                title =
+                    title,
+                onCancel =
+                    onDismiss
+            )
+
+            content(
+                animatedComplete
+            )
         }
     }
 }

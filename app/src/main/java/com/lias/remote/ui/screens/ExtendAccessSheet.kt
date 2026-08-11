@@ -38,6 +38,7 @@ import com.lias.remote.core.models.kind
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.formatTemporaryDuration
@@ -88,6 +89,12 @@ fun ExtendAccessSheet(
         onDismiss =
             onDismiss
     ) {
+
+        val animatedComplete =
+            rememberHigAnimatedCompletion(
+                fallbackDismiss =
+                    onDismiss
+            )
 
         Column(
             modifier =
@@ -303,14 +310,19 @@ fun ExtendAccessSheet(
                         }"
                     },
                 onClick = {
-                    onConfirm(
+                    val minutes =
                         selectedMinutes
                             .toInt()
                             .coerceIn(
                                 1,
                                 120
                             )
-                    )
+
+                    animatedComplete {
+                        onConfirm(
+                            minutes
+                        )
+                    }
                 },
                 style =
                     HigButtonStyle.Primary,
@@ -328,8 +340,11 @@ fun ExtendAccessSheet(
                 HigTextButton(
                     text =
                         "Cancel Extended Access",
-                    onClick =
-                        onCancelExtension,
+                    onClick = {
+                        animatedComplete {
+                            onCancelExtension()
+                        }
+                    },
                     isDestructive =
                         true
                 )

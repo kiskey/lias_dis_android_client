@@ -1,34 +1,43 @@
-// ====================================================================
-// File:
-// app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 33.4.0
-//
-// Purpose:
-//   Shared HIG-style modal sheet infrastructure.
-//
-// Batch 27:
-//   - Adds accessibilityLabel used by Batches 24–26.
-//   - Preserves all existing callers because parameter is optional.
-//   - Adds pane semantics for assistive technologies.
-//   - Backdrop remains dismissible.
-//   - Sheet body consumes pointer taps to prevent accidental dismissal.
-//
-// Plan 3.3 Batch 002:
-//   - Uses Slanoss 2.3.1 CupertinoSheetState / CupertinoBottomSheetScaffold.
-//   - Back, outside tap, swipe-down and header Cancel animate before parent removal.
-//
-// Plan 3.3 Batch 003:
-//   - Adds animated completion ordering for Save/Done/Confirm actions.
-//   - Prevents Hidden observer from racing completion callbacks.
-//
-// Plan 3.3 Batch 004:
-//   - Adds navigation-bar inset handling alongside IME padding.
-//   - Verifies swipe, outside-tap, Back and pane semantics remain active.
-// ====================================================================
+#!/usr/bin/env python3
+from pathlib import Path
+import sys
 
-package com.lias.remote.ui.components
+ROOT = Path.cwd()
+FILE = ROOT / "app/src/main/java/com/lias/remote/ui/components/HigSheets.kt"
+OUT = ROOT / "build/plan33/batch002_cupertino_sheet_adapter.md"
 
-import androidx.activity.compose.BackHandler
+text = FILE.read_text(encoding="utf-8")
+
+if "Plan 3.3 CupertinoSheetState adapter" in text:
+    print("Batch 002 already applied.")
+    sys.exit(0)
+
+required_current = [
+    "fun HigModalSheet(",
+    "AnimatedVisibility(",
+    "visible =\n            true",
+    "slideInVertically",
+    "slideOutVertically",
+    "fun HigSheetHeader(",
+    "com.slapps.cupertino.CupertinoText",
+]
+missing = [x for x in required_current if x not in text]
+if missing:
+    print("ERROR: HigSheets.kt does not match verified luna baseline:")
+    for x in missing:
+        print(" - missing:", repr(x))
+    sys.exit(1)
+
+anchor = "package com.lias.remote.ui.components\n\n"
+pkg_pos = text.find(anchor)
+if pkg_pos < 0:
+    raise SystemExit("ERROR: package declaration anchor not found")
+after_pkg = pkg_pos + len(anchor)
+first_fun = text.find("@Composable", after_pkg)
+if first_fun < 0:
+    raise SystemExit("ERROR: first composable anchor not found")
+
+imports = '''import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -36,7 +45,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,8 +78,16 @@ import com.slapps.cupertino.rememberCupertinoBottomSheetScaffoldState
 import com.slapps.cupertino.rememberCupertinoSheetState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+'''
 
-private val LocalHigAnimatedDismiss =
+text = text[:after_pkg] + imports + "\n" + text[first_fun:]
+
+start = text.find("@Composable\nfun HigModalSheet(")
+end = text.find("\n@Composable\nfun HigSheetHeader(", start)
+if start < 0 or end < 0:
+    raise SystemExit("ERROR: could not bound HigModalSheet")
+
+new_modal = '''private val LocalHigAnimatedDismiss =
     staticCompositionLocalOf<
         (() -> Unit)?
     > {
@@ -84,23 +100,6 @@ fun rememberHigAnimatedDismiss(
 ): () -> Unit =
     LocalHigAnimatedDismiss.current
         ?: fallback
-
-private val LocalHigAnimatedCompletion =
-    staticCompositionLocalOf<
-        (((() -> Unit) -> Unit))?
-    > {
-        null
-    }
-
-@Composable
-fun rememberHigAnimatedCompletion(
-    fallbackDismiss: () -> Unit
-): ((() -> Unit) -> Unit) =
-    LocalHigAnimatedCompletion.current
-        ?: { action ->
-            action()
-            fallbackDismiss()
-        }
 
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
@@ -121,11 +120,6 @@ fun HigModalSheet(
         }
 
     var parentDismissDelivered by
-        remember {
-            mutableStateOf(false)
-        }
-
-    var completionInFlight by
         remember {
             mutableStateOf(false)
         }
@@ -171,40 +165,6 @@ fun HigModalSheet(
         }
     }
 
-    fun requestAnimatedCompletion(
-        action: () -> Unit
-    ) {
-        if (
-            parentDismissDelivered ||
-            completionInFlight
-        ) {
-            return
-        }
-
-        completionInFlight =
-            true
-
-        coroutineScope.launch {
-            runCatching {
-                sheetState.hide()
-            }
-
-            /*
-             * Strict ordering:
-             *   hide animation -> existing action -> parent cleanup.
-             *
-             * This prevents the Hidden observer from removing composition
-             * before Save/Confirm logic runs.
-             */
-            action()
-
-            completionInFlight =
-                false
-
-            deliverParentDismissOnce()
-        }
-    }
-
     LaunchedEffect(sheetState) {
         presentationStarted = true
         sheetState.show()
@@ -221,7 +181,6 @@ fun HigModalSheet(
             .collect { value ->
                 if (
                     presentationStarted &&
-                    !completionInFlight &&
                     value is CupertinoSheetValue.Hidden &&
                     sheetState.targetValue is CupertinoSheetValue.Hidden
                 ) {
@@ -239,9 +198,7 @@ fun HigModalSheet(
 
     CompositionLocalProvider(
         LocalHigAnimatedDismiss provides
-            ::requestAnimatedDismiss,
-        LocalHigAnimatedCompletion provides
-            ::requestAnimatedCompletion
+            ::requestAnimatedDismiss
     ) {
         CupertinoBottomSheetScaffold(
             modifier =
@@ -279,7 +236,6 @@ fun HigModalSheet(
                     modifier =
                         modifier
                             .fillMaxWidth()
-                            .navigationBarsPadding()
                             .imePadding()
                             .then(
                                 if (
@@ -308,75 +264,97 @@ fun HigModalSheet(
         }
     }
 }
+'''
 
-@Composable
-fun HigSheetHeader(
+text = text[:start] + new_modal + text[end:]
+
+header_marker = '''fun HigSheetHeader(
     title: String,
     onCancel: () -> Unit,
     trailingAction:
         (@Composable () -> Unit)? =
         null
 ) {
-
+'''
+header_replacement = header_marker + '''
     val animatedCancel =
         rememberHigAnimatedDismiss(
             fallback =
                 onCancel
         )
 
+'''
+if header_marker not in text:
+    raise SystemExit("ERROR: current HigSheetHeader signature differs")
+text = text.replace(header_marker, header_replacement, 1)
 
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal =
-                        16.dp,
-                    vertical =
-                        8.dp
-                ),
-        verticalAlignment =
-            Alignment.CenterVertically,
-        horizontalArrangement =
-            Arrangement.SpaceBetween
-    ) {
-
-        HigTextButton(
+old_cancel = '''        HigTextButton(
+            text =
+                "Cancel",
+            onClick =
+                onCancel
+        )'''
+new_cancel = '''        HigTextButton(
             text =
                 "Cancel",
             onClick =
                 animatedCancel
-        )
+        )'''
+if old_cancel not in text:
+    raise SystemExit("ERROR: current HigSheetHeader Cancel block differs")
+text = text.replace(old_cancel, new_cancel, 1)
 
-        CupertinoText(
-            text =
-                title,
-            style =
-                HigTypography.headline,
-            fontWeight =
-                FontWeight.SemiBold,
-            color =
-                LiasThemeColors.label
-        )
+text = text.replace("// Version: 27.0.0", "// Version: 33.2.0", 1)
+text = text.replace(
+    "//   - Sheet body consumes pointer taps to prevent accidental dismissal.",
+    "//   - Sheet body consumes pointer taps to prevent accidental dismissal.\n"
+    "//\n"
+    "// Plan 3.3 Batch 002:\n"
+    "//   - Uses Slanoss 2.3.1 CupertinoSheetState / CupertinoBottomSheetScaffold.\n"
+    "//   - Back, outside tap, swipe-down and header Cancel animate before parent removal.",
+    1,
+)
 
-        if (
-            trailingAction !=
-            null
-        ) {
+FILE.write_text(text, encoding="utf-8")
 
-            trailingAction()
-
-        } else {
-
-            /*
-             * Keeps title visually centered against the Cancel button.
-             */
-            Spacer(
-                modifier =
-                    Modifier.width(
-                        60.dp
-                    )
-            )
-        }
-    }
+text = FILE.read_text(encoding="utf-8")
+checks = {
+    "uses_cupertino_scaffold": "CupertinoBottomSheetScaffold(" in text,
+    "uses_sheet_state": "rememberCupertinoSheetState(" in text,
+    "initial_hidden": "CupertinoSheetValue.Hidden" in text,
+    "calls_show": "sheetState.show()" in text,
+    "calls_hide": "sheetState.hide()" in text,
+    "observes_hidden": "snapshotFlow" in text and "sheetState.currentValue" in text,
+    "back_animated": "BackHandler(" in text and "requestAnimatedDismiss()" in text,
+    "header_cancel_animated": "animatedCancel" in text,
+    "no_old_animated_visibility": "AnimatedVisibility(" not in text,
+    "no_old_slide_animation": "slideInVertically" not in text and "slideOutVertically" not in text,
+    "no_content_scaling": "applyContentScaling =\n                false" in text,
+    "keeps_accessibility": "paneTitle" in text,
+    "keeps_ime_padding": ".imePadding()" in text,
 }
+bad = [k for k,v in checks.items() if not v]
+
+OUT.parent.mkdir(parents=True, exist_ok=True)
+if bad:
+    OUT.write_text(
+        "# Batch 002 failed\n\n" +
+        "\n".join(f"- {x}" for x in bad) + "\n",
+        encoding="utf-8"
+    )
+    print("ERROR: Batch 002 verification failed:")
+    for x in bad:
+        print(" -", x)
+    sys.exit(1)
+
+OUT.write_text(
+    "# Plan 3.3 Batch 002 passed\n\n"
+    "- HigModalSheet uses Slanoss CupertinoBottomSheetScaffold.\n"
+    "- Initial state is Hidden and entrance calls show().\n"
+    "- Back/outside/swipe dismissal reaches Hidden before parent removal.\n"
+    "- HigSheetHeader Cancel uses the animated close action.\n"
+    "- IME padding and pane accessibility semantics are retained.\n"
+    "- Arbitrary Done/Save call sites remain for Batch 003.\n",
+    encoding="utf-8"
+)
+print(OUT.read_text())

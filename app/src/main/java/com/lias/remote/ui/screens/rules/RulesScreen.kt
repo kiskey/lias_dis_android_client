@@ -27,7 +27,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,7 +59,6 @@ import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.icons.CupertinoIcons
 import com.slapps.cupertino.icons.outlined.Pencil
 import com.slapps.cupertino.icons.outlined.Trash
-import kotlinx.coroutines.launch
 
 @Composable
 fun RulesScreen(
@@ -77,9 +75,6 @@ fun RulesScreen(
     val hostActivity =
         LocalContext.current
             .findFragmentActivity()
-
-    val scope =
-        rememberCoroutineScope()
 
     var showWizard by
         remember {
@@ -569,35 +564,26 @@ fun RulesScreen(
                 policy ->
 
                 if (
-                    !policySaveInFlight
+                    policySaveInFlight
                 ) {
+                    false
+
+                } else {
 
                     policySaveInFlight =
                         true
 
-                    scope.launch {
+                    val result =
+                        viewModel
+                            .savePolicyAwait(
+                                policy
+                            )
 
-                        val result =
-                            viewModel
-                                .savePolicyAwait(
-                                    policy
-                                )
+                    policySaveInFlight =
+                        false
 
-                        policySaveInFlight =
-                            false
-
-                        if (
-                            result is
-                            ApiResult.Success
-                        ) {
-
-                            showWizard =
-                                false
-
-                            editingPolicy =
-                                null
-                        }
-                    }
+                    result is
+                        ApiResult.Success
                 }
             }
         )
