@@ -201,8 +201,7 @@ fun DevicesScreen(
                 }
             )
         }
-    ) {
-        padding ->
+    ) { padding, navigationHeader ->
 
         LazyColumn(
             state =
@@ -212,6 +211,14 @@ fun DevicesScreen(
             contentPadding =
                 padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
 
             if (
                 state.isLoadingInitialData

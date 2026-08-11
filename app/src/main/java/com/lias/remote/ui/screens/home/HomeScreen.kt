@@ -124,12 +124,20 @@ fun HomeScreen(
     HigLargeTitleScaffold(
         title = "Home",
         scrollState = scrollState
-    ) { padding ->
+    ) { padding, navigationHeader ->
         LazyColumn(
             state = scrollState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
             item {
                 ListSectionHeader("Network Overview")
             }

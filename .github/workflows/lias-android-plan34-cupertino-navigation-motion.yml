@@ -1,0 +1,48 @@
+name: LIAS Android Plan 3.4 Cupertino Navigation Motion
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - luna
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Plan 3.4 static parity gates
+        run: |
+          chmod +x scripts/*.sh scripts/*.py
+          scripts/verify_plan34_batch001.sh
+          scripts/verify_plan34_batch002.sh
+          scripts/verify_plan34_batch003.sh
+          scripts/verify_plan34_batch004.sh
+          python3 scripts/verify_plan34_final.py
+
+      - name: Compile, test, lint, package
+        run: |
+          gradle \
+            :app:compileDebugKotlin \
+            :app:compileReleaseKotlin \
+            :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:assembleRelease \
+            --stacktrace

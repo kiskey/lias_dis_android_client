@@ -60,9 +60,12 @@ import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoScaffold
+import com.slapps.cupertino.CupertinoNavigateBackButton
+import com.slapps.cupertino.ExperimentalCupertinoApi
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.CupertinoTopAppBar
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun ConnectionSettingsScreen(
     viewModel: SettingsViewModel,
@@ -93,9 +96,7 @@ fun ConnectionSettingsScreen(
                 },
                 navigationIcon = {
 
-                    HigTextButton(
-                        text =
-                            "‹ Settings",
+                    CupertinoNavigateBackButton(
                         onClick = {
 
                             if (
@@ -106,6 +107,12 @@ fun ConnectionSettingsScreen(
                             }
 
                             onBack()
+                        },
+                        title = {
+                            CupertinoText(
+                                text =
+                                    "Settings"
+                            )
                         }
                     )
                 },

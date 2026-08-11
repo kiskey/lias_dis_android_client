@@ -68,10 +68,13 @@ import com.lias.remote.ui.screens.PauseSheet
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoNavigateBackButton
+import com.slapps.cupertino.ExperimentalCupertinoApi
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.icons.CupertinoIcons
 import com.slapps.cupertino.icons.outlined.Iphone
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun DeviceDetailScreen(
     pdid: String,
@@ -239,15 +242,18 @@ fun DeviceDetailScreen(
             scrollState,
         navLeading = {
 
-            HigTextButton(
-                text =
-                    "‹ Devices",
+            CupertinoNavigateBackButton(
                 onClick =
-                    onBack
+                    onBack,
+                title = {
+                    CupertinoText(
+                        text =
+                            "Devices"
+                    )
+                }
             )
         }
-    ) {
-        padding ->
+    ) { padding, _ ->
 
         LazyColumn(
             state =

@@ -176,7 +176,7 @@ fun RulesScreen(
                 }
             )
         }
-    ) { padding ->
+    ) { padding, navigationHeader ->
 
         LazyColumn(
             state =
@@ -186,6 +186,14 @@ fun RulesScreen(
             contentPadding =
                 padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
 
             when (
                 val sync =

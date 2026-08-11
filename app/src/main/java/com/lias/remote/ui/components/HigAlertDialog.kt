@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/components/HigAlertDialog.kt
-// Version: 29.0.0
+// Version: 34.3.0
 //
 // Purpose:
 //   Reusable Apple-style alert dialog.
@@ -16,6 +16,7 @@
 
 package com.lias.remote.ui.components
 
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,9 +43,15 @@ import androidx.compose.ui.window.DialogProperties
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoButton
+import com.slapps.cupertino.CupertinoAlertDialog
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.cancel
+import com.slapps.cupertino.default
+import com.slapps.cupertino.destructive
 import com.slapps.cupertino.CupertinoButtonDefaults
 import com.slapps.cupertino.CupertinoText
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun HigAlertDialog(
     onDismissRequest: () -> Unit,
@@ -58,6 +65,96 @@ fun HigAlertDialog(
     onCancel: () -> Unit = {},
     content: (@Composable () -> Unit)? = null
 ) {
+    /*
+     * Slanoss owns compact alert presentation and action styling.
+     * Editable confirmation forms retain the wider compatibility portal.
+     */
+    if (
+        content ==
+        null
+    ) {
+        CupertinoAlertDialog(
+            onDismissRequest =
+                onDismissRequest,
+            title = {
+                CupertinoText(
+                    text =
+                        title
+                )
+            },
+            message =
+                if (
+                    message.isBlank()
+                ) {
+                    null
+                } else {
+                    {
+                        CupertinoText(
+                            text =
+                                message
+                        )
+                    }
+                },
+            buttonsOrientation =
+                Orientation.Horizontal,
+            buttons = {
+                cancel(
+                    onClick = {
+                        onCancel()
+                        onDismissRequest()
+                    }
+                ) {
+                    CupertinoText(
+                        text =
+                            cancelText
+                    )
+                }
+
+                if (
+                    isDestructive
+                ) {
+                    destructive(
+                        onClick = {
+                            if (
+                                confirmEnabled
+                            ) {
+                                onConfirm()
+                                onDismissRequest()
+                            }
+                        },
+                        enabled =
+                            confirmEnabled
+                    ) {
+                        CupertinoText(
+                            text =
+                                confirmText
+                        )
+                    }
+                } else {
+                    default(
+                        onClick = {
+                            if (
+                                confirmEnabled
+                            ) {
+                                onConfirm()
+                                onDismissRequest()
+                            }
+                        },
+                        enabled =
+                            confirmEnabled
+                    ) {
+                        CupertinoText(
+                            text =
+                                confirmText
+                        )
+                    }
+                }
+            }
+        )
+
+        return
+    }
+
     Dialog(
         onDismissRequest = onDismissRequest,
         properties =

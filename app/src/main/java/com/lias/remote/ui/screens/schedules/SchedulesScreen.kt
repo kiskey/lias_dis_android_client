@@ -114,13 +114,21 @@ fun SchedulesScreen(
                 }
             )
         }
-    ) { padding ->
+    ) { padding, navigationHeader ->
 
         LazyColumn(
             state = scrollState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
 
             when (
                 val sync =

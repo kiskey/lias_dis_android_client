@@ -206,7 +206,7 @@ fun SettingsScreen(
             "Settings",
         scrollState =
             scrollState
-    ) { padding ->
+    ) { padding, navigationHeader ->
 
         LazyColumn(
             state =
@@ -216,6 +216,14 @@ fun SettingsScreen(
             contentPadding =
                 padding
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
 
             // ========================================================
             // SERVER

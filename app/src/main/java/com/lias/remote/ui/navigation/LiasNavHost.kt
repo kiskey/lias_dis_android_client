@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/navigation/LiasNavHost.kt
-// Version: 28.0.0
+// Version: 34.1.0
 //
 // Purpose:
 //   Canonical application navigation graph.
@@ -18,6 +18,10 @@
 
 package com.lias.remote.ui.navigation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -78,6 +82,9 @@ import com.lias.remote.ui.theme.HigSpec
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoNavigationBar
+import com.slapps.cupertino.CupertinoNavigationBarItem
+import com.slapps.cupertino.ExperimentalCupertinoApi
 import com.slapps.cupertino.CupertinoScaffold
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.icons.CupertinoIcons
@@ -142,11 +149,6 @@ fun LiasNavHost(
             .uiState
             .collectAsState()
 
-    val uiState by
-        liasViewModel
-            .state
-            .collectAsState()
-
     /*
      * DataStore is asynchronous. Rendering Connect before hydration
      * causes an incorrect first-frame flash on already configured apps.
@@ -161,24 +163,72 @@ fun LiasNavHost(
         return
     }
 
-    if (
-        !settingsState
-            .isConfigured
+    AnimatedContent(
+        targetState =
+            settingsState
+                .isConfigured,
+        transitionSpec = {
+            fadeIn(
+                tween(
+                    180
+                )
+            ) togetherWith
+                fadeOut(
+                    tween(
+                        150
+                    )
+                )
+        },
+        label =
+            "lias-configuration-root"
     ) {
+        configured ->
 
-        ConnectScreen(
-            viewModel =
-                settingsViewModel,
-            onConnected = {
-                /*
-                 * Settings state updates through DataStore and this
-                 * composable naturally transitions to the app graph.
-                 */
-            }
-        )
-
-        return
+        if (
+            configured
+        ) {
+            ConfiguredLiasApp(
+                liasViewModel =
+                    liasViewModel,
+                settingsViewModel =
+                    settingsViewModel,
+                externalDeepLink =
+                    externalDeepLink,
+                onExternalDeepLinkConsumed =
+                    onExternalDeepLinkConsumed
+            )
+        } else {
+            ConnectScreen(
+                viewModel =
+                    settingsViewModel,
+                onConnected = {
+                    /*
+                     * DataStore changes targetState; AnimatedContent
+                     * owns the root presentation transition.
+                     */
+                }
+            )
+        }
     }
+}
+
+@OptIn(ExperimentalCupertinoApi::class)
+@Composable
+private fun ConfiguredLiasApp(
+    liasViewModel: LiasViewModel,
+    settingsViewModel: SettingsViewModel,
+    externalDeepLink: String?,
+    onExternalDeepLinkConsumed: () -> Unit
+) {
+    val settingsState by
+        settingsViewModel
+            .uiState
+            .collectAsState()
+
+    val uiState by
+        liasViewModel
+            .state
+            .collectAsState()
 
     val navController =
         rememberNavController()
@@ -295,16 +345,15 @@ fun LiasNavHost(
         backStackEntry
             ?.destination
 
+    val currentRootTab =
+        rootTabRoute(
+            currentDestination
+                ?.route
+        )
+
     val showTabBar =
-        currentDestination
-            ?.route !=
-            NavigationRoutes.DEVICE_DETAIL &&
-            currentDestination
-                ?.route !=
-            NavigationRoutes.CONNECTION_SETTINGS &&
-            currentDestination
-                ?.route !=
-            NavigationRoutes.IDENTITY_REVIEW
+        currentRootTab !=
+            null
 
     CupertinoScaffold(
         topBar = {
@@ -331,48 +380,15 @@ fun LiasNavHost(
                 showTabBar
             ) {
 
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(
-                                HigSpec.TabBarHeight
-                            )
-                            .background(
-                                LiasThemeColors
-                                    .secondaryBackground
-                            )
-                            .padding(
-                                top =
-                                    4.dp,
-                                bottom =
-                                    4.dp
-                            ),
-                    horizontalArrangement =
-                        Arrangement.SpaceAround,
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
+                CupertinoNavigationBar {
 
                     tabItems.forEach {
                         screen ->
 
-                        val selected =
-                            currentDestination
-                                ?.hierarchy
-                                ?.any {
-                                    destination ->
-
-                                    destination.route ==
-                                        screen.route
-                                }
-                                ?: false
-
-                        TabItem(
-                            screen =
-                                screen,
+                        CupertinoNavigationBarItem(
                             selected =
-                                selected,
+                                currentRootTab ==
+                                    screen.route,
                             onClick = {
 
                                 navController.navigate(
@@ -391,11 +407,26 @@ fun LiasNavHost(
 
                                     launchSingleTop =
                                         true
-
                                     restoreState =
                                         true
                                 }
-                            }
+                            },
+                            icon = {
+                                CupertinoIcon(
+                                    imageVector =
+                                        screen.icon,
+                                    contentDescription =
+                                        null
+                                )
+                            },
+                            label = {
+                                CupertinoText(
+                                    text =
+                                        screen.label
+                                )
+                            },
+                            alwaysShowLabel =
+                                true
                         )
                     }
                 }
@@ -420,59 +451,87 @@ fun LiasNavHost(
                     ),
                 enterTransition = {
 
-                    fadeIn(
-                        tween(
-                            180
+                    if (
+                        isRootTabTransition(
+                            initialState.destination.route,
+                            targetState.destination.route
                         )
-                    ) +
+                    ) {
+                        EnterTransition.None
+                    } else {
                         slideInHorizontally(
-                            tween(
-                                180
-                            )
+                            animationSpec =
+                                tween(
+                                    300
+                                )
                         ) {
-                            it /
-                                5
+                            width ->
+                            width
                         }
+                    }
                 },
                 exitTransition = {
 
-                    fadeOut(
-                        tween(
-                            150
+                    if (
+                        isRootTabTransition(
+                            initialState.destination.route,
+                            targetState.destination.route
                         )
-                    )
+                    ) {
+                        ExitTransition.None
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec =
+                                tween(
+                                    300
+                                )
+                        ) {
+                            width ->
+                            -width / 3
+                        }
+                    }
                 },
                 popEnterTransition = {
 
-                    fadeIn(
-                        tween(
-                            180
+                    if (
+                        isRootTabTransition(
+                            initialState.destination.route,
+                            targetState.destination.route
                         )
-                    ) +
+                    ) {
+                        EnterTransition.None
+                    } else {
                         slideInHorizontally(
-                            tween(
-                                180
-                            )
+                            animationSpec =
+                                tween(
+                                    300
+                                )
                         ) {
-                            -it /
-                                5
+                            width ->
+                            -width / 3
                         }
+                    }
                 },
                 popExitTransition = {
 
-                    fadeOut(
-                        tween(
-                            150
+                    if (
+                        isRootTabTransition(
+                            initialState.destination.route,
+                            targetState.destination.route
                         )
-                    ) +
+                    ) {
+                        ExitTransition.None
+                    } else {
                         slideOutHorizontally(
-                            tween(
-                                180
-                            )
+                            animationSpec =
+                                tween(
+                                    300
+                                )
                         ) {
-                            it /
-                                5
+                            width ->
+                            width
                         }
+                    }
                 }
             ) {
 
@@ -823,93 +882,38 @@ private fun ConnectionBanner(
     }
 }
 
-@Composable
-private fun RowScope.TabItem(
-    screen: LiasScreen,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-
-    val interactionSource =
-        remember {
-            MutableInteractionSource()
-        }
-
-    val color =
-        if (
-            selected
-        ) {
-            LiasThemeColors.blue
-        } else {
-            LiasThemeColors
-                .tertiaryLabel
-        }
-
-    Column(
-        modifier =
-            Modifier
-                .weight(
-                    1f
-                )
-                .semantics(
-                    mergeDescendants =
-                        true
-                ) {
-
-                    role =
-                        Role.Tab
-
-                    this.selected =
-                        selected
-                }
-                .clickable(
-                    interactionSource =
-                        interactionSource,
-                    indication =
-                        null,
-                    onClick =
-                        onClick
-                )
-                .padding(
-                    vertical =
-                        4.dp
-                ),
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-        verticalArrangement =
-            Arrangement.Center
+private fun rootTabRoute(
+    route: String?
+): String? =
+    when (
+        route
     ) {
+        NavigationRoutes.HOME ->
+            NavigationRoutes.HOME
 
-        CupertinoIcon(
-            imageVector =
-                screen.icon,
-            contentDescription =
-                null,
-            tint =
-                color,
-            modifier =
-                Modifier.size(
-                    HigSpec.IconSizeL
-                )
-        )
+        NavigationRoutes.DEVICES,
+        NavigationRoutes.DEVICES_BY_TAG ->
+            NavigationRoutes.DEVICES
 
-        Spacer(
-            modifier =
-                Modifier.height(
-                    2.dp
-                )
-        )
+        NavigationRoutes.SCHEDULES ->
+            NavigationRoutes.SCHEDULES
 
-        CupertinoText(
-            text =
-                screen.label,
-            style =
-                HigTypography.tabLabel,
-            color =
-                color
-        )
+        NavigationRoutes.RULES ->
+            NavigationRoutes.RULES
+
+        NavigationRoutes.SETTINGS ->
+            NavigationRoutes.SETTINGS
+
+        else ->
+            null
     }
-}
+
+private fun isRootTabTransition(
+    fromRoute: String?,
+    toRoute: String?
+): Boolean =
+    rootTabRoute(fromRoute) != null &&
+        rootTabRoute(toRoute) != null
 
 private fun navigateExternal(
     navController:

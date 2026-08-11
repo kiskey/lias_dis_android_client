@@ -47,6 +47,8 @@ import com.lias.remote.ui.components.StatusPill
 import com.lias.remote.ui.theme.HigTypography
 import com.lias.remote.ui.theme.LiasThemeColors
 import com.slapps.cupertino.CupertinoText
+import com.slapps.cupertino.CupertinoNavigateBackButton
+import com.slapps.cupertino.ExperimentalCupertinoApi
 
 private enum class IdentityDialog {
     MERGE,
@@ -57,6 +59,7 @@ private enum class IdentityDialog {
     REVOKE
 }
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun IdentityReviewScreen(
     viewModel: LiasViewModel,
@@ -84,9 +87,15 @@ fun IdentityReviewScreen(
         title = "Identity Review",
         scrollState = scrollState,
         navLeading = {
-            HigTextButton(
-                text = "Back",
-                onClick = onBack
+            CupertinoNavigateBackButton(
+                onClick =
+                    onBack,
+                title = {
+                    CupertinoText(
+                        text =
+                            "Home"
+                    )
+                }
             )
         },
         navTrailing = {
@@ -98,12 +107,20 @@ fun IdentityReviewScreen(
                 enabled = state.supportsIdentityReview && !review.isLoading
             )
         }
-    ) { padding ->
+    ) { padding, navigationHeader ->
         LazyColumn(
             state = scrollState,
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+
+            item(
+                key =
+                    "cupertino-navigation-header"
+            ) {
+                navigationHeader()
+            }
+
             item {
                 CupertinoText(
                     text = "Review evidence before changing device identity. A correlation score is an estimate, not proof.",

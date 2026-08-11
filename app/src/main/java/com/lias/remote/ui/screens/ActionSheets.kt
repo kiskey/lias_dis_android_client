@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt
-// Version: 27.2.0
+// Version: 34.4.0
 //
 // Purpose:
 //   Shared non-device-specific modal actions.
@@ -14,6 +14,10 @@
 
 package com.lias.remote.ui.screens
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +54,11 @@ import com.lias.remote.ui.theme.LiasThemeColors
 import com.lias.remote.ui.theme.SystemBlueDark
 import com.lias.remote.ui.theme.SystemIndigoDark
 import com.slapps.cupertino.CupertinoIcon
+import com.slapps.cupertino.CupertinoActionSheet
+import com.slapps.cupertino.ExperimentalCupertinoApi
+import com.slapps.cupertino.cancel
+import com.slapps.cupertino.default
+import com.slapps.cupertino.destructive
 import com.slapps.cupertino.CupertinoText
 import com.slapps.cupertino.icons.CupertinoIcons
 import com.slapps.cupertino.icons.outlined.ExclamationmarkTriangle
@@ -270,6 +279,7 @@ fun SecurityAlertSheet(
     }
 }
 
+@OptIn(ExperimentalCupertinoApi::class)
 @Composable
 fun GlobalSwitchSheet(
     currentPolicy: Policy,
@@ -283,105 +293,234 @@ fun GlobalSwitchSheet(
         mutableStateOf(currentPolicy.action)
     }
 
-    HigModalSheet(
-        onDismiss = onDismiss,
-        accessibilityLabel = "Global Access Switch"
+    var visible by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var closing by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    val scope =
+        rememberCoroutineScope()
+
+    LaunchedEffect(
+        Unit
     ) {
-        val animatedComplete =
-            rememberHigAnimatedCompletion(
-                fallbackDismiss =
-                    onDismiss
-            )
+        visible =
+            true
+    }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    /*
+     * Slanoss 2.3.1 CupertinoDialogs.kt defines ActionSheet exit as
+     * a 150ms tween. Keep the parent alive for exactly that transition.
+     */
+    fun closeThen(
+        action: () -> Unit
+    ) {
+        if (
+            closing
         ) {
-            HigSheetHeader(
-                title = "Global Access",
-                onCancel = onDismiss
-            )
+            return
+        }
 
-            CupertinoIcon(
-                imageVector = CupertinoIcons.Outlined.Shield,
-                contentDescription = null,
-                tint = LiasThemeColors.blue,
-                modifier = Modifier.size(44.dp)
-            )
+        closing =
+            true
+        visible =
+            false
 
+        scope.launch {
+            delay(
+                150
+            )
+            action()
+        }
+    }
+
+    CupertinoActionSheet(
+        visible =
+            visible,
+        onDismissRequest = {
+            closeThen(
+                onDismiss
+            )
+        },
+        title = {
             CupertinoText(
-                text = "Controls every non-infrastructure device on this LIAS server.",
-                style = HigTypography.body,
-                color = LiasThemeColors.secondaryLabel,
-                textAlign = TextAlign.Center
+                text =
+                    "Global Access"
             )
-
-            SegmentedControl(
-                options = listOf("Allow All", "Schedule", "Block All"),
-                selectedOption = when (selectedAction) {
-                    "allow" -> "Allow All"
-                    "block" -> "Block All"
-                    else -> "Schedule"
-                },
-                onOptionSelected = { selection ->
-                    selectedAction = when (selection) {
-                        "Allow All" -> "allow"
-                        "Block All" -> "block"
-                        else -> "schedule"
-                    }
-                },
-                isDestructive = true,
-                modifier = Modifier.fillMaxWidth()
+        },
+        message = {
+            CupertinoText(
+                text =
+                    "Controls every non-infrastructure device on this LIAS server."
             )
-
-            if (selectedAction == "block") {
-                Column(
-                    modifier = Modifier
+        },
+        content = {
+            Column(
+                modifier =
+                    Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            LiasThemeColors.red.copy(alpha = 0.10f)
+                        .padding(
+                            16.dp
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        12.dp
+                    )
+            ) {
+                SegmentedControl(
+                    options =
+                        listOf(
+                            "Allow All",
+                            "Schedule",
+                            "Block All"
+                        ),
+                    selectedOption =
+                        when (
+                            selectedAction
+                        ) {
+                            "allow" ->
+                                "Allow All"
+
+                            "block" ->
+                                "Block All"
+
+                            else ->
+                                "Schedule"
+                        },
+                    onOptionSelected = {
+                        selection ->
+
+                        selectedAction =
+                            when (
+                                selection
+                            ) {
+                                "Allow All" ->
+                                    "allow"
+
+                                "Block All" ->
+                                    "block"
+
+                                else ->
+                                    "schedule"
+                            }
+                    },
+                    isDestructive =
+                        true,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                if (
+                    selectedAction ==
+                    "block"
+                ) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(
+                                    RoundedCornerShape(
+                                        12.dp
+                                    )
+                                )
+                                .background(
+                                    LiasThemeColors.red
+                                        .copy(
+                                            alpha =
+                                                0.10f
+                                        )
+                                )
+                                .padding(
+                                    12.dp
+                                )
+                    ) {
+                        CupertinoText(
+                            text =
+                                "Block All immediately blocks every non-infrastructure device.",
+                            style =
+                                HigTypography.subheadline,
+                            color =
+                                LiasThemeColors.red,
+                            fontWeight =
+                                FontWeight.Medium
                         )
-                        .padding(12.dp)
+                    }
+                }
+            }
+        },
+        buttons = {
+            if (
+                selectedAction ==
+                "block"
+            ) {
+                destructive(
+                    onClick = {
+                        val updated =
+                            currentPolicy.copy(
+                                action =
+                                    selectedAction,
+                                enabled =
+                                    true
+                            )
+
+                        closeThen {
+                            onSave(
+                                updated
+                            )
+                        }
+                    }
                 ) {
                     CupertinoText(
-                        text = "Block All immediately blocks every non-infrastructure device.",
-                        style = HigTypography.subheadline,
-                        color = LiasThemeColors.red,
-                        fontWeight = FontWeight.Medium
+                        text =
+                            "Apply Block All"
+                    )
+                }
+            } else {
+                default(
+                    onClick = {
+                        val updated =
+                            currentPolicy.copy(
+                                action =
+                                    selectedAction,
+                                enabled =
+                                    true
+                            )
+
+                        closeThen {
+                            onSave(
+                                updated
+                            )
+                        }
+                    }
+                ) {
+                    CupertinoText(
+                        text =
+                            "Save"
                     )
                 }
             }
 
-            HigButton(
-                text = if (selectedAction == "block") {
-                    "Apply Block All"
-                } else {
-                    "Save"
-                },
+            cancel(
                 onClick = {
-                    val updatedPolicy =
-                        currentPolicy.copy(
-                            action = selectedAction,
-                            enabled = true
-                        )
-
-                    animatedComplete {
-                        onSave(
-                            updatedPolicy
-                        )
-                    }
-                },
-                style = if (selectedAction == "block") {
-                    HigButtonStyle.Danger
-                } else {
-                    HigButtonStyle.Primary
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+                    closeThen(
+                        onDismiss
+                    )
+                }
+            ) {
+                CupertinoText(
+                    text =
+                        "Cancel"
+                )
+            }
         }
-    }
+    )
 }
