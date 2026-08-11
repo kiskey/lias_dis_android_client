@@ -272,13 +272,19 @@ fun PolicyWizardSheet(
             is ApiResult.AuthenticationError -> {
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.HttpError -> {
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.ConflictError -> {
@@ -287,7 +293,10 @@ fun PolicyWizardSheet(
                     result.conflicts
 
                 validationError =
-                    result.message
+                    PolicyPresentation
+                        .serverValidationMessage(
+                            result.message
+                        )
             }
 
             is ApiResult.NetworkError -> {
@@ -373,6 +382,7 @@ fun PolicyWizardSheet(
                 "schedule" &&
             (
                 isValidating ||
+                    validationError != null ||
                     localConflicts.isNotEmpty() ||
                     serverConflicts.isNotEmpty()
                 )
@@ -718,6 +728,7 @@ fun PolicyWizardSheet(
                             },
                             enabled =
                                 !isValidating &&
+                                    validationError == null &&
                                     localConflicts
                                         .isEmpty() &&
                                     serverConflicts
@@ -1113,7 +1124,7 @@ private fun StepSchedules(
 
     CupertinoText(
         text =
-            "Choose one or more reusable schedules. LIAS combines them into one effective weekly bundle.",
+            "Choose one or more reusable schedules. LIAS combines them into one effective schedule bundle and validates weekly and calendar-date conflicts.",
         style =
             HigTypography.subheadline,
         color =
@@ -1201,9 +1212,9 @@ private fun StepSchedules(
 
         WarningText(
             title =
-                "Mixed Timezones",
+                "LIAS Cannot Merge Mixed Timezones",
             text =
-                "Selected schedules use ${timezones.joinToString()}. This is difficult to reason about; aligning their timezones is recommended."
+                "LIAS 2.0 rejects schedule bundles whose schedules use different timezones. Selected: ${timezones.joinToString()}. Change them to one timezone before saving."
         )
     }
 
@@ -1230,6 +1241,15 @@ private fun StepSchedules(
                 "LIAS Rejected This Bundle",
             conflicts =
                 serverConflicts
+        )
+
+        CupertinoText(
+            text =
+                "LIAS does not silently choose between contradictory Allow and Block windows. A conflicted bundle fails closed to Block until the overlap is resolved.",
+            style =
+                HigTypography.caption,
+            color =
+                LiasThemeColors.red
         )
     }
 

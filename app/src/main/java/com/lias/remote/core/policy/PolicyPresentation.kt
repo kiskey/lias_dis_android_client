@@ -241,4 +241,47 @@ object PolicyPresentation {
                 }
             )
         }
+
+    /**
+     * Translate verified LIAS 2.0 validation failures into admin-facing text.
+     * LIAS remains authoritative; Android does not resolve conflicts locally.
+     */
+    fun serverValidationMessage(
+        message: String
+    ): String {
+        val normalized =
+            message.trim()
+
+        return when {
+            normalized.contains(
+                "mixed timezones",
+                ignoreCase = true
+            ) ->
+                "LIAS cannot combine schedules that use different timezones. Set the selected schedules to one timezone, then validate again."
+
+            normalized.contains(
+                "schedule conflict",
+                ignoreCase = true
+            ) ||
+                normalized.contains(
+                    "contradictory",
+                    ignoreCase = true
+                ) ->
+                "LIAS found overlapping schedule windows with opposite Allow/Block actions. Resolve the listed windows before saving; conflicted bundles fail closed to Block."
+
+            normalized.contains(
+                "missing",
+                ignoreCase = true
+            ) &&
+                normalized.contains(
+                    "schedule",
+                    ignoreCase = true
+                ) ->
+                "One of the schedules in this rule no longer exists on LIAS. Refresh the rule and select only existing schedules."
+
+            else ->
+                normalized
+        }
+    }
+
 }

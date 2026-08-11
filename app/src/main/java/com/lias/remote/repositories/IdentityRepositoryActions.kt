@@ -285,8 +285,18 @@ suspend fun EventRepository.confirmIdentityCandidate(
             refreshAll()
             refreshIdentityCandidates()
         } else if (result is ApiResult.ConflictError) {
-            clearSelectedIdentityCandidate()
-            refreshIdentityCandidates()
+            // Plan 3.2 stale candidate refresh:
+            refreshIdentityCandidates(
+                _state.value.identityReview.status
+            )
+            loadIdentityCandidate(
+                candidate.id
+            )
+            return@identityMutation ApiResult.ConflictError(
+                conflicts = result.conflicts,
+                message =
+                    "This identity review changed on LIAS or is currently unsafe to merge. The latest evidence has been reloaded; review it again before deciding."
+            )
         }
 
         result
@@ -321,8 +331,18 @@ suspend fun EventRepository.rejectIdentityCandidate(
             clearSelectedIdentityCandidate()
             refreshIdentityCandidates()
         } else if (result is ApiResult.ConflictError) {
-            clearSelectedIdentityCandidate()
-            refreshIdentityCandidates()
+            // Plan 3.2 stale candidate refresh:
+            refreshIdentityCandidates(
+                _state.value.identityReview.status
+            )
+            loadIdentityCandidate(
+                candidate.id
+            )
+            return@identityMutation ApiResult.ConflictError(
+                conflicts = result.conflicts,
+                message =
+                    "This identity review changed on LIAS. The latest evidence has been reloaded; review it again before deciding."
+            )
         }
 
         result
@@ -359,8 +379,16 @@ suspend fun EventRepository.reopenIdentityCandidate(
             refreshIdentityCandidates("pending")
             refreshIdentityCandidates("rejected")
         } else if (result is ApiResult.ConflictError) {
-            clearSelectedIdentityCandidate()
+            // Plan 3.2 stale candidate refresh:
             refreshIdentityCandidates("rejected")
+            loadIdentityCandidate(
+                candidate.id
+            )
+            return@identityMutation ApiResult.ConflictError(
+                conflicts = result.conflicts,
+                message =
+                    "This identity review changed on LIAS. The latest evidence has been reloaded; review it again before reopening."
+            )
         }
 
         result

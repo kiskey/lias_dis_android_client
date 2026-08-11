@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "identity_review_screen": true,
+    "identity_detail_model": true,
+    "identity_decision_model": true,
+    "confirm_action": true,
+    "reject_action": true,
+    "reopen_action": true,
+    "pagination": true,
+    "decision_note": true,
+    "expected_source": true,
+    "expected_target": true,
+    "expected_updated": true,
+    "policy_validate": true,
+    "conflict_model": true,
+    "mixed_timezone_hard_ux": true,
+    "stale_refresh_ux": true
+  },
+  "decision_model_files": [
+    "app/src/main/java/com/lias/remote/core/network/EngineApiTypes.kt"
+  ],
+  "identity_action_files": [
+    "app/src/main/java/com/lias/remote/repositories/IdentityRepositoryActions.kt"
+  ],
+  "policy_wizard_files": [
+    "app/src/main/java/com/lias/remote/ui/screens/rules/PolicyWizardSheet.kt"
+  ]
+}
