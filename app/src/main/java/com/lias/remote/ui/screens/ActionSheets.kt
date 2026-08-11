@@ -1,6 +1,6 @@
 // ====================================================================
 // File: app/src/main/java/com/lias/remote/ui/screens/ActionSheets.kt
-// Version: 34.4.1
+// Version: 35.3.0
 //
 // Purpose:
 //   Shared non-device-specific modal actions.
@@ -44,6 +44,7 @@ import com.lias.remote.core.models.SecurityAlertPayload
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigSheetHeader
@@ -69,6 +70,8 @@ fun OnboardingSheet(
     onComplete: () -> Unit
 ) {
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss = onComplete,
         accessibilityLabel = "Welcome to LIAS"
     ) {
@@ -191,6 +194,8 @@ fun SecurityAlertSheet(
     onTrust: () -> Unit
 ) {
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss = onDismiss,
         accessibilityLabel = "Security Alert"
     ) {
@@ -356,7 +361,7 @@ fun GlobalSwitchSheet(
                 text =
                     "Global Access",
                 style =
-                    HigTypography.headline,
+                    HigTypography.title3,
                 fontWeight =
                     FontWeight.SemiBold
             )
@@ -366,7 +371,9 @@ fun GlobalSwitchSheet(
                 text =
                     "Controls every non-infrastructure device on this LIAS server.",
                 style =
-                    HigTypography.subheadline
+                    HigTypography.body,
+                fontWeight =
+                    FontWeight.Medium
             )
         },
         content = {

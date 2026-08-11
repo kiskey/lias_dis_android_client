@@ -34,6 +34,16 @@ checks = {
         "PresentationDetent.Medium" in h
         and "PresentationDetent.Large" in h,
 
+    "adaptive_sheet_profiles":
+        "enum class HigSheetPresentation" in h
+        and "HigSheetPresentation.Compact" in h
+        and "HigSheetPresentation.Picker" in h
+        and "HigSheetPresentation.Editor" in h,
+
+    "picker_fraction_detent":
+        "PresentationDetent.Fraction(" in h
+        and "0.62f" in h,
+
     "full_height_anchor_surface":
         "Modifier.fillMaxSize()" in h,
 
@@ -97,14 +107,14 @@ checks = {
     "global_action_sheet_retained":
         "CupertinoActionSheet(" in actions,
 
-    "global_title_headline":
+    "global_title_title3":
         '"Global Access",' in actions
-        and "HigTypography.headline" in actions,
+        and "HigTypography.title3" in actions,
 
-    "global_message_subheadline":
+    "global_message_body":
         '"Controls every non-infrastructure device on this LIAS server.",'
         in actions
-        and "HigTypography.subheadline" in actions,
+        and "HigTypography.body" in actions,
 
     "global_actions_retained":
         '"Save"' in actions

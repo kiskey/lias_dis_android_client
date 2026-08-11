@@ -37,6 +37,7 @@ import com.lias.remote.ui.components.GroupedListCard
 import com.lias.remote.ui.components.GroupedListRow
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
@@ -63,6 +64,8 @@ fun UserAssignmentSheet(
         }
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Compact,
         onDismiss = onDismiss
     ) {
         val animatedComplete =

@@ -38,6 +38,7 @@ import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigLargeTitleScaffold
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.HigTextButton
 import com.lias.remote.ui.components.ListSectionHeader
@@ -402,6 +403,8 @@ private fun IdentityCandidateSheet(
     val profiles = state.identityReview.profiles
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss = onDismiss,
         accessibilityLabel = "Identity candidate details"
     ) {

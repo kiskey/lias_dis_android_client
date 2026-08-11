@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.rememberHigAnimatedCompletion
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.theme.HigTypography
@@ -46,6 +47,8 @@ fun PauseSheet(
 ) {
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss =
             onDismiss,
         accessibilityLabel =

@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 33.6.0
+// Version: 35.1.0
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -37,6 +37,11 @@
 //     viewport match Medium/Large so bottom actions remain above nav bars.
 //   - Adds a full-window Dialog constraint portal for nested picker sheets.
 //   - HigModalSheet remains the sole owner of Cupertino sheet lifecycle.
+//
+// Plan 3.5 Batch 001:
+//   - Adds Compact / Picker / Editor semantic presentation profiles.
+//   - Compact = Medium+Large, Picker = 62%+Large, Editor = Large.
+//   - Screens remain isolated from raw Slanoss detent configuration.
 // ====================================================================
 
 package com.lias.remote.ui.components
@@ -122,6 +127,56 @@ fun rememberHigAnimatedCompletion(
             fallbackDismiss()
         }
 
+enum class HigSheetPresentation {
+    Compact,
+    Picker,
+    Editor
+}
+
+private const val HIG_PICKER_VIEWPORT_FRACTION =
+    0.62f
+
+private fun HigSheetPresentation.detents():
+    Set<PresentationDetent> =
+    when (
+        this
+    ) {
+        HigSheetPresentation.Compact ->
+            setOf(
+                PresentationDetent.Medium,
+                PresentationDetent.Large
+            )
+
+        HigSheetPresentation.Picker ->
+            setOf(
+                PresentationDetent.Fraction(
+                    HIG_PICKER_VIEWPORT_FRACTION
+                ),
+                PresentationDetent.Large
+            )
+
+        HigSheetPresentation.Editor ->
+            setOf(
+                PresentationDetent.Large
+            )
+    }
+
+private val HigSheetPresentation.partialViewportFraction:
+    Float
+    get() =
+        when (
+            this
+        ) {
+            HigSheetPresentation.Compact ->
+                0.5f
+
+            HigSheetPresentation.Picker ->
+                HIG_PICKER_VIEWPORT_FRACTION
+
+            HigSheetPresentation.Editor ->
+                1.0f
+        }
+
 /*
  * Full-window presentation boundary for a sheet launched from inside
  * another scrollable sheet. Dialog owns only the window/constraints;
@@ -133,6 +188,9 @@ fun HigModalSheetPortal(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     accessibilityLabel: String? = null,
+    presentation:
+        HigSheetPresentation =
+        HigSheetPresentation.Compact,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(
@@ -165,6 +223,8 @@ fun HigModalSheetPortal(
                     modifier,
                 accessibilityLabel =
                     accessibilityLabel,
+                presentation =
+                    presentation,
                 content =
                     content
             )
@@ -178,6 +238,9 @@ fun HigModalSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     accessibilityLabel: String? = null,
+    presentation:
+        HigSheetPresentation =
+        HigSheetPresentation.Compact,
     content: @Composable ColumnScope.() -> Unit
 ) {
     // Plan 3.3 CupertinoSheetState adapter:
@@ -207,10 +270,7 @@ fun HigModalSheet(
             presentationStyle =
                 PresentationStyle.Modal(
                     detents =
-                        setOf(
-                            PresentationDetent.Medium,
-                            PresentationDetent.Large
-                        ),
+                        presentation.detents(),
                     dismissOnClickOutside =
                         true
                 )
@@ -369,7 +429,8 @@ fun HigModalSheet(
                         ) {
                             1.0f
                         } else {
-                            0.5f
+                            presentation
+                                .partialViewportFraction
                         }
 
                     Column(

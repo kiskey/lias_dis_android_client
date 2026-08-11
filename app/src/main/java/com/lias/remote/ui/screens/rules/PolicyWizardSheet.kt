@@ -60,6 +60,7 @@ import com.lias.remote.ui.components.HigButton
 import com.lias.remote.ui.components.HigButtonStyle
 import com.lias.remote.ui.components.HigConfiguredField
 import com.lias.remote.ui.components.HigModalSheet
+import com.lias.remote.ui.components.HigSheetPresentation
 import com.lias.remote.ui.components.rememberHigAnimatedDismiss
 import com.lias.remote.ui.components.HigSheetHeader
 import com.lias.remote.ui.components.SegmentedControl
@@ -408,6 +409,8 @@ fun PolicyWizardSheet(
     }
 
     HigModalSheet(
+        presentation =
+            HigSheetPresentation.Editor,
         onDismiss =
             onDismiss
     ) {
