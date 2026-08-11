@@ -1,7 +1,7 @@
 // ====================================================================
 // File:
 // app/src/main/java/com/lias/remote/ui/components/HigSheets.kt
-// Version: 35.5.1
+// Version: 35.5.2
 //
 // Purpose:
 //   Shared HIG-style modal sheet infrastructure.
@@ -218,6 +218,9 @@ fun HigModalSheetPortal(
     presentation:
         HigSheetPresentation =
         HigSheetPresentation.Compact,
+    contentInteraction:
+        HigSheetContentInteraction =
+        HigSheetContentInteraction.ResizeSheet,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(
@@ -252,6 +255,8 @@ fun HigModalSheetPortal(
                     accessibilityLabel,
                 presentation =
                     presentation,
+                contentInteraction =
+                    contentInteraction,
                 content =
                     content
             )
